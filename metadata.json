@@ -1,6 +1,6 @@
 {
   "name": "BooksCircle",
-  "description": "Native-feel digital PDF ebooks marketplace for competitive exams and preparation with real-time Firebase sync.",
+  "description": "Native-feel digital PDF ebooks marketplace for competitive exams with secure Razorpay payment gateway integration.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

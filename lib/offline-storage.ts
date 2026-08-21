@@ -94,6 +94,29 @@ export async function getPdfOffline(bookId: string): Promise<ArrayBuffer | null>
   }
 }
 
+export async function isPdfOfflineAvailable(bookId: string): Promise<boolean> {
+  if (typeof window === 'undefined') return false;
+  try {
+    const db = await getDb();
+    const item = await db.get('offlinePdfs', bookId);
+    return !!item && !!item.data;
+  } catch {
+    return false;
+  }
+}
+
+export async function getAllOfflineBookIds(): Promise<string[]> {
+  if (typeof window === 'undefined') return [];
+  try {
+    const db = await getDb();
+    const keys = await db.getAllKeys('offlinePdfs');
+    return keys.map((k) => String(k));
+  } catch (e) {
+    console.warn('Failed to get offline book keys:', e);
+    return [];
+  }
+}
+
 export async function savePdfOffline(bookId: string, data: ArrayBuffer): Promise<void> {
   if (typeof window === 'undefined') return;
   try {
@@ -105,5 +128,46 @@ export async function savePdfOffline(bookId: string, data: ArrayBuffer): Promise
     });
   } catch (e) {
     console.warn('Failed to store offline PDF:', e);
+  }
+}
+
+export async function deleteOfflinePdf(bookId: string): Promise<void> {
+  if (typeof window === 'undefined') return;
+  try {
+    const db = await getDb();
+    await db.delete('offlinePdfs', bookId);
+  } catch (e) {
+    console.warn('Failed to delete offline PDF:', e);
+  }
+}
+
+export async function getOfflineStorageStats(): Promise<{ count: number; totalBytes: number }> {
+  if (typeof window === 'undefined') return { count: 0, totalBytes: 0 };
+  try {
+    const db = await getDb();
+    const allPdfs = await db.getAll('offlinePdfs');
+    let totalBytes = 0;
+    allPdfs.forEach((item) => {
+      if (item.data) {
+        totalBytes += item.data.byteLength;
+      }
+    });
+    return {
+      count: allPdfs.length,
+      totalBytes,
+    };
+  } catch (e) {
+    console.warn('Failed to get offline stats:', e);
+    return { count: 0, totalBytes: 0 };
+  }
+}
+
+export async function clearAllOfflinePdfs(): Promise<void> {
+  if (typeof window === 'undefined') return;
+  try {
+    const db = await getDb();
+    await db.clear('offlinePdfs');
+  } catch (e) {
+    console.warn('Failed to clear offline storage:', e);
   }
 }

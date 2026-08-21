@@ -19,10 +19,11 @@ import {
 } from 'lucide-react';
 import { createEngine, PdfEngine, PdfDocument } from 'clawpdf/browser';
 import { Book } from '@/lib/types';
+import { getPdfOffline } from '@/lib/offline-storage';
 
 interface PDFReaderModalProps {
   book: Book;
-  mode: 'sample' | 'full';
+  mode: 'sample' | 'full' | 'offline';
   onClose: () => void;
   onBuyNow?: (book: Book) => void;
   isPurchased?: boolean;
@@ -321,31 +322,39 @@ export const PDFReaderModal: React.FC<PDFReaderModalProps> = ({
     let active = true;
 
     async function loadPdfDocument() {
-      if (!targetPdfUrl) {
-        if (active) {
-          setErrorMessage('No PDF file or sample link provided for this book.');
-          setIsLoading(false);
-        }
-        return;
-      }
-
       setIsLoading(true);
       setErrorMessage(null);
 
       try {
         let arrayBuffer: ArrayBuffer;
 
-        // Try direct fetch first
-        try {
-          const response = await fetch(targetPdfUrl, { mode: 'cors' });
-          if (!response.ok) throw new Error(`HTTP ${response.status}`);
-          arrayBuffer = await response.arrayBuffer();
-        } catch {
-          // If direct fetch fails (CORS or network), use server proxy route
-          const proxyUrl = `/api/pdf?url=${encodeURIComponent(targetPdfUrl)}`;
-          const proxyRes = await fetch(proxyUrl);
-          if (!proxyRes.ok) throw new Error(`Proxy error ${proxyRes.status}`);
-          arrayBuffer = await proxyRes.arrayBuffer();
+        if (mode === 'offline') {
+          const offlineData = await getPdfOffline(book.id);
+          if (!offlineData) {
+            throw new Error('Offline PDF file not found in device storage. Please download it while connected to internet.');
+          }
+          arrayBuffer = offlineData;
+        } else {
+          if (!targetPdfUrl) {
+            if (active) {
+              setErrorMessage('No PDF file or sample link provided for this book.');
+              setIsLoading(false);
+            }
+            return;
+          }
+
+          // Try direct fetch first
+          try {
+            const response = await fetch(targetPdfUrl, { mode: 'cors' });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            arrayBuffer = await response.arrayBuffer();
+          } catch {
+            // If direct fetch fails (CORS or network), use server proxy route
+            const proxyUrl = `/api/pdf?url=${encodeURIComponent(targetPdfUrl)}`;
+            const proxyRes = await fetch(proxyUrl);
+            if (!proxyRes.ok) throw new Error(`Proxy error ${proxyRes.status}`);
+            arrayBuffer = await proxyRes.arrayBuffer();
+          }
         }
 
         if (!active) return;
@@ -392,7 +401,7 @@ export const PDFReaderModal: React.FC<PDFReaderModalProps> = ({
       if (pdfDocRef.current) pdfDocRef.current[Symbol.dispose]();
       if (engineRef.current) engineRef.current.destroy();
     };
-  }, [targetPdfUrl, setupPages]);
+  }, [targetPdfUrl, setupPages, book.id, mode]);
 
   // Touch and Trackpad Pinch-to-zoom
   useEffect(() => {
@@ -636,6 +645,68 @@ export const PDFReaderModal: React.FC<PDFReaderModalProps> = ({
             title="Back to book details"
           >
             <ArrowLeft className="w-4 h-4" />
+          </button>
+          <div className="min-w-0 flex flex-col">
+            <h2 className="text-xs sm:text-sm font-bold text-slate-900 truncate max-w-[180px] sm:max-w-md">
+              {book.title}
+            </h2>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-slate-500 font-medium">
+                {book.author || 'BooksCircle Edition'}
+              </span>
+              {mode === 'offline' && (
+                <span className="text-[9px] font-bold bg-emerald-50 text-emerald-700 px-1.5 py-0.2 rounded border border-emerald-200">
+                  Offline Mode
+                </span>
+              )}
+              {mode === 'sample' && (
+                <span className="text-[9px] font-bold bg-amber-50 text-amber-700 px-1.5 py-0.2 rounded border border-amber-200">
+                  Sample Preview
+                </span>
+              )}
+              {mode === 'full' && (
+                <span className="text-[9px] font-bold bg-[#4029AB]/10 text-[#4029AB] px-1.5 py-0.2 rounded border border-[#4029AB]/20">
+                  Online Reader
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1 sm:gap-2">
+          {/* Zoom controls */}
+          <button
+            onClick={handleZoomOut}
+            className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-600 cursor-pointer active:scale-95 transition-all"
+            title="Zoom out"
+          >
+            <ZoomOut className="w-4 h-4" />
+          </button>
+          <span className="text-[11px] font-bold text-slate-600 min-w-[36px] text-center hidden sm:inline">
+            {Math.round(scale * 100)}%
+          </span>
+          <button
+            onClick={handleZoomIn}
+            className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-600 cursor-pointer active:scale-95 transition-all"
+            title="Zoom in"
+          >
+            <ZoomIn className="w-4 h-4" />
+          </button>
+          <button
+            onClick={handleToggleFitWidth}
+            className={`px-2 py-1 text-[11px] font-bold rounded-lg transition-all cursor-pointer ${
+              fitToWidth ? 'bg-[#4029AB]/10 text-[#4029AB]' : 'text-slate-600 hover:bg-slate-100'
+            }`}
+            title="Toggle Fit Width"
+          >
+            Fit
+          </button>
+          <button
+            onClick={toggleFullscreen}
+            className="w-8 h-8 rounded-lg hover:bg-slate-100 hidden sm:flex items-center justify-center text-slate-600 cursor-pointer active:scale-95"
+            title={isFullscreen ? 'Exit full screen' : 'Full screen'}
+          >
+            {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
           </button>
         </div>
       </header>

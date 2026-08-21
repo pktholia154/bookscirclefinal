@@ -2,10 +2,11 @@
 
 import React, { useState } from 'react';
 import Image from 'next/image';
-import { X, Trash2, Plus, Minus, ArrowRight, CheckCircle2, Shield, Lock } from 'lucide-react';
+import { X, Trash2, Plus, Minus, ArrowRight, CheckCircle2, Shield, Lock, AlertCircle, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { CartItem } from '@/lib/types';
 import { DEFAULT_BOOK_COVER } from '@/lib/data';
+import { processRazorpayPayment } from '@/lib/services/razorpay';
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -100,6 +101,8 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 }) => {
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState(false);
+  const [lastPaymentId, setLastPaymentId] = useState<string | null>(null);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
   const subtotal = items.reduce((acc, item) => acc + item.book.buy_price * item.quantity, 0);
   const totalListPrice = items.reduce(
@@ -108,21 +111,48 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   );
   const savings = Math.max(0, totalListPrice - subtotal);
 
-  const handleCheckout = () => {
+  const handleCheckout = async () => {
+    if (items.length === 0) return;
     setIsCheckingOut(true);
+    setCheckoutError(null);
+
     const checkoutItems = [...items];
-    setTimeout(() => {
+    const bookIds = checkoutItems.map((i) => i.book.id);
+    const bookTitles = checkoutItems.map((i) => i.book.title);
+
+    try {
+      await processRazorpayPayment({
+        amountInRupees: subtotal,
+        bookIds,
+        bookTitles,
+        userName: 'Pardeep Kumar',
+        userEmail: 'pardeep1984@gmail.com',
+        onSuccess: (paymentData) => {
+          setIsCheckingOut(false);
+          setLastPaymentId(paymentData.payment_id);
+          setOrderSuccess(true);
+          if (onSuccessfulCheckout) {
+            onSuccessfulCheckout(checkoutItems);
+          }
+          setTimeout(() => {
+            setOrderSuccess(false);
+            onClearCart();
+            onClose();
+          }, 3000);
+        },
+        onError: (err) => {
+          setIsCheckingOut(false);
+          setCheckoutError(err);
+        },
+        onDismiss: () => {
+          setIsCheckingOut(false);
+        },
+      });
+    } catch (err: any) {
+      console.error('Checkout error:', err);
       setIsCheckingOut(false);
-      setOrderSuccess(true);
-      if (onSuccessfulCheckout) {
-        onSuccessfulCheckout(checkoutItems);
-      }
-      setTimeout(() => {
-        setOrderSuccess(false);
-        onClearCart();
-        onClose();
-      }, 2500);
-    }, 1200);
+      setCheckoutError(err?.message || 'Payment could not be initiated.');
+    }
   };
 
   if (!isOpen) return null;
@@ -174,13 +204,18 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                 <CheckCircle2 className="w-10 h-10" />
               </motion.div>
               <h3 className="text-xl font-bold text-gray-950 mb-1">
-                Order Successful!
+                Payment Verified & Order Successful!
               </h3>
-              <p className="text-sm text-gray-600 max-w-xs mb-4">
-                Your PDF ebooks are ready for instant download and linked to your BooksCircle account.
+              <p className="text-sm text-gray-600 max-w-xs mb-3">
+                Your PDF ebooks have been unlocked and added to your permanent library.
               </p>
+              {lastPaymentId && (
+                <div className="px-3 py-1.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg text-xs font-mono mb-3">
+                  Razorpay ID: {lastPaymentId}
+                </div>
+              )}
               <div className="p-3 bg-gray-50 rounded-xl text-xs text-gray-500 w-full border border-gray-100">
-                Receipt & Direct PDF links sent to your registered email.
+                Receipt & direct PDF access link sent to pardeep1984@gmail.com
               </div>
             </div>
           ) : items.length === 0 ? (
@@ -217,6 +252,16 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 
               {/* Price summary & Checkout footer */}
               <div className="p-4 border-t border-gray-100 bg-gray-50 space-y-3">
+                {checkoutError && (
+                  <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-red-500 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="font-bold">Payment Error</p>
+                      <p className="text-[11px] text-red-600 mt-0.5">{checkoutError}</p>
+                    </div>
+                  </div>
+                )}
+
                 <div className="space-y-1.5 text-xs text-gray-600">
                   <div className="flex justify-between">
                     <span>Subtotal</span>
@@ -242,25 +287,30 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                   id="checkout-btn"
                   onClick={handleCheckout}
                   disabled={isCheckingOut}
-                  className="w-full py-3.5 px-4 rounded-xl font-bold text-sm bg-[#4029AB] text-white hover:bg-[#2E1B85] active:scale-98 shadow-md transition-all flex items-center justify-center gap-2"
+                  className="w-full py-3.5 px-4 rounded-xl font-bold text-sm bg-[#4029AB] text-white hover:bg-[#2E1B85] active:scale-98 shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70"
                 >
                   {isCheckingOut ? (
-                    <span>Processing Secure Checkout...</span>
+                    <span className="flex items-center gap-2">
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>Opening Razorpay Secure Checkout...</span>
+                    </span>
                   ) : (
                     <>
                       <Lock className="w-4 h-4" />
-                      <span>Proceed to Instant Checkout (₹{subtotal})</span>
+                      <span>Pay ₹{subtotal} with Razorpay</span>
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}
                 </button>
 
-                <p className="text-[10px] text-gray-400 text-center flex items-center justify-center gap-1">
-                  <Lock className="w-3 h-3" /> 256-Bit SSL Encrypted Instant Payment Gateway
+                <p className="text-[10px] text-gray-400 text-center flex items-center justify-center gap-1.5">
+                  <Lock className="w-3 h-3 text-emerald-600" />
+                  <span>Secured by Razorpay • UPI, Cards & NetBanking</span>
                 </p>
               </div>
             </>
           )}
+
         </motion.div>
       </div>
     </AnimatePresence>

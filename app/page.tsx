@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useTransition } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useTransition } from 'react';
 import Image from 'next/image';
 import { Header } from '@/components/Header';
 import { CategoryChips } from '@/components/CategoryChips';
@@ -10,11 +10,15 @@ import { BookDetailPage } from '@/components/BookDetailPage';
 import { CartDrawer } from '@/components/CartDrawer';
 import { SeedStatusModal } from '@/components/SeedStatusModal';
 import { BottomNav, TabKey } from '@/components/BottomNav';
+import { PurchasedView } from '@/components/PurchasedView';
+import { CategoriesView } from '@/components/CategoriesView';
+import { ProfileView } from '@/components/ProfileView';
 import { Book, Category, CartItem } from '@/lib/types';
 import { DEFAULT_BOOK_COVER } from '@/lib/data';
 import { getBooksFromFirestore, getCategoriesFromFirestore } from '@/lib/services/books';
 import { getPurchasedBookIdsFromLocal, savePurchasedBookIds } from '@/lib/offline-storage';
-import { Check, ShoppingBag, Database, RefreshCw, ShieldCheck, BookOpen, Eye } from 'lucide-react';
+import { processRazorpayPayment } from '@/lib/services/razorpay';
+import { Check, ShoppingBag, Database, RefreshCw, BookOpen, AlertCircle, Lock } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function HomePage() {
@@ -33,9 +37,7 @@ export default function HomePage() {
       try {
         const saved = localStorage.getItem('bookscircle_cart');
         if (saved) return JSON.parse(saved);
-      } catch (e) {
-        console.warn('LocalStorage cart load failed:', e);
-      }
+      } catch {}
     }
     return [];
   });
@@ -44,18 +46,12 @@ export default function HomePage() {
   const [isSeedModalOpen, setIsSeedModalOpen] = useState<boolean>(false);
   const [isFirebaseSynced, setIsFirebaseSynced] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isCartTabCheckingOut, setIsCartTabCheckingOut] = useState<boolean>(false);
   const [, startTransition] = useTransition();
-
-  // Handle successful checkout
-  const handleSuccessfulCheckout = (purchasedItems: CartItem[]) => {
-    const newPurchasedIds = purchasedItems.map((item) => item.book.id);
-    savePurchasedBookIds(newPurchasedIds);
-    setPurchasedBookIds((prev) => Array.from(new Set([...prev, ...newPurchasedIds])));
-    setToastMessage(`Purchase successful! ${purchasedItems.length} eBook(s) unlocked for reading.`);
-  };
 
   // Save cart to localStorage
   useEffect(() => {
+    if (typeof window === 'undefined') return;
     try {
       localStorage.setItem('bookscircle_cart', JSON.stringify(cart));
     } catch (e) {
@@ -63,8 +59,8 @@ export default function HomePage() {
     }
   }, [cart]);
 
-  // Fetch live books & categories from Firestore db 'bookscircle'
-  const loadData = async (showLoadingSpinner = false) => {
+  // Fetch live books & categories from Firestore
+  const loadData = useCallback(async (showLoadingSpinner = false) => {
     if (showLoadingSpinner) {
       setIsRefreshing(true);
     }
@@ -74,27 +70,12 @@ export default function HomePage() {
         getCategoriesFromFirestore(),
       ]);
 
-      setBooks(fetchedBooks || []);
-      if (fetchedBooks && fetchedBooks.length > 0) {
+      if (fetchedBooks.length > 0) {
+        setBooks(fetchedBooks);
         setIsFirebaseSynced(true);
       }
-
-      // If explicit categories collection exists, use it; otherwise derive categories from books
-      if (fetchedCats && fetchedCats.length > 0) {
+      if (fetchedCats.length > 0) {
         setCategories(fetchedCats);
-      } else if (fetchedBooks && fetchedBooks.length > 0) {
-        const uniqueCatNames = Array.from(
-          new Set(fetchedBooks.map((b) => b.category).filter(Boolean))
-        );
-        const derived: Category[] = uniqueCatNames.map((c) => ({
-          id: `cat-${c.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
-          title: c,
-          seolsug: c.toLowerCase().replace(/[^a-z0-9]/g, '-'),
-          seo_description: `${c} study materials and books`,
-        }));
-        setCategories(derived);
-      } else {
-        setCategories([]);
       }
     } catch (err) {
       console.error('Failed to load Firestore data:', err);
@@ -102,86 +83,52 @@ export default function HomePage() {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
-    (async () => {
+    async function init() {
       try {
         const [fetchedBooks, fetchedCats] = await Promise.all([
           getBooksFromFirestore(),
           getCategoriesFromFirestore(),
         ]);
         if (!isMounted) return;
-
-        setBooks(fetchedBooks || []);
-        if (fetchedBooks && fetchedBooks.length > 0) {
+        if (fetchedBooks.length > 0) {
+          setBooks(fetchedBooks);
           setIsFirebaseSynced(true);
         }
-
-        if (fetchedCats && fetchedCats.length > 0) {
+        if (fetchedCats.length > 0) {
           setCategories(fetchedCats);
-        } else if (fetchedBooks && fetchedBooks.length > 0) {
-          const uniqueCatNames = Array.from(
-            new Set(fetchedBooks.map((b) => b.category).filter(Boolean))
-          );
-          const derived: Category[] = uniqueCatNames.map((c) => ({
-            id: `cat-${c.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
-            title: c,
-            seolsug: c.toLowerCase().replace(/[^a-z0-9]/g, '-'),
-            seo_description: `${c} study materials and books`,
-          }));
-          setCategories(derived);
-        } else {
-          setCategories([]);
         }
       } catch (err) {
-        console.error('Failed to load Firestore data on mount:', err);
+        console.error('Failed to load Firestore data:', err);
       } finally {
         if (isMounted) {
           setIsLoading(false);
         }
       }
-    })();
-
+    }
+    init();
     return () => {
       isMounted = false;
     };
   }, []);
 
-  // Show quick toast notification
-  const triggerToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => {
-      setToastMessage(null);
-    }, 2200);
-  };
-
   // Cart operations
-  const cartBookIds = useMemo(() => {
-    return new Set(cart.map((item) => item.book.id));
-  }, [cart]);
-
-  const totalCartCount = useMemo(() => {
-    return cart.reduce((total, item) => total + item.quantity, 0);
-  }, [cart]);
-
   const handleAddToCart = (book: Book, e?: React.MouseEvent) => {
-    if (e) {
-      e.stopPropagation();
-    }
-    setCart((prev) => {
-      const existing = prev.find((item) => item.book.id === book.id);
+    if (e) e.stopPropagation();
+    setCart((prevCart) => {
+      const existing = prevCart.find((item) => item.book.id === book.id);
       if (existing) {
-        return prev.map((item) =>
-          item.book.id === book.id
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
+        return prevCart.map((item) =>
+          item.book.id === book.id ? { ...item, quantity: item.quantity + 1 } : item
         );
       }
-      return [...prev, { book, quantity: 1 }];
+      return [...prevCart, { book, quantity: 1 }];
     });
-    triggerToast(`Added "${book.title.slice(0, 22)}..." to cart`);
+    setToastMessage(`Added "${book.title.slice(0, 20)}..." to Cart`);
+    setTimeout(() => setToastMessage(null), 2500);
   };
 
   const handleUpdateQuantity = (bookId: string, quantity: number) => {
@@ -190,9 +137,7 @@ export default function HomePage() {
       return;
     }
     setCart((prev) =>
-      prev.map((item) =>
-        item.book.id === bookId ? { ...item, quantity } : item
-      )
+      prev.map((item) => (item.book.id === bookId ? { ...item, quantity } : item))
     );
   };
 
@@ -204,24 +149,56 @@ export default function HomePage() {
     setCart([]);
   };
 
-  // Filtered books based on Search Query and Category
+  const handleSuccessfulCheckout = (purchasedItems: CartItem[]) => {
+    const newPurchasedIds = purchasedItems.map((item) => item.book.id);
+    savePurchasedBookIds(newPurchasedIds);
+    setPurchasedBookIds((prev) => Array.from(new Set([...prev, ...newPurchasedIds])));
+    setToastMessage(`Purchase successful! ${purchasedItems.length} eBook(s) unlocked for reading.`);
+    startTransition(() => {
+      setActiveTab('purchased');
+      setIsCartOpen(false);
+    });
+  };
+
+  const handleBuyNow = (book: Book) => {
+    handleAddToCart(book);
+    setIsCartOpen(true);
+  };
+
+  // Demo unlock book for testing
+  const handleUnlockDemoBook = (bookId: string) => {
+    savePurchasedBookIds([bookId]);
+    setPurchasedBookIds((prev) => Array.from(new Set([...prev, bookId])));
+  };
+
+  // Compute cart counts & set for fast lookup
+  const totalCartCount = useMemo(() => {
+    return cart.reduce((acc, item) => acc + item.quantity, 0);
+  }, [cart]);
+
+  const cartBookIds = useMemo(() => {
+    return new Set(cart.map((item) => item.book.id));
+  }, [cart]);
+
+  // Filter books based on search & active category for Home Page
   const filteredBooks = useMemo(() => {
     let result = books;
 
+    // Filter by category
     if (selectedCategory !== 'all') {
       result = result.filter(
         (b) => b.category.toLowerCase() === selectedCategory.toLowerCase()
       );
     }
 
+    // Filter by search query
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       result = result.filter(
         (b) =>
           b.title.toLowerCase().includes(q) ||
           b.category.toLowerCase().includes(q) ||
-          (b.tags && b.tags.some((t) => t.toLowerCase().includes(q))) ||
-          b.full_description?.toLowerCase().includes(q) ||
+          (b.topics && b.topics.some((t) => t.toLowerCase().includes(q))) ||
           b.author?.toLowerCase().includes(q)
       );
     }
@@ -229,88 +206,56 @@ export default function HomePage() {
     return result;
   }, [books, selectedCategory, searchQuery]);
 
-  // Dynamic Carousel Sections based on loaded categories
-  const firstCategoryName = useMemo(() => {
-    if (categories.length > 0) return categories[0].title;
-    if (books.length > 0) return books[0].category;
-    return 'Featured';
-  }, [categories, books]);
+  // Curated collections for Horizontal Carousel Sections
+  const featuredTrendingBooks = useMemo(() => {
+    return books.filter((b) => (b.rating && b.rating >= 4.6) || (b.tags && b.tags.includes('featured')));
+  }, [books]);
 
-  const secondCategoryName = useMemo(() => {
-    if (categories.length > 1) return categories[1].title;
-    if (books.length > 1) {
-      const diff = books.find((b) => b.category !== firstCategoryName);
-      if (diff) return diff.category;
-    }
-    return 'Newly Arrived';
-  }, [categories, books, firstCategoryName]);
+  const newReleasesBooks = useMemo(() => {
+    return books.filter((b) => (b.rating && b.rating >= 4.7) || (b.tags && b.tags.includes('bestseller')));
+  }, [books]);
 
-  // Section 1 books
   const category1Books = useMemo(() => {
-    if (selectedCategory !== 'all' || searchQuery.trim()) {
-      return filteredBooks.slice(0, 6);
-    }
-    const inFirstCat = books.filter(
-      (b) => b.category.toLowerCase() === firstCategoryName.toLowerCase()
-    );
-    return inFirstCat.length > 0 ? inFirstCat : books.slice(0, 6);
-  }, [books, filteredBooks, selectedCategory, searchQuery, firstCategoryName]);
+    const catName = categories[0]?.title || 'UPSC Civil Services';
+    return books.filter((b) => b.category.toLowerCase() === catName.toLowerCase());
+  }, [books, categories]);
 
-  // Section 2 books
   const category2Books = useMemo(() => {
-    if (selectedCategory !== 'all' || searchQuery.trim()) {
-      return filteredBooks.slice(2, 8);
-    }
-    const inSecondCat = books.filter(
-      (b) => b.category.toLowerCase() === secondCategoryName.toLowerCase()
-    );
-    return inSecondCat.length > 0 ? inSecondCat : books.slice(3, 9);
-  }, [books, filteredBooks, selectedCategory, searchQuery, secondCategoryName]);
+    const catName = categories[1]?.title || 'SSC & Govt Exams';
+    return books.filter((b) => b.category.toLowerCase() === catName.toLowerCase());
+  }, [books, categories]);
 
-  // Section 3 books (Standard List View)
-  const listViewBooks = useMemo(() => {
-    if (searchQuery.trim() || selectedCategory !== 'all') {
-      return filteredBooks;
-    }
-    return books;
-  }, [books, filteredBooks, searchQuery, selectedCategory]);
+  // Switch tab with smooth scroll
+  const handleTabChange = (tab: TabKey) => {
+    startTransition(() => {
+      setActiveTab(tab);
+      if (tab === 'cart') {
+        setIsCartOpen(true);
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  };
 
-  // Related books for dedicated details page
-  const relatedBooks = useMemo(() => {
-    if (!selectedBook) return [];
-    const inSameCat = books.filter(
-      (b) =>
-        b.id !== selectedBook.id &&
-        b.category.toLowerCase() === selectedBook.category.toLowerCase()
-    );
-    if (inSameCat.length > 0) return inSameCat;
-    return books.filter((b) => b.id !== selectedBook.id).slice(0, 5);
-  }, [books, selectedBook]);
-
-  // When a book is selected, show the BookDetailPage
+  // If a book detail page is open, render that view
   if (selectedBook) {
-    const isBookPurchased = purchasedBookIds.includes(selectedBook.id);
-
     return (
-      <div className="min-h-screen bg-white">
+      <div className="min-h-screen bg-white text-gray-900 pb-20">
+        <Header
+          cartCount={totalCartCount}
+          onOpenCart={() => setIsCartOpen(true)}
+          searchQuery={searchQuery}
+          onSearchChange={(q) => setSearchQuery(q)}
+          onOpenSeedModal={() => setIsSeedModalOpen(true)}
+          isFirebaseSynced={isFirebaseSynced}
+        />
         <BookDetailPage
           book={selectedBook}
           onBack={() => setSelectedBook(null)}
-          onAddToCart={(b) => handleAddToCart(b)}
-          onBuyNow={(b) => {
-            handleAddToCart(b);
-            setIsCartOpen(true);
-          }}
+          onAddToCart={handleAddToCart}
+          onBuyNow={handleBuyNow}
           isInCart={cartBookIds.has(selectedBook.id)}
-          isPurchased={isBookPurchased}
-          relatedBooks={relatedBooks}
-          onSelectRelatedBook={(b) => {
-            setSelectedBook(b);
-            window.scrollTo({ top: 0, behavior: 'instant' });
-          }}
+          isPurchased={purchasedBookIds.includes(selectedBook.id)}
         />
-
-        {/* Slide-over Shopping Cart Drawer */}
         <CartDrawer
           isOpen={isCartOpen}
           onClose={() => setIsCartOpen(false)}
@@ -320,167 +265,124 @@ export default function HomePage() {
           onClearCart={handleClearCart}
           onSuccessfulCheckout={handleSuccessfulCheckout}
         />
+        <BottomNav
+          activeTab={activeTab}
+          onTabChange={handleTabChange}
+          cartCount={totalCartCount}
+        />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-white text-gray-900 flex flex-col selection:bg-[#4029AB]/15 selection:text-[#4029AB]">
-      {/* 1. Professional Sticky Header */}
+    <div className="min-h-screen bg-white text-gray-900 pb-24 selection:bg-[#4029AB] selection:text-white">
+      {/* 1. Header with Search, Firebase status, and Cart */}
       <Header
         cartCount={totalCartCount}
         onOpenCart={() => setIsCartOpen(true)}
         searchQuery={searchQuery}
         onSearchChange={(q) => {
-          startTransition(() => {
-            setSearchQuery(q);
-          });
+          setSearchQuery(q);
+          if (activeTab !== 'home' && activeTab !== 'categories') {
+            setActiveTab('home');
+          }
         }}
         onOpenSeedModal={() => setIsSeedModalOpen(true)}
         isFirebaseSynced={isFirebaseSynced}
       />
 
-      {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto pb-24 sm:pb-28">
+      {/* 2. Main Content Views (Switched via BottomNav Tabs) */}
+      <main className="w-full">
+        {/* TAB 1: HOME PAGE */}
         {activeTab === 'home' && (
           <>
-            {/* Top Flexible Chips Buttons for Categories (loaded from Firebase db 'bookscircle') */}
-            {categories.length > 0 && (
-              <CategoryChips
-                categories={categories}
-                selectedCategory={selectedCategory}
-                onSelectCategory={(cat) => {
-                  startTransition(() => {
-                    setSelectedCategory(cat);
-                  });
-                }}
-              />
-            )}
+            {/* Flexible Category Chips */}
+            <CategoryChips
+              categories={categories}
+              selectedCategory={selectedCategory}
+              onSelectCategory={(cat) => setSelectedCategory(cat)}
+            />
 
-            {/* Filter Indicator */}
-            {(searchQuery || selectedCategory !== 'all') && (
-              <div className="px-6 py-2 flex items-center justify-between text-xs text-gray-600 bg-gray-50/80 mx-6 rounded-xl mb-2 border border-gray-100">
-                <span>
-                  Showing results for{' '}
-                  <strong className="text-gray-900">
-                    {selectedCategory !== 'all' ? selectedCategory : 'All Categories'}
-                  </strong>
-                  {searchQuery && (
-                    <>
-                      {' '}matching &quot;
-                      <strong className="text-gray-900">{searchQuery}</strong>&quot;
-                    </>
-                  )}
-                </span>
-                <button
-                  onClick={() => {
-                    setSelectedCategory('all');
-                    setSearchQuery('');
-                  }}
-                  className="text-[#4029AB] font-bold hover:underline cursor-pointer"
-                >
-                  Reset Filters
-                </button>
-              </div>
-            )}
-
-            {/* Loading State */}
             {isLoading ? (
-              <div className="py-16 px-6 text-center space-y-3">
-                <RefreshCw className="w-8 h-8 text-[#4029AB] animate-spin mx-auto" />
-                <p className="text-xs text-gray-500 font-semibold">
-                  Connecting to Firestore database &lsquo;bookscircle&rsquo;...
+              <div className="flex flex-col items-center justify-center py-20 gap-3">
+                <RefreshCw className="w-8 h-8 text-[#4029AB] animate-spin" />
+                <p className="text-xs font-bold text-gray-500">
+                  Loading curated exam e-books from BooksCircle...
                 </p>
               </div>
-            ) : books.length === 0 ? (
-              /* Clean Empty State when Firestore DB has no books yet */
-              <div className="py-16 px-6 text-center max-w-md mx-auto space-y-4">
-                <div className="w-14 h-14 rounded-2xl bg-[#4029AB]/10 text-[#4029AB] flex items-center justify-center mx-auto">
-                  <Database className="w-7 h-7" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-gray-900">
-                    No books in Firestore &lsquo;bookscircle&rsquo; database
-                  </h3>
-                  <p className="text-xs text-gray-500 mt-1 leading-relaxed">
-                    Demo data has been removed. The application is now reading exclusively from your Firebase Firestore database.
-                  </p>
-                </div>
-                <div className="flex items-center justify-center gap-2 pt-2">
-                  <button
-                    onClick={() => loadData(true)}
-                    disabled={isRefreshing}
-                    className="px-4 py-2 bg-[#4029AB] text-white rounded-xl text-xs font-bold hover:bg-[#34208e] transition-all flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-                    <span>{isRefreshing ? 'Checking...' : 'Refresh from Firebase'}</span>
-                  </button>
-                  <button
-                    onClick={() => setIsSeedModalOpen(true)}
-                    className="px-4 py-2 border border-gray-200 text-gray-700 rounded-xl text-xs font-semibold hover:bg-gray-50 transition-all cursor-pointer"
-                  >
-                    Database Info
-                  </button>
-                </div>
+            ) : searchQuery.trim() ? (
+              /* Search Results */
+              <div className="pt-2">
+                <BookListView
+                  title={`Search Results (${filteredBooks.length})`}
+                  books={filteredBooks}
+                  onSelectBook={(book) => setSelectedBook(book)}
+                  onAddToCart={handleAddToCart}
+                  cartBookIds={cartBookIds}
+                />
               </div>
-            ) : filteredBooks.length === 0 ? (
-              <div className="py-16 px-6 text-center">
-                <ShoppingBag className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                <h3 className="text-base font-bold text-gray-800">
-                  No matching PDF e-books found
-                </h3>
-                <p className="text-xs text-gray-500 mt-1 max-w-sm mx-auto">
-                  Try searching with another exam keyword or reset your filter.
-                </p>
+            ) : selectedCategory !== 'all' ? (
+              /* Category-Specific View */
+              <div className="pt-2">
+                <BookListView
+                  title={`${selectedCategory} Books (${filteredBooks.length})`}
+                  books={filteredBooks}
+                  onSelectBook={(book) => setSelectedBook(book)}
+                  onAddToCart={handleAddToCart}
+                  cartBookIds={cartBookIds}
+                />
               </div>
             ) : (
+              /* Default Full Home View with Peekaboo Carousel & Standard List */
               <>
-                {/* 1. Horizontal Carousel 1 with Peekaboo */}
+                {/* Horizontal Carousel 1: Trending & Top Rated */}
+                <CarouselSection
+                  title="Trending & Top Rated"
+                  sectionId="trending-books"
+                  books={featuredTrendingBooks.length > 0 ? featuredTrendingBooks : books.slice(0, 6)}
+                  onSelectBook={(book) => setSelectedBook(book)}
+                  onAddToCart={handleAddToCart}
+                  cartBookIds={cartBookIds}
+                />
+
+                {/* Horizontal Carousel 2: New Arrivals */}
+                <CarouselSection
+                  title="New Arrivals & Latest Editions"
+                  sectionId="new-arrivals"
+                  books={newReleasesBooks.length > 0 ? newReleasesBooks : books.slice(3, 9)}
+                  onSelectBook={(book) => setSelectedBook(book)}
+                  onAddToCart={handleAddToCart}
+                  cartBookIds={cartBookIds}
+                />
+
+                {/* Standard List View: Complete Catalog */}
+                <BookListView
+                  title="All Curated Study Materials & Guides"
+                  books={books}
+                  onSelectBook={(book) => setSelectedBook(book)}
+                  onAddToCart={handleAddToCart}
+                  cartBookIds={cartBookIds}
+                />
+
+                {/* Category Spotlight 1 */}
                 {category1Books.length > 0 && (
-                  <CarouselSection
-                    sectionId="category-1-carousel"
-                    title={
-                      selectedCategory !== 'all'
-                        ? `${selectedCategory} Essentials`
-                        : `${firstCategoryName} Essentials`
-                    }
+                  <BookListView
+                    title={categories[0]?.title || 'UPSC Civil Services Materials'}
                     books={category1Books}
                     onSelectBook={(book) => setSelectedBook(book)}
                     onAddToCart={handleAddToCart}
                     cartBookIds={cartBookIds}
-                    onViewAll={() => setSelectedCategory('all')}
                   />
                 )}
 
-                {/* 2. Standard List View */}
-                {listViewBooks.length > 0 && (
-                  <BookListView
-                    title={
-                      selectedCategory !== 'all'
-                        ? `${selectedCategory} Titles`
-                        : 'All PDF E-Books (List View)'
-                    }
-                    books={listViewBooks.slice(0, 6)}
-                    onSelectBook={(book) => setSelectedBook(book)}
-                    onAddToCart={handleAddToCart}
-                    cartBookIds={cartBookIds}
-                  />
-                )}
-
-                {/* 3. Horizontal Carousel 2 with Peekaboo */}
+                {/* Category Spotlight 2 */}
                 {category2Books.length > 0 && (
-                  <CarouselSection
-                    sectionId="category-2-carousel"
-                    title={
-                      selectedCategory !== 'all'
-                        ? `More in ${selectedCategory}`
-                        : secondCategoryName
-                    }
+                  <BookListView
+                    title={categories[1]?.title || 'SSC & Competitive Exam Guides'}
                     books={category2Books}
                     onSelectBook={(book) => setSelectedBook(book)}
                     onAddToCart={handleAddToCart}
                     cartBookIds={cartBookIds}
-                    onViewAll={() => setSelectedCategory('all')}
                   />
                 )}
               </>
@@ -488,46 +390,58 @@ export default function HomePage() {
           </>
         )}
 
-        {/* Library Tab View */}
-        {activeTab === 'library' && (
-          <div className="px-6 py-6 max-w-3xl mx-auto space-y-6">
-            <div>
-              <h2 className="text-xl font-bold text-gray-800">My PDF Library</h2>
-              <p className="text-xs text-gray-500 mt-0.5">
-                Your purchased and unlocked study materials
-              </p>
+        {/* TAB 2: CATEGORIES PAGE */}
+        {activeTab === 'categories' && (
+          <CategoriesView
+            categories={categories}
+            books={books}
+            onSelectBook={(book) => setSelectedBook(book)}
+            onAddToCart={handleAddToCart}
+            cartBookIds={cartBookIds}
+          />
+        )}
+
+        {/* TAB 3: CART PAGE / TAB */}
+        {activeTab === 'cart' && (
+          <div className="px-4 sm:px-6 py-6 max-w-2xl mx-auto space-y-6">
+            <div className="border-b border-gray-100 pb-4 flex items-center justify-between">
+              <div>
+                <h1 className="text-xl sm:text-2xl font-black text-gray-950">Shopping Cart</h1>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Review selected e-books before secure digital checkout.
+                </p>
+              </div>
+              <span className="bg-[#4029AB] text-white text-xs font-bold px-3 py-1 rounded-full">
+                {totalCartCount} items
+              </span>
             </div>
 
-            {books.filter((b) => purchasedBookIds.includes(b.id)).length === 0 ? (
-              <div className="py-12 px-4 text-center bg-gray-50 rounded-2xl border border-gray-100 space-y-3">
-                <BookOpen className="w-10 h-10 text-gray-400 mx-auto" />
-                <h4 className="text-sm font-bold text-gray-800">No purchased books yet</h4>
-                <p className="text-xs text-gray-500 max-w-xs mx-auto">
-                  Books you purchase from the catalog will appear here for instant offline-ready PDF reading.
-                </p>
+            {cart.length === 0 ? (
+              <div className="py-16 text-center bg-gray-50 rounded-3xl border border-gray-200/80 space-y-4">
+                <ShoppingBag className="w-12 h-12 text-gray-400 mx-auto" />
+                <div>
+                  <h3 className="text-base font-bold text-gray-900">Your cart is empty</h3>
+                  <p className="text-xs text-gray-500 mt-1 max-w-xs mx-auto">
+                    Explore competitive exam e-books and study material to add to your library.
+                  </p>
+                </div>
                 <button
-                  onClick={() => {
-                    startTransition(() => {
-                      setActiveTab('home');
-                    });
-                  }}
-                  className="px-4 py-2 bg-[#4029AB] text-white rounded-xl text-xs font-bold shadow-xs hover:bg-[#34208e] cursor-pointer inline-flex items-center gap-1.5"
+                  onClick={() => handleTabChange('home')}
+                  className="px-5 py-2.5 bg-[#4029AB] text-white rounded-xl text-xs font-bold shadow-xs hover:bg-[#34208e] cursor-pointer inline-flex items-center gap-1.5 active:scale-95 transition-all"
                 >
                   <ShoppingBag className="w-3.5 h-3.5" />
                   <span>Browse Catalog</span>
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {books
-                  .filter((b) => purchasedBookIds.includes(b.id))
-                  .map((book) => (
+              <div className="space-y-4">
+                <div className="space-y-3">
+                  {cart.map(({ book, quantity }) => (
                     <div
                       key={book.id}
-                      onClick={() => setSelectedBook(book)}
-                      className="flex items-start gap-3.5 p-4 rounded-2xl border border-gray-200 bg-white hover:border-[#4029AB]/40 hover:shadow-md cursor-pointer transition-all active:scale-[0.99]"
+                      className="p-4 rounded-2xl border border-gray-200 bg-white flex items-center gap-3.5"
                     >
-                      <div className="relative w-14 aspect-[2/3] rounded-none overflow-hidden shrink-0 self-start bg-gray-100 border border-gray-200 shadow-2xs">
+                      <div className="relative w-14 aspect-[2/3] rounded-none overflow-hidden shrink-0 bg-gray-100 border border-gray-200 shadow-2xs">
                         <Image
                           src={book.cover || DEFAULT_BOOK_COVER}
                           alt={book.title}
@@ -537,117 +451,133 @@ export default function HomePage() {
                           referrerPolicy="no-referrer"
                         />
                       </div>
-                      <div className="flex-1 min-w-0 flex flex-col justify-between self-stretch">
-                        <div>
-                          <h4 className="font-bold text-xs sm:text-sm text-gray-950 truncate">
-                            {book.title}
-                          </h4>
-                          <p className="text-[11px] text-gray-500 mt-0.5">
-                            {book.category} • {book.pages || 200} pages
-                          </p>
-                        </div>
-                        <div className="mt-2.5 flex items-center gap-2">
-                          <span className="inline-flex items-center gap-1 text-[10px] bg-emerald-50 text-emerald-700 font-bold px-2 py-0.5 rounded-full border border-emerald-200">
-                            <Check className="w-3 h-3 text-emerald-600" />
-                            Purchased
-                          </span>
-                          <span className="text-[11px] font-bold text-[#4029AB] hover:underline flex items-center gap-0.5">
-                            <BookOpen className="w-3 h-3" />
-                            Read
-                          </span>
-                        </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-[9px] font-bold text-[#4029AB] bg-[#4029AB]/10 px-1.5 py-0.2 rounded uppercase">
+                          {book.category}
+                        </span>
+                        <h4 className="font-bold text-xs sm:text-sm text-gray-950 truncate mt-1">
+                          {book.title}
+                        </h4>
+                        <p className="text-xs font-black text-gray-900 mt-1">₹{book.buy_price}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleUpdateQuantity(book.id, quantity - 1)}
+                          className="w-7 h-7 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center justify-center font-bold text-sm cursor-pointer"
+                        >
+                          -
+                        </button>
+                        <span className="text-xs font-bold w-4 text-center">{quantity}</span>
+                        <button
+                          onClick={() => handleUpdateQuantity(book.id, quantity + 1)}
+                          className="w-7 h-7 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center justify-center font-bold text-sm cursor-pointer"
+                        >
+                          +
+                        </button>
                       </div>
                     </div>
                   ))}
+                </div>
+
+                {/* Checkout Summary Box */}
+                <div className="p-5 rounded-3xl bg-gray-50 border border-gray-200/80 space-y-3">
+                  <div className="flex justify-between text-xs text-gray-600">
+                    <span>Subtotal</span>
+                    <span className="font-bold text-gray-900">
+                      ₹
+                      {cart.reduce((sum, item) => sum + (item.book.buy_price || 0) * item.quantity, 0)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-600">
+                    <span>Instant Digital Delivery</span>
+                    <span className="font-bold text-emerald-600">Free</span>
+                  </div>
+                  <div className="border-t border-gray-200 pt-3 flex justify-between text-sm font-black text-gray-950">
+                    <span>Total Amount</span>
+                    <span>
+                      ₹
+                      {cart.reduce((sum, item) => sum + (item.book.buy_price || 0) * item.quantity, 0)}
+                    </span>
+                  </div>
+
+                  <button
+                    disabled={isCartTabCheckingOut}
+                    onClick={async () => {
+                      if (cart.length === 0) return;
+                      setIsCartTabCheckingOut(true);
+                      const currentCart = [...cart];
+                      const totalAmount = currentCart.reduce(
+                        (sum, item) => sum + (item.book.buy_price || 0) * item.quantity,
+                        0
+                      );
+                      const bookIds = currentCart.map((i) => i.book.id);
+                      const bookTitles = currentCart.map((i) => i.book.title);
+
+                      await processRazorpayPayment({
+                        amountInRupees: totalAmount,
+                        bookIds,
+                        bookTitles,
+                        userName: 'Pardeep Kumar',
+                        userEmail: 'pardeep1984@gmail.com',
+                        onSuccess: (paymentData) => {
+                          setIsCartTabCheckingOut(false);
+                          handleSuccessfulCheckout(currentCart);
+                          handleClearCart();
+                        },
+                        onError: (err) => {
+                          setIsCartTabCheckingOut(false);
+                          setToastMessage(err || 'Payment failed.');
+                          setTimeout(() => setToastMessage(null), 3000);
+                        },
+                        onDismiss: () => {
+                          setIsCartTabCheckingOut(false);
+                        },
+                      });
+                    }}
+                    className="w-full py-3 bg-[#4029AB] hover:bg-[#34208e] text-white text-xs sm:text-sm font-bold rounded-2xl shadow-xs transition-all active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer mt-2 disabled:opacity-70"
+                  >
+                    {isCartTabCheckingOut ? (
+                      <span className="flex items-center gap-2">
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        <span>Opening Razorpay Gateway...</span>
+                      </span>
+                    ) : (
+                      <>
+                        <Lock className="w-4 h-4" />
+                        <span>Pay with Razorpay & Unlock eBooks</span>
+                      </>
+                    )}
+                  </button>
+
+                  <p className="text-[10px] text-gray-400 text-center flex items-center justify-center gap-1.5 pt-1">
+                    <Lock className="w-3 h-3 text-emerald-600" />
+                    <span>Secured by Razorpay • Instant Digital Activation</span>
+                  </p>
+                </div>
               </div>
             )}
           </div>
         )}
 
-        {/* Store Tab View */}
-        {activeTab === 'store' && (
-          <div className="px-6 py-6 max-w-4xl mx-auto space-y-6">
-            <div className="flex justify-between items-center">
-              <div>
-                <h2 className="text-xl font-bold text-gray-800">BooksCircle Store</h2>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  Browse all live Firestore PDF books
-                </p>
-              </div>
-              <button
-                onClick={() => setIsCartOpen(true)}
-                className="px-3.5 py-1.5 bg-[#4029AB] text-white rounded-full text-xs font-bold flex items-center gap-1.5 cursor-pointer"
-              >
-                <ShoppingBag className="w-3.5 h-3.5" />
-                <span>Cart ({totalCartCount})</span>
-              </button>
-            </div>
-
-            {books.length === 0 ? (
-              <div className="py-12 text-center text-xs text-gray-500 bg-gray-50 rounded-2xl border border-gray-100">
-                No books currently stored in Firestore.
-              </div>
-            ) : (
-              <BookListView
-                title="All Firestore Catalog Titles"
-                books={books}
-                onSelectBook={(book) => setSelectedBook(book)}
-                onAddToCart={handleAddToCart}
-                cartBookIds={cartBookIds}
-              />
-            )}
-          </div>
+        {/* TAB 4: PURCHASED PAGE */}
+        {activeTab === 'purchased' && (
+          <PurchasedView
+            books={books}
+            purchasedBookIds={purchasedBookIds}
+            onSelectBook={(book) => setSelectedBook(book)}
+            onNavigateHome={() => handleTabChange('home')}
+            onUnlockDemoBook={handleUnlockDemoBook}
+          />
         )}
 
-        {/* Account Tab View */}
-        {activeTab === 'account' && (
-          <div className="px-6 py-6 max-w-xl mx-auto space-y-6">
-            <div className="flex items-center gap-4 p-5 rounded-2xl bg-gray-50 border border-gray-100">
-              <div className="w-14 h-14 rounded-full bg-[#4029AB] text-white flex items-center justify-center font-bold text-lg">
-                BC
-              </div>
-              <div>
-                <h3 className="font-bold text-base text-gray-900">BooksCircle Reader</h3>
-                <p className="text-xs text-gray-500">pardeep1984@gmail.com</p>
-                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full mt-1.5">
-                  <ShieldCheck className="w-3 h-3" />
-                  Firestore Live Sync Active
-                </span>
-              </div>
-            </div>
-
-            <div className="p-4 rounded-2xl border border-gray-100 space-y-3">
-              <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
-                Firestore Database Info
-              </h4>
-              <div className="text-xs space-y-2 text-gray-600">
-                <div className="flex justify-between py-1 border-b border-gray-100">
-                  <span>Firebase Project</span>
-                  <span className="font-mono font-semibold text-gray-900">bookscircle-d579d</span>
-                </div>
-                <div className="flex justify-between py-1 border-b border-gray-100">
-                  <span>Firestore Database</span>
-                  <span className="font-mono font-semibold text-[#4029AB]">bookscircle</span>
-                </div>
-                <div className="flex justify-between py-1 border-b border-gray-100">
-                  <span>Live Books Loaded</span>
-                  <span className="font-semibold text-gray-900">{books.length} items</span>
-                </div>
-                <div className="flex justify-between py-1">
-                  <span>Categories</span>
-                  <span className="font-semibold text-gray-900">{categories.length} categories</span>
-                </div>
-              </div>
-              <button
-                onClick={() => loadData(true)}
-                disabled={isRefreshing}
-                className="w-full mt-2 py-2 px-3 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-                <span>Re-sync from Firebase</span>
-              </button>
-            </div>
-          </div>
+        {/* TAB 5: PROFILE PAGE */}
+        {activeTab === 'profile' && (
+          <ProfileView
+            userEmail="pardeep1984@gmail.com"
+            userName="Pardeep Kumar"
+            purchasedCount={purchasedBookIds.length}
+            onNavigateToPurchased={() => handleTabChange('purchased')}
+          />
         )}
       </main>
 
@@ -662,7 +592,7 @@ export default function HomePage() {
         onSuccessfulCheckout={handleSuccessfulCheckout}
       />
 
-      {/* Firebase Database Status Modal */}
+      {/* Firebase Database Status Modal (Admin/Developer inspection modal) */}
       <SeedStatusModal
         isOpen={isSeedModalOpen}
         onClose={() => setIsSeedModalOpen(false)}
@@ -674,12 +604,7 @@ export default function HomePage() {
       {/* Fixed High Density Bottom Navigation */}
       <BottomNav
         activeTab={activeTab}
-        onTabChange={(tab) => {
-          startTransition(() => {
-            setActiveTab(tab);
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          });
-        }}
+        onTabChange={handleTabChange}
         cartCount={totalCartCount}
       />
 

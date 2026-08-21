@@ -231,9 +231,9 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
           </div>
         </section>
 
-        {/* 3. Four-Column Key Metrics Bar (Divided by subtle vertical rules) */}
+        {/* 3. Key Metrics Bar (Divided by subtle vertical rules) */}
         <section className="border-y border-gray-100 py-3">
-          <div className="grid grid-cols-4 items-center text-center">
+          <div className="grid grid-cols-3 items-center text-center">
             {/* Stat 1: Rating */}
             <div className="flex flex-col items-center justify-center px-1">
               <div className="flex items-center gap-0.5 text-xs font-bold text-gray-900">
@@ -245,36 +245,29 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
               </span>
             </div>
 
-            {/* Stat 2: Ebook Format */}
-            <div className="flex flex-col items-center justify-center px-1 border-l border-gray-200">
-              <BookOpen className="w-4 h-4 text-gray-700" />
-              <span className="text-[11px] text-gray-500 mt-0.5">
-                Ebook
-              </span>
-            </div>
-
-            {/* Stat 3: Pages Count */}
-            <div className="flex flex-col items-center justify-center px-1 border-l border-gray-200">
-              <span className="text-xs font-bold text-gray-900">
-                {pageCount}
-              </span>
-              <span className="text-[11px] text-gray-500 mt-0.5">
-                Pages
-              </span>
-            </div>
-
-            {/* Stat 4: Add to Wishlist */}
+            {/* Stat 2: Share */}
             <div
-              onClick={toggleWishlist}
+              onClick={handleShare}
               className="flex flex-col items-center justify-center px-1 border-l border-gray-200 cursor-pointer active:scale-95 transition-transform"
             >
-              <Bookmark
-                className={`w-4 h-4 transition-colors ${
-                  isWishlisted ? 'text-[#4029AB] fill-[#4029AB]' : 'text-[#4029AB]'
-                }`}
-              />
+              <Share2 className="w-4 h-4 text-[#4029AB]" />
               <span className="text-[11px] font-semibold text-[#4029AB] mt-0.5 whitespace-nowrap">
-                {isWishlisted ? 'Wishlisted' : 'Add to wishlist'}
+                Share
+              </span>
+            </div>
+
+            {/* Stat 3: Add to Cart */}
+            <div
+              onClick={() => onAddToCart(book)}
+              className="flex flex-col items-center justify-center px-1 border-l border-gray-200 cursor-pointer active:scale-95 transition-transform"
+            >
+              {isInCart ? (
+                <Check className="w-4 h-4 text-[#4029AB]" />
+              ) : (
+                <ShoppingBag className="w-4 h-4 text-[#4029AB]" />
+              )}
+              <span className="text-[11px] font-semibold text-[#4029AB] mt-0.5 whitespace-nowrap">
+                {isInCart ? 'In cart' : 'Add to cart'}
               </span>
             </div>
           </div>
@@ -368,6 +361,10 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
                   <div className="grid grid-cols-2 gap-2 border-b border-gray-200/60 pb-2">
                     <span className="text-gray-500">ISBN / Identifier</span>
                     <span className="font-semibold text-gray-900">{book.isbn || '978-81-94821-44-1'}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 border-b border-gray-200/60 pb-2">
+                    <span className="text-gray-500">Price</span>
+                    <span className="font-semibold text-gray-900">₹{book.buy_price}</span>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <span className="text-gray-500">File Format & Size</span>

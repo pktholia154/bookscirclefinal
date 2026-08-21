@@ -29,7 +29,7 @@ const BookListItem: React.FC<{
     <div
       id={`list-item-${book.id}`}
       onClick={() => onSelectBook(book)}
-      className="group flex items-start gap-3.5 sm:gap-4 bg-gray-50/80 hover:bg-gray-50 p-3 sm:p-3.5 rounded-2xl border border-gray-100 cursor-pointer transition-all active:scale-[0.99] shadow-2xs"
+      className="group flex items-start gap-3.5 sm:gap-4 bg-transparent p-2 sm:p-3.5 rounded-2xl border border-gray-100 cursor-pointer transition-all active:scale-[0.99]"
     >
       {/* Book Cover Thumbnail: Aligned to top, 2:3 ratio, sharp corners */}
       <div className="relative w-14 sm:w-16 aspect-[2/3] rounded-none overflow-hidden shrink-0 self-start bg-gray-200 shadow-2xs border border-gray-200">
@@ -53,20 +53,8 @@ const BookListItem: React.FC<{
 
         {/* Subtitle / Category */}
         <p className="text-[11px] text-gray-500 truncate mt-0.5 mb-1.5">
-          {book.category} • {book.pages || 320} Pages
+          {book.category}
         </p>
-
-        {/* Tags */}
-        <div className="flex gap-1.5 flex-wrap">
-          {tags.map((tag, idx) => (
-            <span
-              key={idx}
-              className="text-[9px] sm:text-[10px] bg-white border border-gray-200 px-2 py-0.5 rounded text-gray-600 font-medium"
-            >
-              {tag}
-            </span>
-          ))}
-        </div>
       </div>
 
       {/* Right Pricing & Buy / Cart Actions */}
@@ -116,7 +104,7 @@ export const BookListView: React.FC<BookListViewProps> = ({
   if (!books || books.length === 0) return null;
 
   return (
-    <section id="standard-list-view" className="w-full py-3 px-6">
+    <section id="standard-list-view" className="w-full py-3 px-3 sm:px-6">
       {title && (
         <div className="flex justify-between items-end mb-3">
           <h2 className="text-lg font-bold text-gray-800 tracking-tight">
