@@ -2,25 +2,35 @@
 
 import React, { useState, useEffect, useMemo, useCallback, useTransition } from 'react';
 import Image from 'next/image';
-import { Header } from '@/components/Header';
+import { Header, UserProfile } from '@/components/Header';
 import { CategoryChips } from '@/components/CategoryChips';
 import { CarouselSection } from '@/components/CarouselSection';
 import { BookListView } from '@/components/BookListView';
 import { BookDetailPage } from '@/components/BookDetailPage';
 import { CartDrawer } from '@/components/CartDrawer';
-import { SeedStatusModal } from '@/components/SeedStatusModal';
 import { BottomNav, TabKey } from '@/components/BottomNav';
 import { PurchasedView } from '@/components/PurchasedView';
 import { CategoriesView } from '@/components/CategoriesView';
 import { ProfileView } from '@/components/ProfileView';
+import { GoogleSignInModal } from '@/components/GoogleSignInModal';
 import { Footer } from '@/components/Footer';
 import { Book, Category, CartItem } from '@/lib/types';
 import { DEFAULT_BOOK_COVER } from '@/lib/data';
 import { getBooksFromFirestore, getCategoriesFromFirestore } from '@/lib/services/books';
 import { getPurchasedBookIdsFromLocal, savePurchasedBookIds } from '@/lib/offline-storage';
 import { processRazorpayPayment } from '@/lib/services/razorpay';
-import { Check, ShoppingBag, Database, RefreshCw, BookOpen, AlertCircle, Lock } from 'lucide-react';
+import { auth, signInWithGoogle, signOutUser } from '@/lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
+import { Check, ShoppingBag, RefreshCw, Lock } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+
+const RAZORPAY_TEST_USER: UserProfile = {
+  uid: 'razorpay_test_auditor_uid',
+  email: 'reviewer.razorpay@bookscircle.org',
+  displayName: 'Razorpay Test Reviewer',
+  photoURL: null,
+  isTestAccount: true,
+};
 
 export default function HomePage() {
   const [books, setBooks] = useState<Book[]>([]);
@@ -30,6 +40,17 @@ export default function HomePage() {
   const [activeTab, setActiveTab] = useState<TabKey>('home');
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const [isGoogleModalOpen, setIsGoogleModalOpen] = useState<boolean>(false);
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('bookscircle_test_user');
+        if (saved) return JSON.parse(saved);
+      } catch {}
+    }
+    return RAZORPAY_TEST_USER; // Default to Razorpay test reviewer for effortless auditing & checkout testing
+  });
+
   const [purchasedBookIds, setPurchasedBookIds] = useState<string[]>(() => {
     return getPurchasedBookIdsFromLocal();
   });
@@ -44,11 +65,30 @@ export default function HomePage() {
   });
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
-  const [isSeedModalOpen, setIsSeedModalOpen] = useState<boolean>(false);
-  const [isFirebaseSynced, setIsFirebaseSynced] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isCartTabCheckingOut, setIsCartTabCheckingOut] = useState<boolean>(false);
   const [, startTransition] = useTransition();
+
+  // Listen to Firebase Auth state for real Google Sign-In
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user && !user.isAnonymous) {
+        const profile: UserProfile = {
+          uid: user.uid,
+          email: user.email,
+          displayName: user.displayName || user.email?.split('@')[0] || 'Google User',
+          photoURL: user.photoURL,
+          isTestAccount: false,
+        };
+        setCurrentUser(profile);
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('bookscircle_test_user');
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   // Save cart to localStorage
   useEffect(() => {
@@ -73,7 +113,6 @@ export default function HomePage() {
 
       if (fetchedBooks.length > 0) {
         setBooks(fetchedBooks);
-        setIsFirebaseSynced(true);
       }
       if (fetchedCats.length > 0) {
         setCategories(fetchedCats);
@@ -97,7 +136,6 @@ export default function HomePage() {
         if (!isMounted) return;
         if (fetchedBooks.length > 0) {
           setBooks(fetchedBooks);
-          setIsFirebaseSynced(true);
         }
         if (fetchedCats.length > 0) {
           setCategories(fetchedCats);
@@ -115,6 +153,45 @@ export default function HomePage() {
       isMounted = false;
     };
   }, []);
+
+  // Login Modal Handler (opens dual-choice login: Standard Email/Password & dominating Google Sign-In)
+  const handleOpenLogin = () => {
+    setIsGoogleModalOpen(true);
+  };
+
+  const handleSelectUserProfile = (profile: UserProfile) => {
+    setCurrentUser(profile);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('bookscircle_test_user', JSON.stringify(profile));
+    }
+    setToastMessage(`Signed in as ${profile.displayName || profile.email}`);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  // Sign Out Handler
+  const handleSignOut = async () => {
+    try {
+      await signOutUser();
+    } catch (e) {
+      console.warn('Firebase signout note:', e);
+    }
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('bookscircle_test_user');
+    }
+    setCurrentUser(null);
+    setToastMessage('Signed out successfully.');
+    setTimeout(() => setToastMessage(null), 2500);
+  };
+
+  // Switch to Razorpay Test Account
+  const handleSetTestAccount = () => {
+    setCurrentUser(RAZORPAY_TEST_USER);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('bookscircle_test_user', JSON.stringify(RAZORPAY_TEST_USER));
+    }
+    setToastMessage('Switched to Razorpay Test Reviewer account.');
+    setTimeout(() => setToastMessage(null), 2500);
+  };
 
   // Cart operations
   const handleAddToCart = (book: Book, e?: React.MouseEvent) => {
@@ -237,6 +314,9 @@ export default function HomePage() {
     });
   };
 
+  const activeEmail = currentUser?.email || 'reviewer.razorpay@bookscircle.org';
+  const activeName = currentUser?.displayName || 'Razorpay Test Reviewer';
+
   // If a book detail page is open, render that view
   if (selectedBook) {
     return (
@@ -246,8 +326,12 @@ export default function HomePage() {
           onOpenCart={() => setIsCartOpen(true)}
           searchQuery={searchQuery}
           onSearchChange={(q) => setSearchQuery(q)}
-          onOpenSeedModal={() => setIsSeedModalOpen(true)}
-          isFirebaseSynced={isFirebaseSynced}
+          currentUser={currentUser}
+          onGoogleSignIn={handleOpenLogin}
+          onNavigateToProfile={() => {
+            setSelectedBook(null);
+            handleTabChange('profile');
+          }}
         />
         <BookDetailPage
           book={selectedBook}
@@ -265,6 +349,8 @@ export default function HomePage() {
           onRemoveItem={handleRemoveFromCart}
           onClearCart={handleClearCart}
           onSuccessfulCheckout={handleSuccessfulCheckout}
+          userEmail={activeEmail}
+          userName={activeName}
         />
         <BottomNav
           activeTab={activeTab}
@@ -277,7 +363,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-white text-gray-900 pb-24 selection:bg-[#4029AB] selection:text-white">
-      {/* 1. Header with Search, Firebase status, and Cart */}
+      {/* 1. Header with Search, Login, and Cart */}
       <Header
         cartCount={totalCartCount}
         onOpenCart={() => setIsCartOpen(true)}
@@ -288,8 +374,9 @@ export default function HomePage() {
             setActiveTab('home');
           }
         }}
-        onOpenSeedModal={() => setIsSeedModalOpen(true)}
-        isFirebaseSynced={isFirebaseSynced}
+        currentUser={currentUser}
+        onGoogleSignIn={handleOpenLogin}
+        onNavigateToProfile={() => handleTabChange('profile')}
       />
 
       {/* 2. Main Content Views (Switched via BottomNav Tabs) */}
@@ -521,8 +608,8 @@ export default function HomePage() {
                         amountInRupees: totalAmount,
                         bookIds,
                         bookTitles,
-                        userName: 'Pardeep Kumar',
-                        userEmail: 'pardeep1984@gmail.com',
+                        userName: activeName,
+                        userEmail: activeEmail,
                         onSuccess: (paymentData) => {
                           setIsCartTabCheckingOut(false);
                           handleSuccessfulCheckout(currentCart);
@@ -548,7 +635,7 @@ export default function HomePage() {
                     ) : (
                       <>
                         <Lock className="w-4 h-4" />
-                        <span>Pay with Razorpay & Unlock eBooks</span>
+                        <span>Pay with Razorpay &amp; Unlock eBooks</span>
                       </>
                     )}
                   </button>
@@ -577,10 +664,11 @@ export default function HomePage() {
         {/* TAB 5: PROFILE PAGE */}
         {activeTab === 'profile' && (
           <ProfileView
-            userEmail="pardeep1984@gmail.com"
-            userName="Pardeep Kumar"
+            currentUser={currentUser}
             purchasedCount={purchasedBookIds.length}
             onNavigateToPurchased={() => handleTabChange('purchased')}
+            onGoogleSignIn={handleOpenLogin}
+            onSignOut={handleSignOut}
           />
         )}
       </main>
@@ -594,15 +682,15 @@ export default function HomePage() {
         onRemoveItem={handleRemoveFromCart}
         onClearCart={handleClearCart}
         onSuccessfulCheckout={handleSuccessfulCheckout}
+        userEmail={activeEmail}
+        userName={activeName}
       />
 
-      {/* Firebase Database Status Modal (Admin/Developer inspection modal) */}
-      <SeedStatusModal
-        isOpen={isSeedModalOpen}
-        onClose={() => setIsSeedModalOpen(false)}
-        onRefreshData={() => loadData(true)}
-        booksCount={books.length}
-        categoriesCount={categories.length}
+      {/* Dual Login Authentication Modal */}
+      <GoogleSignInModal
+        isOpen={isGoogleModalOpen}
+        onClose={() => setIsGoogleModalOpen(false)}
+        onSelectUser={handleSelectUserProfile}
       />
 
       {/* Fixed High Density Bottom Navigation */}

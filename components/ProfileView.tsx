@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 import {
-  User,
+  User as UserIcon,
   Mail,
   Share2,
   Copy,
@@ -14,27 +15,57 @@ import {
   ShieldCheck,
   Send,
   MessageCircle,
-  Sparkles,
   Smartphone,
-  Info,
-  HelpCircle
+  LogIn,
+  LogOut,
+  Key,
+  CreditCard,
+  AlertTriangle,
+  RefreshCw,
+  Sparkles
 } from 'lucide-react';
 import { getOfflineStorageStats, clearAllOfflinePdfs } from '@/lib/offline-storage';
+import { UserProfile } from '@/components/Header';
+
+// Crisp Google 'G' vector icon component
+const GoogleIcon: React.FC<{ className?: string }> = ({ className = 'w-4 h-4' }) => (
+  <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      fill="#4285F4"
+      d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"
+    />
+    <path
+      fill="#34A853"
+      d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"
+    />
+    <path
+      fill="#FBBC05"
+      d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
+    />
+    <path
+      fill="#EA4335"
+      d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
+    />
+  </svg>
+);
 
 interface ProfileViewProps {
-  userEmail?: string;
-  userName?: string;
+  currentUser: UserProfile | null;
   purchasedCount: number;
   onNavigateToPurchased: () => void;
+  onGoogleSignIn: () => void;
+  onSignOut: () => void;
 }
 
 export const ProfileView: React.FC<ProfileViewProps> = ({
-  userEmail = 'pardeep1984@gmail.com',
-  userName = 'Pardeep Kumar',
+  currentUser,
   purchasedCount = 0,
   onNavigateToPurchased,
+  onGoogleSignIn,
+  onSignOut,
 }) => {
   const [copied, setCopied] = useState(false);
+  const [isSigningIn, setIsSigningIn] = useState(false);
   const [offlineStats, setOfflineStats] = useState<{ count: number; totalBytes: number }>({
     count: 0,
     totalBytes: 0,
@@ -54,10 +85,11 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     if (typeof window !== 'undefined') {
       return window.location.origin;
     }
-    return 'https://ais-pre-kix7q2nneqt2lmktmciuv6-513220259814.asia-southeast1.run.app';
+    return 'https://bookscircle.org';
   };
 
-  const shareText = 'Check out BooksCircle for competitive exam prep books, curated study guides, and instant offline PDF reading!';
+  const shareText =
+    'Check out BooksCircle for competitive exam prep books, curated study guides, and instant offline PDF reading!';
 
   // Primary Native Web Share API
   const handleNativeShare = async () => {
@@ -88,6 +120,16 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       setTimeout(() => setCopied(false), 2500);
     } catch {
       showToast('Could not copy link to clipboard');
+    }
+  };
+
+  // Trigger Sign In
+  const handleGoogleAuth = async () => {
+    setIsSigningIn(true);
+    try {
+      await onGoogleSignIn();
+    } finally {
+      setIsSigningIn(false);
     }
   };
 
@@ -127,35 +169,97 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
   const formattedStorage = (offlineStats.totalBytes / (1024 * 1024)).toFixed(1);
 
+  const displayUserName = currentUser?.displayName || 'Guest Reader';
+  const displayUserEmail = currentUser?.email || 'Not signed in';
+  const userInitial = displayUserName.charAt(0).toUpperCase();
+
   return (
     <div className="w-full px-4 sm:px-6 py-5 max-w-2xl mx-auto space-y-6">
       {/* 1. Profile Identity Card */}
       <div className="p-5 sm:p-6 rounded-3xl bg-gray-50 border border-gray-200/80 flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-5 text-center sm:text-left shadow-2xs">
         {/* Avatar */}
-        <div className="relative w-18 h-18 sm:w-20 sm:h-20 rounded-full bg-[#4029AB] text-white flex items-center justify-center text-2xl font-black shadow-md shrink-0 ring-4 ring-white">
-          <span>{userName.charAt(0)}</span>
-          <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center border-2 border-white shadow-xs">
-            <ShieldCheck className="w-3.5 h-3.5" />
+        {currentUser?.photoURL ? (
+          <div className="relative w-18 h-18 sm:w-20 sm:h-20 rounded-full overflow-hidden shadow-md shrink-0 ring-4 ring-white border border-gray-200">
+            <Image
+              src={currentUser.photoURL}
+              alt={displayUserName}
+              fill
+              sizes="80px"
+              className="object-cover"
+              referrerPolicy="no-referrer"
+            />
+            <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center border-2 border-white shadow-xs">
+              <ShieldCheck className="w-3.5 h-3.5" />
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="relative w-18 h-18 sm:w-20 sm:h-20 rounded-full bg-[#4029AB] text-white flex items-center justify-center text-2xl font-black shadow-md shrink-0 ring-4 ring-white">
+            <span>{userInitial}</span>
+            {currentUser && (
+              <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center border-2 border-white shadow-xs">
+                <ShieldCheck className="w-3.5 h-3.5" />
+              </div>
+            )}
+          </div>
+        )}
 
         {/* User Info Details */}
         <div className="flex-1 min-w-0">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2">
-            <h2 className="text-lg sm:text-xl font-black text-gray-950">{userName}</h2>
-            <span className="inline-block px-2.5 py-0.5 text-[10px] font-bold bg-[#4029AB]/10 text-[#4029AB] rounded-full">
-              Reader Member
-            </span>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2 justify-center sm:justify-start">
+            <h2 className="text-lg sm:text-xl font-black text-gray-950">{displayUserName}</h2>
+            {currentUser ? (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full">
+                <ShieldCheck className="w-2.5 h-2.5" />
+                Verified Reader
+              </span>
+            ) : (
+              <span className="inline-block px-2.5 py-0.5 text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 rounded-full">
+                Guest Mode
+              </span>
+            )}
           </div>
 
           <div className="flex items-center justify-center sm:justify-start gap-1.5 text-xs text-gray-600 mt-1 font-medium">
             <Mail className="w-3.5 h-3.5 text-gray-400" />
-            <span className="font-mono text-gray-800">{userEmail}</span>
+            <span className="font-mono text-gray-800">{displayUserEmail}</span>
           </div>
 
           <p className="text-[11px] text-gray-500 mt-2">
-            Competitive Exam Aspirant • BooksCircle Digital Library Reader
+            {currentUser
+              ? 'Account synchronized • Instant access to purchased e-books & bookmarks'
+              : 'Sign in to access your purchased PDF library across all your devices.'}
           </p>
+
+          {/* Action Buttons: Sign In / Sign Out */}
+          <div className="pt-3 flex flex-wrap items-center justify-center sm:justify-start gap-2">
+            {!currentUser ? (
+              <button
+                id="profile-login-btn"
+                onClick={handleGoogleAuth}
+                disabled={isSigningIn}
+                className="px-4 py-2 bg-[#4029AB] hover:bg-[#34208e] text-white text-xs font-bold rounded-xl shadow-xs active:scale-95 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-60"
+              >
+                {isSigningIn ? (
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin text-white" />
+                ) : (
+                  <LogIn className="w-3.5 h-3.5" />
+                )}
+                <span>Login</span>
+              </button>
+            ) : (
+              <button
+                id="profile-signout-btn"
+                onClick={() => {
+                  onSignOut();
+                  showToast('Signed out successfully.');
+                }}
+                className="px-3.5 py-1.5 bg-white hover:bg-red-50 border border-gray-200 hover:border-red-200 text-red-600 text-xs font-bold rounded-xl active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Sign Out</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -195,7 +299,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         </div>
       </div>
 
-      {/* 3. Share BooksCircle App Section */}
+      {/* 4. Share BooksCircle App Section */}
       <div className="p-5 sm:p-6 rounded-3xl border border-gray-200 bg-white space-y-4 shadow-2xs">
         <div className="flex items-center justify-between">
           <div>
@@ -262,7 +366,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         </div>
       </div>
 
-      {/* 4. App Storage & Maintenance */}
+      {/* 5. App Storage & Maintenance */}
       <div className="p-5 rounded-3xl border border-gray-200 bg-white space-y-3 shadow-2xs">
         <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
           Device & Storage Management
@@ -292,7 +396,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         </div>
       </div>
 
-      {/* 5. Razorpay Compliance & Legal Policies */}
+      {/* 6. Razorpay Compliance & Legal Policies */}
       <div className="p-5 sm:p-6 rounded-3xl border border-gray-200 bg-white space-y-4 shadow-2xs">
         <div className="flex items-center justify-between">
           <div>

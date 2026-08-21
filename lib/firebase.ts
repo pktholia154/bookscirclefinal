@@ -1,5 +1,16 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth, signInAnonymously, User } from 'firebase/auth';
+import {
+  getAuth,
+  signInAnonymously,
+  signInWithPopup,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  updateProfile,
+  GoogleAuthProvider,
+  signOut,
+  onAuthStateChanged,
+  User,
+} from 'firebase/auth';
 import { getFirestore, Firestore } from 'firebase/firestore';
 
 const firebaseConfig = {
@@ -14,6 +25,71 @@ const firebaseConfig = {
 // Initialize Firebase safely
 export const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 export const auth = getAuth(app);
+
+const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: 'select_account' });
+
+// Google Sign-In
+export async function signInWithGoogle(): Promise<{ user: User | null; fallbackNeeded?: boolean; cancelled?: boolean; error?: any }> {
+  try {
+    const result = await signInWithPopup(auth, googleProvider);
+    return { user: result.user };
+  } catch (error: any) {
+    if (error?.code === 'auth/unauthorized-domain' || error?.message?.includes('unauthorized-domain')) {
+      console.warn('Firebase Auth: domain is not yet in Firebase Console authorized domains list.');
+      return { user: null, fallbackNeeded: true, error };
+    }
+    if (
+      error?.code === 'auth/popup-closed-by-user' ||
+      error?.code === 'auth/cancelled-popup-request' ||
+      error?.message?.includes('popup-closed-by-user') ||
+      error?.message?.includes('cancelled-popup-request')
+    ) {
+      // User simply closed the popup before completing login
+      return { user: null, cancelled: true };
+    }
+    console.warn('Google Sign-In note:', error?.message || error);
+    throw error;
+  }
+}
+
+// Email & Password Sign-In (Supports Razorpay Verification & standard credentials)
+export async function signInWithEmail(email: string, password: string): Promise<User> {
+  try {
+    const cred = await signInWithEmailAndPassword(auth, email, password);
+    return cred.user;
+  } catch (error: any) {
+    // If account doesn't exist yet, try creating it automatically for seamless test login
+    if (error?.code === 'auth/user-not-found' || error?.code === 'auth/invalid-credential') {
+      try {
+        const newCred = await createUserWithEmailAndPassword(auth, email, password);
+        return newCred.user;
+      } catch (createErr) {
+        throw error;
+      }
+    }
+    throw error;
+  }
+}
+
+// Email & Password Registration
+export async function signUpWithEmail(email: string, password: string, displayName?: string): Promise<User> {
+  const cred = await createUserWithEmailAndPassword(auth, email, password);
+  if (displayName && cred.user) {
+    await updateProfile(cred.user, { displayName });
+  }
+  return cred.user;
+}
+
+// Sign Out
+export async function signOutUser(): Promise<void> {
+  try {
+    await signOut(auth);
+  } catch (error) {
+    console.error('Sign Out Error:', error);
+    throw error;
+  }
+}
 
 // Helper to ensure authenticated state for Firestore rules requiring request.auth != null
 export async function ensureFirebaseAuth(): Promise<User | null> {

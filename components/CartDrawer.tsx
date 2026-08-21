@@ -16,6 +16,8 @@ interface CartDrawerProps {
   onRemoveItem: (bookId: string) => void;
   onClearCart: () => void;
   onSuccessfulCheckout?: (purchasedBooks: CartItem[]) => void;
+  userEmail?: string;
+  userName?: string;
 }
 
 const CartItemRow: React.FC<{
@@ -98,6 +100,8 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   onRemoveItem,
   onClearCart,
   onSuccessfulCheckout,
+  userEmail = 'reviewer.razorpay@bookscircle.org',
+  userName = 'Razorpay Test Reviewer',
 }) => {
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState(false);
@@ -125,8 +129,8 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
         amountInRupees: subtotal,
         bookIds,
         bookTitles,
-        userName: 'Pardeep Kumar',
-        userEmail: 'pardeep1984@gmail.com',
+        userName: userName,
+        userEmail: userEmail,
         onSuccess: (paymentData) => {
           setIsCheckingOut(false);
           setLastPaymentId(paymentData.payment_id);
@@ -204,7 +208,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                 <CheckCircle2 className="w-10 h-10" />
               </motion.div>
               <h3 className="text-xl font-bold text-gray-950 mb-1">
-                Payment Verified & Order Successful!
+                Payment Verified &amp; Order Successful!
               </h3>
               <p className="text-sm text-gray-600 max-w-xs mb-3">
                 Your PDF ebooks have been unlocked and added to your permanent library.
@@ -215,7 +219,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                 </div>
               )}
               <div className="p-3 bg-gray-50 rounded-xl text-xs text-gray-500 w-full border border-gray-100">
-                Receipt & direct PDF access link sent to pardeep1984@gmail.com
+                Receipt &amp; direct PDF access link sent to <span className="font-mono font-semibold text-gray-800">{userEmail}</span>
               </div>
             </div>
           ) : items.length === 0 ? (
