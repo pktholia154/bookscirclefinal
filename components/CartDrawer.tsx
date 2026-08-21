@@ -8,6 +8,8 @@ import { CartItem } from '@/lib/types';
 import { DEFAULT_BOOK_COVER } from '@/lib/data';
 import { processRazorpayPayment } from '@/lib/services/razorpay';
 
+import { UserProfile } from '@/components/Header';
+
 interface CartDrawerProps {
   isOpen: boolean;
   onClose: () => void;
@@ -15,7 +17,9 @@ interface CartDrawerProps {
   onUpdateQuantity: (bookId: string, quantity: number) => void;
   onRemoveItem: (bookId: string) => void;
   onClearCart: () => void;
-  onSuccessfulCheckout?: (purchasedBooks: CartItem[]) => void;
+  onSuccessfulCheckout?: (purchasedBooks: CartItem[], paymentData: { order_id: string; payment_id: string; amountInRupees: number }) => void;
+  currentUser?: UserProfile | null;
+  onRequireLogin?: (onSuccess?: (user: UserProfile) => void) => void;
   userEmail?: string;
   userName?: string;
 }
@@ -100,8 +104,10 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   onRemoveItem,
   onClearCart,
   onSuccessfulCheckout,
-  userEmail = 'reviewer.razorpay@bookscircle.org',
-  userName = 'Razorpay Test Reviewer',
+  currentUser,
+  onRequireLogin,
+  userEmail,
+  userName,
 }) => {
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState(false);
@@ -115,8 +121,27 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   );
   const savings = Math.max(0, totalListPrice - subtotal);
 
-  const handleCheckout = async () => {
+  const activeEmail = currentUser?.email || userEmail || '';
+  const activeName = currentUser?.displayName || userName || 'Reader';
+
+  const handleCheckout = async (userOverride?: UserProfile) => {
     if (items.length === 0) return;
+
+    const activeUser = userOverride || currentUser;
+
+    // Strict authentication check before initiating checkout
+    if (!activeUser || !activeUser.email) {
+      if (onRequireLogin) {
+        onRequireLogin((loggedInUser: UserProfile) => {
+          handleCheckout(loggedInUser);
+        });
+      }
+      return;
+    }
+
+    const currentActiveEmail = activeUser?.email || userEmail || 'reviewer.razorpay@bookscircle.org';
+    const currentActiveName = activeUser?.displayName || userName || 'Reader';
+
     setIsCheckingOut(true);
     setCheckoutError(null);
 
@@ -129,20 +154,20 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
         amountInRupees: subtotal,
         bookIds,
         bookTitles,
-        userName: userName,
-        userEmail: userEmail,
+        userName: currentActiveName,
+        userEmail: currentActiveEmail,
         onSuccess: (paymentData) => {
           setIsCheckingOut(false);
           setLastPaymentId(paymentData.payment_id);
           setOrderSuccess(true);
           if (onSuccessfulCheckout) {
-            onSuccessfulCheckout(checkoutItems);
+            onSuccessfulCheckout(checkoutItems, paymentData);
           }
           setTimeout(() => {
             setOrderSuccess(false);
             onClearCart();
             onClose();
-          }, 3000);
+          }, 2500);
         },
         onError: (err) => {
           setIsCheckingOut(false);
@@ -287,9 +312,37 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                   </div>
                 </div>
 
+                {/* User Account / Login State Status */}
+                {currentUser && currentUser.email ? (
+                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-indigo-50/70 border border-indigo-100 text-xs">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-6 h-6 rounded-full bg-[#4029AB] text-white flex items-center justify-center text-[10px] font-bold shrink-0">
+                        {currentUser.displayName?.[0] || 'U'}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-bold text-gray-900 truncate text-[11px]">{currentUser.displayName || 'Reader'}</p>
+                        <p className="text-[10px] text-gray-500 font-mono truncate">{currentUser.email}</p>
+                      </div>
+                    </div>
+                    <span className="text-[10px] text-indigo-700 font-bold bg-white px-2 py-0.5 rounded-full border border-indigo-200 shrink-0">
+                      Sync Ready
+                    </span>
+                  </div>
+                ) : (
+                  <div className="p-2.5 rounded-xl bg-amber-50/80 border border-amber-200 text-xs flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-bold text-amber-900 text-xs">Sign in to buy &amp; unlock eBooks</p>
+                      <p className="text-[10px] text-amber-800 leading-tight mt-0.5">
+                        Your purchased PDF eBooks will be linked to your account for cross-device reading.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 <button
                   id="checkout-btn"
-                  onClick={handleCheckout}
+                  onClick={() => handleCheckout()}
                   disabled={isCheckingOut}
                   className="w-full py-3.5 px-4 rounded-xl font-bold text-sm bg-[#4029AB] text-white hover:bg-[#2E1B85] active:scale-98 shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70"
                 >
@@ -298,6 +351,12 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                       <RefreshCw className="w-4 h-4 animate-spin" />
                       <span>Opening Razorpay Secure Checkout...</span>
                     </span>
+                  ) : !currentUser || !currentUser.email ? (
+                    <>
+                      <Lock className="w-4 h-4" />
+                      <span>Log in &amp; Pay ₹{subtotal}</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </>
                   ) : (
                     <>
                       <Lock className="w-4 h-4" />

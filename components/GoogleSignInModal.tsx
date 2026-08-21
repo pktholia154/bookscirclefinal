@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Mail, Lock, Eye, EyeOff, ShieldCheck, ArrowRight, LogIn, Sparkles, AlertCircle, RefreshCw } from 'lucide-react';
+import { X, Mail, Lock, Eye, EyeOff, ShieldCheck, ArrowRight, LogIn, AlertCircle, RefreshCw } from 'lucide-react';
 import { UserProfile } from '@/components/Header';
 import { signInWithGoogle, signInWithEmail } from '@/lib/firebase';
 
@@ -10,6 +10,8 @@ interface LoginModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSelectUser: (user: UserProfile) => void;
+  title?: string;
+  subtitle?: string;
 }
 
 const GoogleIcon: React.FC<{ className?: string }> = ({ className = 'w-5 h-5' }) => (
@@ -37,6 +39,8 @@ export const GoogleSignInModal: React.FC<LoginModalProps> = ({
   isOpen,
   onClose,
   onSelectUser,
+  title = 'Login to BooksCircle',
+  subtitle = 'Sign in to access your purchased library & reading bookmarks',
 }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -145,9 +149,9 @@ export const GoogleSignInModal: React.FC<LoginModalProps> = ({
           <div className="px-6 pt-6 pb-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
             <div>
               <h3 className="text-lg font-black text-gray-950 tracking-tight">
-                Login to BooksCircle
+                {title}
               </h3>
-              <p className="text-xs text-gray-500">Sign in to access your purchased library &amp; reading bookmarks</p>
+              <p className="text-xs text-gray-500">{subtitle}</p>
             </div>
             <button
               onClick={onClose}

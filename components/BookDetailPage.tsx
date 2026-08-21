@@ -296,12 +296,12 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
           ) : (
             <button
               id="book-detail-buy-btn"
-              onClick={() => onAddToCart(book)}
+              onClick={() => onBuyNow(book)}
               className="w-full py-2.5 px-4 rounded-lg bg-[#4029AB] hover:bg-[#34208e] text-white text-xs sm:text-sm font-bold transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
             >
               <ShoppingBag className="w-4 h-4 text-white" />
               <span>
-                {isInCart ? 'In Cart (₹' + book.buy_price + ')' : '₹' + book.buy_price + ' Ebook'}
+                {isInCart ? `Buy Now (₹${book.buy_price})` : `Buy for ₹${book.buy_price}`}
               </span>
             </button>
           )}
