@@ -292,6 +292,72 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         </div>
       </div>
 
+      {/* 5. Razorpay Compliance & Legal Policies */}
+      <div className="p-5 sm:p-6 rounded-3xl border border-gray-200 bg-white space-y-4 shadow-2xs">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-sm sm:text-base font-bold text-gray-950 flex items-center gap-1.5">
+              <ShieldCheck className="w-4 h-4 text-[#4029AB]" />
+              <span>Legal Policies &amp; Customer Support</span>
+            </h3>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Exam Kart official policies and Razorpay verified merchant terms.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+          <a
+            href="/privacy-policy"
+            className="p-3 rounded-2xl bg-gray-50 hover:bg-[#4029AB]/5 border border-gray-200/80 hover:border-[#4029AB]/40 font-semibold text-gray-800 hover:text-[#4029AB] flex items-center justify-between transition-all"
+          >
+            <span>📜 Privacy Policy</span>
+            <ExternalLink className="w-3.5 h-3.5 text-gray-400" />
+          </a>
+
+          <a
+            href="/terms-and-conditions"
+            className="p-3 rounded-2xl bg-gray-50 hover:bg-[#4029AB]/5 border border-gray-200/80 hover:border-[#4029AB]/40 font-semibold text-gray-800 hover:text-[#4029AB] flex items-center justify-between transition-all"
+          >
+            <span>⚖️ Terms &amp; Conditions</span>
+            <ExternalLink className="w-3.5 h-3.5 text-gray-400" />
+          </a>
+
+          <a
+            href="/license-agreement"
+            className="p-3 rounded-2xl bg-gray-50 hover:bg-[#4029AB]/5 border border-gray-200/80 hover:border-[#4029AB]/40 font-semibold text-gray-800 hover:text-[#4029AB] flex items-center justify-between transition-all"
+          >
+            <span>🛡️ License Agreement</span>
+            <ExternalLink className="w-3.5 h-3.5 text-gray-400" />
+          </a>
+
+          <a
+            href="/refund-policy"
+            className="p-3 rounded-2xl bg-gray-50 hover:bg-[#4029AB]/5 border border-gray-200/80 hover:border-[#4029AB]/40 font-semibold text-gray-800 hover:text-[#4029AB] flex items-center justify-between transition-all"
+          >
+            <span>💳 Refund Policy</span>
+            <ExternalLink className="w-3.5 h-3.5 text-gray-400" />
+          </a>
+
+          <a
+            href="/contact"
+            className="sm:col-span-2 p-3 rounded-2xl bg-emerald-50/70 hover:bg-emerald-100/70 border border-emerald-200 font-semibold text-emerald-900 flex items-center justify-between transition-all"
+          >
+            <span>📞 Contact Us &amp; Customer Support</span>
+            <ExternalLink className="w-3.5 h-3.5 text-emerald-700" />
+          </a>
+        </div>
+
+        {/* Registered Entity Box */}
+        <div className="p-3.5 rounded-2xl bg-gray-50 border border-gray-200/80 text-[11px] text-gray-600 space-y-1">
+          <p><strong className="text-gray-900 font-bold">Legal Entity:</strong> Pardeep Kumar</p>
+          <p><strong className="text-gray-900 font-bold">Brand Name:</strong> Exam Kart</p>
+          <p><strong className="text-gray-900 font-bold">Email:</strong> support@exam-kart.com</p>
+          <p><strong className="text-gray-900 font-bold">Address:</strong> 1st Floor, SCO-28, Sector 13, Bhiwani, Haryana 127021</p>
+          <p><strong className="text-gray-900 font-bold">Website:</strong> https://bookscircle.org/</p>
+        </div>
+      </div>
+
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-gray-950 text-white text-xs font-semibold px-4 py-2 rounded-full shadow-xl flex items-center gap-2 pointer-events-none">

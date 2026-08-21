@@ -13,6 +13,7 @@ import { BottomNav, TabKey } from '@/components/BottomNav';
 import { PurchasedView } from '@/components/PurchasedView';
 import { CategoriesView } from '@/components/CategoriesView';
 import { ProfileView } from '@/components/ProfileView';
+import { Footer } from '@/components/Footer';
 import { Book, Category, CartItem } from '@/lib/types';
 import { DEFAULT_BOOK_COVER } from '@/lib/data';
 import { getBooksFromFirestore, getCategoriesFromFirestore } from '@/lib/services/books';
@@ -387,6 +388,9 @@ export default function HomePage() {
                 )}
               </>
             )}
+
+            {/* Bottom of Home Page: Official Razorpay Compliance & Policy Footer */}
+            <Footer onNavigateToTab={handleTabChange} />
           </>
         )}
 
