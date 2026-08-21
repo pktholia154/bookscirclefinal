@@ -1,0 +1,18 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // BooksCircle collections: allow read access to everyone, allow write access for admin/auth or prototyping
+    match /books/{bookId} {
+      allow read: if true;
+      allow write: if true;
+    }
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow write: if true;
+    }
+    match /{document=**} {
+      allow read: if true;
+      allow write: if true;
+    }
+  }
+}
