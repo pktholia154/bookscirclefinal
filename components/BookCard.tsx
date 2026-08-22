@@ -35,7 +35,7 @@ export const BookCard: React.FC<BookCardProps> = ({
       onClick={() => onSelect(book)}
       className="peekaboo-item group shrink-0 cursor-pointer select-none flex flex-col w-[calc((100vw-57px)/3.5)] min-w-[82px] max-w-[102px] sm:w-[135px] sm:min-w-[135px] sm:max-w-[135px] md:w-[160px] md:min-w-[160px] md:max-w-[160px] lg:w-[175px] lg:min-w-[175px] lg:max-w-[175px] transition-transform active:scale-[0.98]"
     >
-      {/* Cover Image with Price Badge & Cart Icon Overlay */}
+      {/* Cover Image with Cart Icon Overlay (Price removed from top-right corner) */}
       <div className="relative aspect-[2/3] w-full rounded-none overflow-hidden bg-gray-100 shadow-xs border border-gray-200">
         <Image
           src={imgSrc}
@@ -46,12 +46,6 @@ export const BookCard: React.FC<BookCardProps> = ({
           referrerPolicy="no-referrer"
           onError={() => setImgSrc(DEFAULT_BOOK_COVER)}
         />
-
-
-        {/* Top-Right Price / Badge */}
-        <div className="absolute top-1 right-1 sm:top-1.5 sm:right-1.5 bg-[#4029AB] text-white text-[8px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-xs leading-none">
-          ₹{book.buy_price}
-        </div>
 
         {/* Circular Cart Button Overlay at Bottom-Right of Cover */}
         <button
@@ -68,20 +62,23 @@ export const BookCard: React.FC<BookCardProps> = ({
         </button>
       </div>
 
-      {/* Pricing & Discount Tag */}
-      <div className="flex items-baseline gap-1 mt-1">
-        <span className="font-bold text-[11px] sm:text-sm text-gray-900 tracking-tight">
+      {/* Dominating Pricing & Discount Tag */}
+      <div className="flex items-baseline gap-1 mt-1.5">
+        <span className="font-black text-sm sm:text-base text-gray-950 tracking-tight">
           ₹{book.buy_price}
         </span>
         {discountPercent > 0 && (
-          <span className="text-[8px] sm:text-[10px] font-bold text-emerald-600 leading-none">
+          <span className="text-[9px] sm:text-[11px] font-bold text-emerald-600 leading-none">
             {discountPercent}% OFF
           </span>
         )}
       </div>
 
-      {/* Book Title (2 rows max) */}
-      <h3 className="text-[10px] sm:text-xs font-bold text-gray-900 line-clamp-2 leading-tight mt-0.5 group-hover:text-[#4029AB] transition-colors">
+      {/* Book Title (Single row truncated, slightly increased font size) */}
+      <h3
+        className="text-xs sm:text-sm font-bold text-gray-900 truncate leading-snug mt-0.5 group-hover:text-[#4029AB] transition-colors"
+        title={book.title}
+      >
         {book.title}
       </h3>
 

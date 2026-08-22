@@ -366,36 +366,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         </div>
       </div>
 
-      {/* 5. App Storage & Maintenance */}
-      <div className="p-5 rounded-3xl border border-gray-200 bg-white space-y-3 shadow-2xs">
-        <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
-          Device & Storage Management
-        </h4>
-
-        <div className="flex items-center justify-between text-xs py-2 border-b border-gray-100">
-          <div>
-            <p className="font-semibold text-gray-900">Offline PDFs Encrypted Storage</p>
-            <p className="text-[11px] text-gray-500">
-              {offlineStats.count} items stored locally ({formattedStorage} MB)
-            </p>
-          </div>
-          {offlineStats.count > 0 && (
-            <button
-              onClick={handleClearCache}
-              className="text-xs font-bold text-red-600 hover:text-red-700 hover:underline flex items-center gap-1 cursor-pointer"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              <span>Clear</span>
-            </button>
-          )}
-        </div>
-
-        <div className="flex items-center justify-between text-xs py-1">
-          <span className="text-gray-500">App Version</span>
-          <span className="font-mono text-gray-700 font-semibold">BooksCircle v1.2.0</span>
-        </div>
-      </div>
-
       {/* 6. Razorpay Compliance & Legal Policies */}
       <div className="p-5 sm:p-6 rounded-3xl border border-gray-200 bg-white space-y-4 shadow-2xs">
         <div className="flex items-center justify-between">

@@ -3,14 +3,10 @@
 import React, { useState, useMemo } from 'react';
 import Image from 'next/image';
 import {
-  LayoutGrid,
   BookOpen,
-  Search,
   ShoppingCart,
   Check,
-  ChevronRight,
   Layers,
-  Sparkles
 } from 'lucide-react';
 import { Book, Category } from '@/lib/types';
 import { DEFAULT_BOOK_COVER } from '@/lib/data';
@@ -31,7 +27,6 @@ export const CategoriesView: React.FC<CategoriesViewProps> = ({
   cartBookIds,
 }) => {
   const [selectedCat, setSelectedCat] = useState<string>('all');
-  const [searchQuery, setSearchQuery] = useState<string>('');
 
   // Compute book count per category
   const categoryCounts = useMemo(() => {
@@ -43,34 +38,18 @@ export const CategoriesView: React.FC<CategoriesViewProps> = ({
     return map;
   }, [books]);
 
-  // Filtered books
+  // Filtered books by category only (no search box)
   const filteredBooks = useMemo(() => {
-    let result = books;
-
-    if (selectedCat !== 'all') {
-      result = result.filter(
-        (b) => b.category.toLowerCase() === selectedCat.toLowerCase()
-      );
-    }
-
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      result = result.filter(
-        (b) =>
-          b.title.toLowerCase().includes(q) ||
-          b.category.toLowerCase().includes(q) ||
-          (b.topics && b.topics.some((t) => t.toLowerCase().includes(q))) ||
-          b.author?.toLowerCase().includes(q)
-      );
-    }
-
-    return result;
-  }, [books, selectedCat, searchQuery]);
+    if (selectedCat === 'all') return books;
+    return books.filter(
+      (b) => b.category.toLowerCase() === selectedCat.toLowerCase()
+    );
+  }, [books, selectedCat]);
 
   return (
-    <div className="w-full px-4 sm:px-6 py-5 max-w-5xl mx-auto space-y-6">
-      {/* 1. Header */}
-      <div className="border-b border-gray-100 pb-4">
+    <div className="w-full px-4 sm:px-6 py-4 sm:py-6 max-w-5xl mx-auto space-y-5 bg-white">
+      {/* 1. Header with exact requested label */}
+      <div className="border-b border-gray-100 pb-3">
         <div className="flex items-center gap-2">
           <h1 className="text-xl sm:text-2xl font-black text-gray-950 tracking-tight">
             Book Categories
@@ -84,53 +63,31 @@ export const CategoriesView: React.FC<CategoriesViewProps> = ({
         </p>
       </div>
 
-      {/* 2. Search Input */}
-      <div className="relative">
-        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-        <input
-          type="text"
-          placeholder="Search subjects, exams, or syllabus topics..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full pl-9 pr-4 py-2.5 text-xs rounded-xl bg-gray-50 border border-gray-200 text-gray-900 focus:outline-none focus:border-[#4029AB] focus:bg-white"
-        />
-      </div>
-
-      {/* 3. All Categories in Chips Style */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-bold uppercase tracking-wider text-gray-400">
-            Select Category (Chips)
-          </span>
-          <span className="text-[11px] text-gray-500 font-medium">
-            {selectedCat === 'all' ? 'Showing All' : selectedCat}
-          </span>
-        </div>
-
-        {/* Chips Container */}
-        <div className="flex flex-wrap items-center gap-2 p-3 bg-gray-50/70 border border-gray-200/80 rounded-2xl">
-          {/* All Chip */}
+      {/* 2. Seamless Category Chips (No Box, No Background Container, Unboxed Flow) */}
+      <div className="space-y-1.5">
+        <div className="flex flex-wrap items-center gap-2 pt-1">
+          {/* All Categories Chip */}
           <button
             id="cat-chip-all"
             onClick={() => setSelectedCat('all')}
-            className={`px-3.5 py-2 rounded-full text-xs font-bold transition-all duration-150 active:scale-95 flex items-center gap-1.5 cursor-pointer ${
+            className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all duration-150 active:scale-95 flex items-center gap-1.5 cursor-pointer ${
               selectedCat === 'all'
-                ? 'bg-[#4029AB] text-white shadow-xs'
-                : 'bg-white text-gray-700 border border-gray-200 hover:border-gray-300'
+                ? 'bg-[#4029AB] text-white shadow-2xs'
+                : 'bg-transparent text-gray-700 hover:text-[#4029AB] hover:bg-gray-100/60 border border-gray-200/80'
             }`}
           >
             <Layers className="w-3.5 h-3.5" />
             <span>All Categories</span>
             <span
               className={`text-[10px] px-1.5 py-0.2 rounded-full font-semibold ${
-                selectedCat === 'all' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500'
+                selectedCat === 'all' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
               }`}
             >
               {books.length}
             </span>
           </button>
 
-          {/* Individual Category Chips */}
+          {/* Individual Category Chips - Seamlessly placed without background boxes */}
           {categories.map((cat) => {
             const isSelected = selectedCat.toLowerCase() === cat.title.toLowerCase();
             const count = categoryCounts[cat.title] || 0;
@@ -140,17 +97,17 @@ export const CategoriesView: React.FC<CategoriesViewProps> = ({
                 key={cat.id}
                 id={`cat-chip-${cat.seolsug || cat.id}`}
                 onClick={() => setSelectedCat(cat.title)}
-                className={`px-3.5 py-2 rounded-full text-xs font-bold transition-all duration-150 active:scale-95 flex items-center gap-1.5 cursor-pointer ${
+                className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all duration-150 active:scale-95 flex items-center gap-1.5 cursor-pointer ${
                   isSelected
-                    ? 'bg-[#4029AB] text-white shadow-xs'
-                    : 'bg-white text-gray-700 border border-gray-200 hover:border-gray-300'
+                    ? 'bg-[#4029AB] text-white shadow-2xs'
+                    : 'bg-transparent text-gray-700 hover:text-[#4029AB] hover:bg-gray-100/60 border border-gray-200/80'
                 }`}
               >
                 <span>{cat.title}</span>
                 {count > 0 && (
                   <span
                     className={`text-[10px] px-1.5 py-0.2 rounded-full font-semibold ${
-                      isSelected ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500'
+                      isSelected ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
                     }`}
                   >
                     {count}
@@ -162,10 +119,10 @@ export const CategoriesView: React.FC<CategoriesViewProps> = ({
         </div>
       </div>
 
-      {/* 4. Filtered Books Results */}
+      {/* 3. Filtered Books Results */}
       <div className="space-y-3 pt-2">
-        <div className="flex items-center justify-between">
-          <h2 className="text-base font-bold text-gray-900">
+        <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+          <h2 className="text-sm sm:text-base font-black text-gray-950">
             {selectedCat === 'all' ? 'All E-Books' : `${selectedCat} Titles`}
           </h2>
           <span className="text-xs font-bold text-gray-400">
@@ -174,31 +131,29 @@ export const CategoriesView: React.FC<CategoriesViewProps> = ({
         </div>
 
         {filteredBooks.length === 0 ? (
-          <div className="py-12 text-center bg-gray-50 rounded-2xl border border-gray-100 space-y-2">
+          <div className="py-12 text-center bg-gray-50/70 rounded-2xl border border-gray-200/80 space-y-2">
             <BookOpen className="w-8 h-8 text-gray-400 mx-auto" />
             <p className="text-xs text-gray-600 font-bold">No books found in this category.</p>
             <button
-              onClick={() => {
-                setSelectedCat('all');
-                setSearchQuery('');
-              }}
+              onClick={() => setSelectedCat('all')}
               className="text-xs font-bold text-[#4029AB] hover:underline cursor-pointer"
             >
               Show all books
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {filteredBooks.map((book) => {
               const inCart = cartBookIds.has(book.id);
 
               return (
                 <div
                   key={book.id}
+                  id={`cat-book-${book.id}`}
                   onClick={() => onSelectBook(book)}
-                  className="flex items-start gap-3.5 p-3.5 rounded-2xl border border-gray-200 bg-white hover:border-[#4029AB]/40 hover:shadow-md cursor-pointer transition-all active:scale-[0.99] group"
+                  className="flex items-start gap-3 p-3 rounded-2xl border border-gray-200 bg-white hover:border-[#4029AB]/40 hover:shadow-xs cursor-pointer transition-all active:scale-[0.99] group"
                 >
-                  {/* Sharp 2:3 Cover */}
+                  {/* Sharp 2:3 Cover (No price on cover) */}
                   <div className="relative w-14 sm:w-16 aspect-[2/3] rounded-none overflow-hidden shrink-0 self-start bg-gray-100 border border-gray-200 shadow-2xs">
                     <Image
                       src={book.cover || DEFAULT_BOOK_COVER}
@@ -216,25 +171,29 @@ export const CategoriesView: React.FC<CategoriesViewProps> = ({
                       <span className="text-[9px] font-bold text-[#4029AB] bg-[#4029AB]/10 px-1.5 py-0.2 rounded uppercase">
                         {book.category}
                       </span>
-                      <h4 className="font-bold text-xs sm:text-sm text-gray-950 line-clamp-2 mt-1 leading-snug group-hover:text-[#4029AB] transition-colors">
+                      <h4
+                        className="font-bold text-xs sm:text-sm text-gray-950 truncate mt-1 leading-snug group-hover:text-[#4029AB] transition-colors"
+                        title={book.title}
+                      >
                         {book.title}
                       </h4>
-                      <p className="text-[11px] text-gray-500 mt-0.5">
+                      <p className="text-[11px] text-gray-500 mt-0.5 truncate">
                         {book.author || 'BooksCircle'} • {book.pages || 220} Pages
                       </p>
                     </div>
 
-                    <div className="mt-2.5 flex items-center justify-between">
-                      <span className="text-sm font-black text-gray-950">
+                    <div className="mt-2 flex items-center justify-between">
+                      <span className="text-sm sm:text-base font-black text-gray-950">
                         ₹{book.buy_price}
                       </span>
 
                       <button
+                        id={`cat-add-cart-${book.id}`}
                         onClick={(e) => {
                           e.stopPropagation();
                           onAddToCart(book, e);
                         }}
-                        className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition-all active:scale-95 ${
+                        className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition-all active:scale-95 cursor-pointer ${
                           inCart
                             ? 'bg-[#4029AB] text-white'
                             : 'bg-gray-100 hover:bg-[#4029AB] hover:text-white text-gray-800'

@@ -11,6 +11,7 @@ import { CartDrawer } from '@/components/CartDrawer';
 import { BottomNav, TabKey } from '@/components/BottomNav';
 import { PurchasedView } from '@/components/PurchasedView';
 import { CategoriesView } from '@/components/CategoriesView';
+import { DedicatedSearchView } from '@/components/DedicatedSearchView';
 import { ProfileView } from '@/components/ProfileView';
 import { GoogleSignInModal } from '@/components/GoogleSignInModal';
 import { Footer } from '@/components/Footer';
@@ -481,21 +482,22 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-white text-gray-900 pb-24 selection:bg-[#4029AB] selection:text-white">
-      {/* 1. Header with Search, Login, and Cart */}
-      <Header
-        cartCount={totalCartCount}
-        onOpenCart={() => setIsCartOpen(true)}
-        searchQuery={searchQuery}
-        onSearchChange={(q) => {
-          setSearchQuery(q);
-          if (activeTab !== 'home' && activeTab !== 'categories') {
-            setActiveTab('home');
-          }
-        }}
-        currentUser={currentUser}
-        onGoogleSignIn={handleOpenLogin}
-        onNavigateToProfile={() => handleTabChange('profile')}
-      />
+      {/* 1. Header with Search, Login, and Cart (ONLY ON HOME PAGE) */}
+      {activeTab === 'home' && !selectedBook && (
+        <Header
+          cartCount={totalCartCount}
+          onOpenCart={() => setIsCartOpen(true)}
+          searchQuery={searchQuery}
+          onSearchChange={(q) => {
+            setSearchQuery(q);
+            setActiveTab('search');
+          }}
+          currentUser={currentUser}
+          onGoogleSignIn={handleOpenLogin}
+          onNavigateToProfile={() => handleTabChange('profile')}
+          onOpenDedicatedSearch={() => setActiveTab('search')}
+        />
+      )}
 
       {/* 2. Main Content Views (Switched via BottomNav Tabs or Book Detail) */}
       <main className="w-full">
@@ -511,6 +513,24 @@ export default function HomePage() {
           />
         ) : (
           <>
+            {/* TAB: DEDICATED SEARCH PAGE */}
+            {activeTab === 'search' && (
+              <DedicatedSearchView
+                books={books}
+                categories={categories}
+                initialQuery={searchQuery}
+                onBack={() => {
+                  setSearchQuery('');
+                  setActiveTab('home');
+                }}
+                onSelectBook={(book) => setSelectedBook(book)}
+                onAddToCart={handleAddToCart}
+                onBuyNow={handleBuyNow}
+                cartBookIds={cartBookIds}
+                purchasedBookIds={purchasedBookIds}
+              />
+            )}
+
             {/* TAB 1: HOME PAGE */}
             {activeTab === 'home' && (
               <>
@@ -558,16 +578,6 @@ export default function HomePage() {
                       title="Trending & Top Rated"
                       sectionId="trending-books"
                       books={featuredTrendingBooks.length > 0 ? featuredTrendingBooks : books.slice(0, 6)}
-                      onSelectBook={(book) => setSelectedBook(book)}
-                      onAddToCart={handleAddToCart}
-                      cartBookIds={cartBookIds}
-                    />
-
-                    {/* Horizontal Carousel 2: New Arrivals */}
-                    <CarouselSection
-                      title="New Arrivals & Latest Editions"
-                      sectionId="new-arrivals"
-                      books={newReleasesBooks.length > 0 ? newReleasesBooks : books.slice(3, 9)}
                       onSelectBook={(book) => setSelectedBook(book)}
                       onAddToCart={handleAddToCart}
                       cartBookIds={cartBookIds}

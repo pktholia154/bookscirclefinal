@@ -3,7 +3,7 @@
 import React from 'react';
 import { Home, LayoutGrid, ShoppingCart, BookOpen, User } from 'lucide-react';
 
-export type TabKey = 'home' | 'categories' | 'cart' | 'purchased' | 'profile';
+export type TabKey = 'home' | 'categories' | 'cart' | 'purchased' | 'profile' | 'search';
 
 interface BottomNavProps {
   activeTab: TabKey;
@@ -17,7 +17,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
   cartCount,
 }) => {
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 h-16 sm:h-18 bg-white/95 backdrop-blur-md border-t border-gray-200/80 flex items-center justify-around px-2 sm:px-6 max-w-7xl mx-auto shadow-sm">
+    <nav className="fixed bottom-0 left-0 right-0 z-40 h-16 sm:h-18 bg-white/95 backdrop-blur-md border-t md:border-x border-gray-200/80 flex items-center justify-around px-2 sm:px-6 max-w-2xl lg:max-w-3xl mx-auto shadow-sm">
       {/* 1. Home Tab */}
       <button
         id="nav-tab-home"
