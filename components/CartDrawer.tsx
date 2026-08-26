@@ -33,8 +33,8 @@ const CartItemRow: React.FC<{
 
   return (
     <div className="py-3.5 flex gap-3 items-center">
-      {/* Thumbnail: 2:3 ratio, sharp corners */}
-      <div className="relative w-14 aspect-[2/3] rounded-none overflow-hidden shrink-0 bg-gray-100 border border-gray-200">
+      {/* Thumbnail: 3:4 ratio, sharp corners */}
+      <div className="relative w-14 aspect-[3/4] rounded-none overflow-hidden shrink-0 bg-gray-100 border border-gray-200">
         <Image
           src={imgSrc}
           alt={item.book.title}

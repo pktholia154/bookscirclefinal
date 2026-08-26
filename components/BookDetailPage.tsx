@@ -9,19 +9,12 @@ import {
   BookmarkCheck,
   Star,
   BookOpen,
-  FileText,
   Check,
-  ChevronDown,
-  ChevronUp,
-  MoreVertical,
-  Send,
-  Sparkles,
-  Download,
   Eye,
-  ShieldCheck,
   ShoppingBag,
-  ExternalLink,
-  ChevronRight
+  ChevronRight,
+  Send,
+  MoreVertical
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Book, Review } from '@/lib/types';
@@ -51,7 +44,6 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
 }) => {
   const [imgLoadFailed, setImgLoadFailed] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
-  const [isAboutExpanded, setIsAboutExpanded] = useState(false);
   const [activePdfReaderMode, setActivePdfReaderMode] = useState<'sample' | 'full' | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -140,7 +132,6 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
       ? `${(ratingCount / 1000).toFixed(2).replace(/\.00$/, '')}K`
       : ratingCount.toString();
 
-  const authorName = book.author || 'Editorial Board';
   const publisherName = book.publisher || 'Jaico Publishing House';
   const pageCount = book.pages || 236;
 
@@ -200,11 +191,11 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
       </header>
 
       {/* Main Container */}
-      <main className="max-w-2xl mx-auto px-4 sm:px-6 pt-5 space-y-6">
+      <main className="max-w-2xl mx-auto px-4 sm:px-6 pt-4 space-y-5">
         {/* 2. Top Book Identity Section (Cover on Left, Title/Author/Publisher on Right) */}
         <section className="flex gap-4 sm:gap-6 items-start">
-          {/* Book Cover (Ratio 2:3, Sharp corners, no rounded edges) */}
-          <div className="relative w-24 sm:w-32 aspect-[2/3] shrink-0 rounded-none overflow-hidden bg-gray-100 border border-gray-200 shadow-sm">
+          {/* Book Cover (Ratio 3:4, Sharp corners, no rounded edges) */}
+          <div className="relative w-24 sm:w-32 aspect-[3/4] shrink-0 rounded-none overflow-hidden bg-gray-100 border border-gray-200 shadow-sm">
             <Image
               src={imgSrc}
               alt={book.title}
@@ -217,17 +208,29 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
             />
           </div>
 
-          {/* Title, Author & Publisher */}
+          {/* Title, Publisher & Price */}
           <div className="flex-1 min-w-0">
             <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-950 leading-snug tracking-tight">
               {book.title}
             </h1>
-            <p className="text-sm text-gray-800 font-medium mt-1.5">
-              {authorName}
-            </p>
-            <p className="text-xs text-gray-500 font-normal mt-0.5">
+            <p className="text-xs text-gray-500 font-normal mt-1">
               {publisherName}
             </p>
+            <div className="flex items-baseline gap-2 mt-2.5">
+              <span className="text-xl sm:text-2xl font-black text-gray-950 tracking-tight">
+                ₹{book.buy_price}
+              </span>
+              {book.list_price > book.buy_price && (
+                <span className="text-xs sm:text-sm text-gray-400 line-through font-medium">
+                  ₹{book.list_price}
+                </span>
+              )}
+              {book.list_price > book.buy_price && (
+                <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
+                  {Math.round(((book.list_price - book.buy_price) / book.list_price) * 100)}% off
+                </span>
+              )}
+            </div>
           </div>
         </section>
 
@@ -307,84 +310,36 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
           )}
         </section>
 
-        {/* 5. "About this eBook" Section */}
-        <section className="space-y-2 pt-2">
-          <h2 className="text-base sm:text-lg font-bold text-gray-900">
-            About this eBook
+        {/* 5. "About this book" Section */}
+        <section className="space-y-3 pt-2">
+          <h2 className="text-base sm:text-lg font-bold text-gray-950">
+            About this book
           </h2>
 
-          <div className="text-xs sm:text-sm text-gray-600 leading-relaxed space-y-2">
-            <p className={isAboutExpanded ? '' : 'line-clamp-3'}>
-              {book.full_description || book.seo_description}
-            </p>
-
-            {/* Expandable detailed metadata & table */}
-            {isAboutExpanded && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                className="pt-3 space-y-3"
-              >
-                {book.topics && book.topics.length > 0 && (
-                  <div>
-                    <h4 className="text-xs font-bold text-gray-900 mb-1.5">
-                      Key Topics Covered
-                    </h4>
-                    <div className="flex flex-wrap gap-1.5">
-                      {book.topics.map((topic, i) => (
-                        <span
-                          key={i}
-                          className="px-2.5 py-1 rounded bg-gray-100 text-[11px] font-medium text-gray-700"
-                        >
-                          {topic}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Technical / Publishing Specs Table */}
-                <div className="rounded-lg border border-gray-100 bg-gray-50/70 p-3.5 space-y-2 text-xs">
-                  <div className="grid grid-cols-2 gap-2 border-b border-gray-200/60 pb-2">
-                    <span className="text-gray-500">Publisher</span>
-                    <span className="font-semibold text-gray-900">{publisherName}</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 border-b border-gray-200/60 pb-2">
-                    <span className="text-gray-500">Published on</span>
-                    <span className="font-semibold text-gray-900">{book.published_date || '2023'}</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 border-b border-gray-200/60 pb-2">
-                    <span className="text-gray-500">Language</span>
-                    <span className="font-semibold text-gray-900">{book.language || 'English'}</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 border-b border-gray-200/60 pb-2">
-                    <span className="text-gray-500">ISBN / Identifier</span>
-                    <span className="font-semibold text-gray-900">{book.isbn || '978-81-94821-44-1'}</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 border-b border-gray-200/60 pb-2">
-                    <span className="text-gray-500">Price</span>
-                    <span className="font-semibold text-gray-900">₹{book.buy_price}</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <span className="text-gray-500">File Format & Size</span>
-                    <span className="font-semibold text-gray-900">PDF ({book.file_size || '14.2 MB'})</span>
-                  </div>
-                </div>
-              </motion.div>
+          <div className="space-y-3 text-xs sm:text-sm leading-relaxed">
+            {/* SEO Description */}
+            {(book.seo_description || book.seoDescription) && (
+              <p className="font-semibold text-gray-900 bg-gray-50/80 p-3.5 rounded-xl border border-gray-100/90 text-xs sm:text-sm leading-relaxed">
+                {book.seo_description || book.seoDescription}
+              </p>
             )}
 
-            <button
-              onClick={() => setIsAboutExpanded(!isAboutExpanded)}
-              className="text-xs font-bold text-[#4029AB] hover:underline flex items-center gap-1 pt-1 cursor-pointer"
-            >
-              <span>{isAboutExpanded ? 'Show less' : 'See more about this book'}</span>
-              {isAboutExpanded ? (
-                <ChevronUp className="w-3.5 h-3.5" />
-              ) : (
-                <ChevronDown className="w-3.5 h-3.5" />
+            {/* Full Description */}
+            {(book.full_description || book.fullDescription) &&
+              (book.full_description || book.fullDescription) !==
+                (book.seo_description || book.seoDescription) && (
+                <div className="text-gray-700 leading-relaxed whitespace-pre-line text-xs sm:text-sm">
+                  {book.full_description || book.fullDescription}
+                </div>
               )}
-            </button>
+
+            {/* Fallback if neither is present */}
+            {!(book.seo_description || book.seoDescription) &&
+              !(book.full_description || book.fullDescription) && (
+                <p className="text-gray-500 italic text-xs">
+                  No detailed description provided for this title.
+                </p>
+              )}
           </div>
         </section>
 
@@ -589,7 +544,7 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
                   onClick={() => onSelectRelatedBook && onSelectRelatedBook(relBook)}
                   className="w-24 shrink-0 cursor-pointer group"
                 >
-                  <div className="relative aspect-[2/3] w-full rounded-none overflow-hidden bg-gray-100 border border-gray-200 shadow-2xs">
+                  <div className="relative aspect-[3/4] w-full rounded-none overflow-hidden bg-gray-100 border border-gray-200 shadow-2xs">
                     <Image
                       src={relBook.cover || DEFAULT_BOOK_COVER}
                       alt={relBook.title}

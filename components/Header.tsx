@@ -75,9 +75,6 @@ export const Header: React.FC<HeaderProps> = ({
           <h1 className="text-xl sm:text-2xl font-black tracking-tight text-[#4029AB]">
             BooksCircle
           </h1>
-          <p className="text-[9px] sm:text-[10px] text-gray-500 uppercase tracking-widest font-semibold">
-            Curated Library
-          </p>
         </div>
 
         {/* Desktop Embedded Search Bar */}

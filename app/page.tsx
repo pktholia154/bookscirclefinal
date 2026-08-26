@@ -672,7 +672,7 @@ export default function HomePage() {
                           key={book.id}
                           className="p-4 rounded-2xl border border-gray-200 bg-white flex items-center gap-3.5"
                         >
-                          <div className="relative w-14 aspect-[2/3] rounded-none overflow-hidden shrink-0 bg-gray-100 border border-gray-200 shadow-2xs">
+                          <div className="relative w-14 aspect-[3/4] rounded-none overflow-hidden shrink-0 bg-gray-100 border border-gray-200 shadow-2xs">
                             <Image
                               src={book.cover || DEFAULT_BOOK_COVER}
                               alt={book.title}

@@ -359,10 +359,10 @@ export const PurchasedView: React.FC<PurchasedViewProps> = ({
               >
                 {/* Book Card Main Info */}
                 <div className="flex items-start gap-3 sm:gap-4">
-                  {/* Sharp 2:3 Cover Ratio */}
+                  {/* Sharp 3:4 Cover Ratio */}
                   <div
                     onClick={() => onSelectBook(book)}
-                    className="relative w-14 sm:w-20 aspect-[2/3] rounded-none overflow-hidden shrink-0 bg-gray-100 border border-gray-200 shadow-2xs cursor-pointer group"
+                    className="relative w-14 sm:w-20 aspect-[3/4] rounded-none overflow-hidden shrink-0 bg-gray-100 border border-gray-200 shadow-2xs cursor-pointer group"
                   >
                     <Image
                       src={book.cover || DEFAULT_BOOK_COVER}

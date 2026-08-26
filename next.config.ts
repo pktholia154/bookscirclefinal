@@ -9,6 +9,10 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: false,
   },
   images: {
+    formats: ['image/avif', 'image/webp'],
+    deviceSizes: [360, 480, 640, 750, 828, 1080, 1200],
+    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
+    minimumCacheTTL: 604800,
     remotePatterns: [
       {
         protocol: 'https',
@@ -47,6 +51,32 @@ const nextConfig: NextConfig = {
         pathname: '/**',
       },
     ],
+  },
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
+          },
+          {
+            key: 'Referrer-Policy',
+            value: 'strict-origin-when-cross-origin',
+          },
+        ],
+      },
+      {
+        source: '/api/pdf(.*)',
+        headers: [
+          {
+            key: 'X-Robots-Tag',
+            value: 'noindex, nofollow, noarchive',
+          },
+        ],
+      },
+    ];
   },
   output: 'standalone',
   transpilePackages: ['motion'],

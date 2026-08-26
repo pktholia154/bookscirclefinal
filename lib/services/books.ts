@@ -48,12 +48,17 @@ export async function getBooksFromFirestore(): Promise<Book[]> {
           const ratingCount = Number(data.reviewCount ?? data.rating_count ?? data.ratings_count ?? data.review_count ?? 0);
           const pages = Number(data.pageCount ?? data.pages ?? data.page_count ?? data.num_pages ?? 0);
 
+          const seoDesc = String(data.seo_description ?? data.seoDescription ?? data.short_description ?? data.shortDescription ?? data.subtitle ?? '').trim();
+          const fullDesc = String(data.full_description ?? data.fullDescription ?? data.description ?? data.summary ?? data.content ?? '').trim();
+
           books.push({
             id: docSnap.id,
             title: data.title || data.name || 'Untitled Book',
             slug: data.slug || docSnap.id,
-            seo_description: data.seo_description || data.short_description || data.subtitle || '',
-            full_description: data.full_description || data.description || data.summary || '',
+            seo_description: seoDesc,
+            full_description: fullDesc,
+            seoDescription: seoDesc,
+            fullDescription: fullDesc,
             category: data.category || 'General',
             tags: Array.isArray(data.tags) ? data.tags : [],
             isActive: data.isActive !== undefined ? Boolean(data.isActive) : true,

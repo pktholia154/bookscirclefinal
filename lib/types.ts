@@ -13,6 +13,8 @@ export interface Book {
   slug: string;
   seo_description: string;
   full_description: string;
+  seoDescription?: string;
+  fullDescription?: string;
   category: string;
   tags: string[];
   isActive: boolean;

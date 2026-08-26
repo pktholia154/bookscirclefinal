@@ -36,7 +36,7 @@ export const BookCard: React.FC<BookCardProps> = ({
       className="peekaboo-item group shrink-0 cursor-pointer select-none flex flex-col w-[calc((100vw-57px)/3.5)] min-w-[82px] max-w-[102px] sm:w-[135px] sm:min-w-[135px] sm:max-w-[135px] md:w-[160px] md:min-w-[160px] md:max-w-[160px] lg:w-[175px] lg:min-w-[175px] lg:max-w-[175px] transition-transform active:scale-[0.98]"
     >
       {/* Cover Image with Cart Icon Overlay (Price removed from top-right corner) */}
-      <div className="relative aspect-[2/3] w-full rounded-none overflow-hidden bg-gray-100 shadow-xs border border-gray-200">
+      <div className="relative aspect-[3/4] w-full rounded-none overflow-hidden bg-gray-100 shadow-xs border border-gray-200">
         <Image
           src={imgSrc}
           alt={book.title}
@@ -63,12 +63,12 @@ export const BookCard: React.FC<BookCardProps> = ({
       </div>
 
       {/* Dominating Pricing & Discount Tag */}
-      <div className="flex items-baseline gap-1 mt-1.5">
-        <span className="font-black text-sm sm:text-base text-gray-950 tracking-tight">
+      <div className="flex items-baseline gap-1 mt-1.5 sm:mt-2">
+        <span className="font-black text-base sm:text-lg md:text-xl text-gray-950 tracking-tight leading-none">
           ₹{book.buy_price}
         </span>
         {discountPercent > 0 && (
-          <span className="text-[9px] sm:text-[11px] font-bold text-emerald-600 leading-none">
+          <span className="text-[9px] sm:text-[10px] md:text-xs font-bold text-emerald-600 leading-none">
             {discountPercent}% OFF
           </span>
         )}

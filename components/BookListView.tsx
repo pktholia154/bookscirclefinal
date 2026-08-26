@@ -31,8 +31,8 @@ const BookListItem: React.FC<{
       onClick={() => onSelectBook(book)}
       className="group flex items-start gap-3.5 sm:gap-4 bg-transparent p-2 sm:p-3.5 rounded-2xl border border-gray-100 cursor-pointer transition-all active:scale-[0.99]"
     >
-      {/* Book Cover Thumbnail: Aligned to top, 2:3 ratio, sharp corners */}
-      <div className="relative w-14 sm:w-16 aspect-[2/3] rounded-none overflow-hidden shrink-0 self-start bg-gray-200 shadow-2xs border border-gray-200">
+      {/* Book Cover Thumbnail: Aligned to top, 3:4 ratio, sharp corners */}
+      <div className="relative w-14 sm:w-16 aspect-[3/4] rounded-none overflow-hidden shrink-0 self-start bg-gray-200 shadow-2xs border border-gray-200">
         <Image
           src={imgSrc}
           alt={book.title}

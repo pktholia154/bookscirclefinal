@@ -637,64 +637,44 @@ export const PDFReaderModal: React.FC<PDFReaderModalProps> = ({
       className="fixed inset-0 z-50 w-screen h-screen bg-white text-slate-900 flex flex-col overflow-hidden select-none"
     >
       {/* 1. Header Toolbar */}
-      <header className="h-14 bg-white border-b border-slate-200 px-3 sm:px-5 flex items-center justify-between z-30 shrink-0">
-        <div className="flex items-center gap-3 min-w-0">
+      <header className="h-14 bg-white border-b border-slate-200 px-2 sm:px-4 flex items-center justify-between z-30 shrink-0 w-full max-w-full overflow-hidden gap-1.5 sm:gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0 flex-1 overflow-hidden pr-1">
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 active:scale-95 flex items-center justify-center text-slate-700 transition-all cursor-pointer shrink-0"
+            className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-slate-100 hover:bg-slate-200 active:scale-95 flex items-center justify-center text-slate-700 transition-all cursor-pointer shrink-0"
             title="Back to book details"
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
-          <div className="min-w-0 flex flex-col">
-            <h2 className="text-xs sm:text-sm font-bold text-slate-900 truncate max-w-[180px] sm:max-w-md">
+          <div className="min-w-0 flex-1 overflow-hidden">
+            <h2 className="text-xs sm:text-sm font-bold text-slate-900 truncate tracking-tight">
               {book.title}
             </h2>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] text-slate-500 font-medium">
-                {book.author || 'BooksCircle Edition'}
-              </span>
-              {mode === 'offline' && (
-                <span className="text-[9px] font-bold bg-emerald-50 text-emerald-700 px-1.5 py-0.2 rounded border border-emerald-200">
-                  Offline Mode
-                </span>
-              )}
-              {mode === 'sample' && (
-                <span className="text-[9px] font-bold bg-amber-50 text-amber-700 px-1.5 py-0.2 rounded border border-amber-200">
-                  Sample Preview
-                </span>
-              )}
-              {mode === 'full' && (
-                <span className="text-[9px] font-bold bg-[#4029AB]/10 text-[#4029AB] px-1.5 py-0.2 rounded border border-[#4029AB]/20">
-                  Online Reader
-                </span>
-              )}
-            </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-1 sm:gap-2">
+        <div className="flex items-center gap-1 sm:gap-2 shrink-0 ml-auto">
           {/* Zoom controls */}
           <button
             onClick={handleZoomOut}
-            className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-600 cursor-pointer active:scale-95 transition-all"
+            className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-600 cursor-pointer active:scale-95 transition-all shrink-0"
             title="Zoom out"
           >
-            <ZoomOut className="w-4 h-4" />
+            <ZoomOut className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </button>
-          <span className="text-[11px] font-bold text-slate-600 min-w-[36px] text-center hidden sm:inline">
+          <span className="text-[11px] font-bold text-slate-600 min-w-[32px] text-center hidden sm:inline shrink-0">
             {Math.round(scale * 100)}%
           </span>
           <button
             onClick={handleZoomIn}
-            className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-600 cursor-pointer active:scale-95 transition-all"
+            className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-600 cursor-pointer active:scale-95 transition-all shrink-0"
             title="Zoom in"
           >
-            <ZoomIn className="w-4 h-4" />
+            <ZoomIn className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </button>
           <button
             onClick={handleToggleFitWidth}
-            className={`px-2 py-1 text-[11px] font-bold rounded-lg transition-all cursor-pointer ${
+            className={`px-2 py-1 text-[10px] sm:text-[11px] font-bold rounded-lg transition-all cursor-pointer shrink-0 ${
               fitToWidth ? 'bg-[#4029AB]/10 text-[#4029AB]' : 'text-slate-600 hover:bg-slate-100'
             }`}
             title="Toggle Fit Width"
@@ -703,7 +683,7 @@ export const PDFReaderModal: React.FC<PDFReaderModalProps> = ({
           </button>
           <button
             onClick={toggleFullscreen}
-            className="w-8 h-8 rounded-lg hover:bg-slate-100 hidden sm:flex items-center justify-center text-slate-600 cursor-pointer active:scale-95"
+            className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg hover:bg-slate-100 hidden sm:flex items-center justify-center text-slate-600 cursor-pointer active:scale-95 shrink-0"
             title={isFullscreen ? 'Exit full screen' : 'Full screen'}
           >
             {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}

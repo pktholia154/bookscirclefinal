@@ -153,8 +153,8 @@ export const CategoriesView: React.FC<CategoriesViewProps> = ({
                   onClick={() => onSelectBook(book)}
                   className="flex items-start gap-3 p-3 rounded-2xl border border-gray-200 bg-white hover:border-[#4029AB]/40 hover:shadow-xs cursor-pointer transition-all active:scale-[0.99] group"
                 >
-                  {/* Sharp 2:3 Cover (No price on cover) */}
-                  <div className="relative w-14 sm:w-16 aspect-[2/3] rounded-none overflow-hidden shrink-0 self-start bg-gray-100 border border-gray-200 shadow-2xs">
+                  {/* Sharp 3:4 Cover (No price on cover) */}
+                  <div className="relative w-14 sm:w-16 aspect-[3/4] rounded-none overflow-hidden shrink-0 self-start bg-gray-100 border border-gray-200 shadow-2xs">
                     <Image
                       src={book.cover || DEFAULT_BOOK_COVER}
                       alt={book.title}

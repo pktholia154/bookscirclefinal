@@ -233,90 +233,11 @@ export const DedicatedSearchView: React.FC<DedicatedSearchViewProps> = ({
             </div>
           </div>
         </div>
-
-        {/* 2. Flexible Category Chips (Scrollable) */}
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-2.5 pb-0.5">
-          <button
-            onClick={() => setSelectedCategory('all')}
-            className={`px-3 py-1 rounded-full text-[11px] font-bold shrink-0 transition-all cursor-pointer ${
-              selectedCategory === 'all'
-                ? 'bg-[#4029AB] text-white shadow-2xs'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            All Categories
-          </button>
-          {categories.map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => setSelectedCategory(cat.title)}
-              className={`px-3 py-1 rounded-full text-[11px] font-bold shrink-0 transition-all cursor-pointer ${
-                selectedCategory.toLowerCase() === cat.title.toLowerCase()
-                  ? 'bg-[#4029AB] text-white shadow-2xs'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              {cat.title}
-            </button>
-          ))}
-        </div>
       </div>
 
       {/* Main Search View Content */}
       <main className="px-3 sm:px-5 py-3 space-y-4">
-        {/* If query is empty and no category selected: Show Trending & Recent Searches */}
-        {!query && selectedCategory === 'all' && (
-          <div className="space-y-4">
-            {/* Recent Searches */}
-            {recentSearches.length > 0 && (
-              <div className="p-3.5 rounded-2xl bg-gray-50/80 border border-gray-100 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500 flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5 text-[#4029AB]" />
-                    <span>Recent Searches</span>
-                  </span>
-                  <button
-                    onClick={handleClearRecentSearches}
-                    className="text-[10px] font-bold text-gray-400 hover:text-red-600 transition-colors cursor-pointer"
-                  >
-                    Clear History
-                  </button>
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {recentSearches.map((term, i) => (
-                    <button
-                      key={i}
-                      onClick={() => handleExecuteSearch(term)}
-                      className="px-2.5 py-1 rounded-lg bg-white border border-gray-200 hover:border-[#4029AB] text-xs font-semibold text-gray-800 flex items-center gap-1 transition-all active:scale-95 cursor-pointer shadow-2xs"
-                    >
-                      <span>{term}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
 
-            {/* Trending & Popular Searches */}
-            <div className="p-3.5 rounded-2xl bg-gray-50/80 border border-gray-100 space-y-2">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500 flex items-center gap-1.5">
-                <TrendingUp className="w-3.5 h-3.5 text-[#4029AB]" />
-                <span>Popular Exam Keywords</span>
-              </span>
-              <div className="flex flex-wrap gap-1.5">
-                {POPULAR_SEARCH_TAGS.map((tag, i) => (
-                  <button
-                    key={i}
-                    onClick={() => handleExecuteSearch(tag)}
-                    className="px-2.5 py-1 rounded-lg bg-white border border-gray-200 hover:border-[#4029AB] hover:text-[#4029AB] text-xs font-semibold text-gray-800 flex items-center gap-1 transition-all active:scale-95 cursor-pointer shadow-2xs"
-                  >
-                    <Sparkles className="w-3 h-3 text-[#4029AB]" />
-                    <span>{tag}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Search Results Header: Count & Sort Filter */}
         <div className="flex items-center justify-between pt-1 border-b border-gray-100 pb-2">
@@ -384,8 +305,8 @@ export const DedicatedSearchView: React.FC<DedicatedSearchViewProps> = ({
                   onClick={() => onSelectBook(book)}
                   className="group flex items-start gap-3 p-3 rounded-2xl border border-gray-200 bg-white hover:border-[#4029AB]/40 hover:shadow-xs transition-all cursor-pointer active:scale-[0.99]"
                 >
-                  {/* Book Cover (Ratio 2:3, Sharp corners) */}
-                  <div className="relative w-14 sm:w-16 aspect-[2/3] rounded-none overflow-hidden shrink-0 self-start bg-gray-100 border border-gray-200 shadow-2xs">
+                  {/* Book Cover (Ratio 3:4, Sharp corners) */}
+                  <div className="relative w-14 sm:w-16 aspect-[3/4] rounded-none overflow-hidden shrink-0 self-start bg-gray-100 border border-gray-200 shadow-2xs">
                     <Image
                       src={book.cover || DEFAULT_BOOK_COVER}
                       alt={book.title}
