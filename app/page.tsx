@@ -13,7 +13,6 @@ import { PurchasedView } from '@/components/PurchasedView';
 import { CategoriesView } from '@/components/CategoriesView';
 import { DedicatedSearchView } from '@/components/DedicatedSearchView';
 import { ProfileView } from '@/components/ProfileView';
-import { GoogleSignInModal } from '@/components/GoogleSignInModal';
 import { IOSInstallGuideModal } from '@/components/IOSInstallGuideModal';
 import { Footer } from '@/components/Footer';
 import { Book, Category, CartItem } from '@/lib/types';
@@ -21,6 +20,7 @@ import { DEFAULT_BOOK_COVER } from '@/lib/data';
 import { getBooksFromFirestore, getCategoriesFromFirestore } from '@/lib/services/books';
 import { getPurchasedBookIdsFromLocal, savePurchasedBookIds } from '@/lib/offline-storage';
 import { recordUserPurchaseInFirestore, syncUserPurchases, subscribeToUserPurchases } from '@/lib/services/purchases';
+import { syncUserProfileToFirestore } from '@/lib/services/users';
 import { processRazorpayPayment, loadRazorpayScript } from '@/lib/services/razorpay';
 import {
   getCartItemsFromLocal,
@@ -31,7 +31,7 @@ import {
   calculateCartSummary,
   subscribeToCartChanges,
 } from '@/lib/services/cart';
-import { auth, signOutUser } from '@/lib/firebase';
+import { auth, signOutUser, signInWithGoogle } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { usePWAInstall } from '@/hooks/use-pwa-install';
 import { Check, ShoppingBag, RefreshCw, Lock, Trash2 } from 'lucide-react';
@@ -147,8 +147,18 @@ export default function HomePage() {
         };
         setCurrentUser(profile);
         if (typeof window !== 'undefined') {
-          localStorage.removeItem('bookscircle_test_user');
+          localStorage.removeItem('bookscircle_user_session');
         }
+
+        // Guarantee user profile document is initialized in Firestore /users/{uid}
+        syncUserProfileToFirestore({
+          uid: user.uid,
+          email: user.email,
+          displayName: user.displayName,
+          photoURL: user.photoURL,
+          providerId: user.providerData?.[0]?.providerId || 'google.com',
+        }).catch((err) => console.warn('User profile sync on auth state change note:', err));
+
         try {
           const syncedIds = await syncUserPurchases(user.uid, user.email || undefined);
           setPurchasedBookIds(syncedIds);
@@ -252,40 +262,65 @@ export default function HomePage() {
     };
   }, []);
 
-  // Require Login Handler with context & callback resume
-  const handleRequireLogin = (
-    callback?: (user: UserProfile) => void,
-    modalConfig?: { title?: string; subtitle?: string }
-  ) => {
-    setLoginModalConfig({
-      title: modalConfig?.title || 'Sign in to Complete Purchase',
-      subtitle: modalConfig?.subtitle || 'Sign in or create an account to link and access your eBooks',
-    });
-    if (callback) {
-      setPendingActionAfterLogin(() => callback);
-    } else {
-      setPendingActionAfterLogin(null);
+  // Direct Google Sign-In trigger (No modal popup dialog)
+  const triggerDirectGoogleSignIn = async (callback?: (user: UserProfile) => void) => {
+    try {
+      setToastMessage('Initiating Google sign in...');
+      const res = await signInWithGoogle();
+      if (res.user) {
+        const profile: UserProfile = {
+          uid: res.user.uid,
+          email: res.user.email,
+          displayName: res.user.displayName || (res.user.email ? res.user.email.split('@')[0] : 'Google User'),
+          photoURL: res.user.photoURL,
+        };
+        await handleSelectUserProfile(profile);
+        if (callback) {
+          callback(profile);
+        }
+      } else if (res.fallbackNeeded) {
+        setToastMessage('Firebase Google Sign-In domain check in progress. Please retry.');
+        setTimeout(() => setToastMessage(null), 3500);
+      } else if (res.cancelled) {
+        setToastMessage('Google sign in was cancelled.');
+        setTimeout(() => setToastMessage(null), 2500);
+      }
+    } catch (err: any) {
+      if (!err?.message?.includes('popup-closed-by-user')) {
+        setToastMessage('Google sign in error: ' + (err?.message || 'Failed'));
+        setTimeout(() => setToastMessage(null), 3500);
+      }
     }
-    setIsGoogleModalOpen(true);
   };
 
-  // Standard Login Modal Handler
+  // Require Login Handler with direct Google sign in execution
+  const handleRequireLogin = (
+    callback?: (user: UserProfile) => void
+  ) => {
+    triggerDirectGoogleSignIn(callback);
+  };
+
+  // Standard Direct Login Handler
   const handleOpenLogin = () => {
-    setLoginModalConfig({
-      title: 'Login to BooksCircle',
-      subtitle: 'Sign in to access your purchased library & reading bookmarks',
-    });
-    setPendingActionAfterLogin(null);
-    setIsGoogleModalOpen(true);
+    triggerDirectGoogleSignIn();
   };
 
   const handleSelectUserProfile = async (profile: UserProfile) => {
     setCurrentUser(profile);
     if (typeof window !== 'undefined') {
-      localStorage.setItem('bookscircle_test_user', JSON.stringify(profile));
+      localStorage.setItem('bookscircle_user_session', JSON.stringify(profile));
     }
     setToastMessage(`Signed in as ${profile.displayName || profile.email}`);
     setTimeout(() => setToastMessage(null), 3000);
+
+    // Ensure user profile document exists in Firestore /users/{uid}
+    syncUserProfileToFirestore({
+      uid: profile.uid,
+      email: profile.email,
+      displayName: profile.displayName,
+      photoURL: profile.photoURL,
+      providerId: 'google.com',
+    }).catch((err) => console.warn('User profile sync in handleSelectUserProfile note:', err));
 
     // Sync cloud purchases
     try {
@@ -313,7 +348,7 @@ export default function HomePage() {
       console.warn('Firebase signout note:', e);
     }
     if (typeof window !== 'undefined') {
-      localStorage.removeItem('bookscircle_test_user');
+      localStorage.removeItem('bookscircle_user_session');
     }
     setCurrentUser(null);
     setToastMessage('Signed out successfully.');
@@ -441,7 +476,7 @@ export default function HomePage() {
     }
   };
 
-  // Direct Buy Now handler with deduplication and instant auto-resume
+  // Direct Buy Now handler - initiates direct checkout without adding to user's cart
   const handleBuyNow = (book: Book) => {
     if (purchasedBookIds.includes(book.id)) {
       setToastMessage(`You already own "${book.title.slice(0, 20)}...". Opening Library.`);
@@ -453,10 +488,6 @@ export default function HomePage() {
     }
 
     const buyItem: CartItem = { book, quantity: 1 };
-    
-    // Ensure item is also added/synced to cart state
-    const { updatedCart } = addToCartAction(book);
-    setCart(updatedCart);
 
     if (!currentUser || !currentUser.email) {
       handleRequireLogin((loggedInUser: UserProfile) => {
@@ -910,18 +941,6 @@ export default function HomePage() {
         onRequireLogin={handleRequireLogin}
         userEmail={activeEmail}
         userName={activeName}
-      />
-
-      {/* Dual Login Authentication Modal */}
-      <GoogleSignInModal
-        isOpen={isGoogleModalOpen}
-        onClose={() => {
-          setIsGoogleModalOpen(false);
-          setPendingActionAfterLogin(null);
-        }}
-        onSelectUser={handleSelectUserProfile}
-        title={loginModalConfig.title}
-        subtitle={loginModalConfig.subtitle}
       />
 
       {/* iOS Add to Home Screen Instructions Modal */}

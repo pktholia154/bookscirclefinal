@@ -1,59 +1,46 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Books collection - public read access for catalog browsing, write for admin/sync
+    
+    // Books catalog - public read and sync
     match /books/{bookId} {
-      allow read: if true;
-      allow write: if true;
-    }
-    
-    // Categories collection - public read access for category navigation
-    match /categories/{categoryId} {
-      allow read: if true;
-      allow write: if true;
-    }
-    
-    // Transaction purchase records by payment ID (e.g., pay_XXXXX)
-    match /purchases/{purchaseId} {
-      allow read: if true;
-      allow write: if true;
-    }
-    
-    // Order records by order ID (e.g., order_XXXXX)
-    match /orders/{orderId} {
-      allow read: if true;
-      allow write: if true;
-    }
-    
-    // User purchase summaries indexed by User UID
-    match /user_purchases/{userId} {
-      allow read: if true;
-      allow write: if true;
-    }
-    
-    // User purchase summaries indexed by sanitized email
-    match /user_purchases_by_email/{emailKey} {
-      allow read: if true;
-      allow write: if true;
-    }
-    
-    // Aggregate analytics & purchase counts per book
-    match /book_analytics/{bookId} {
-      allow read: if true;
-      allow write: if true;
-    }
-    
-    // User profile documents
-    match /users/{userId} {
-      allow read: if true;
-      allow write: if true;
+      allow read, write: if true;
     }
 
-    // Default catch-all for any other collections
+    // Categories
+    match /categories/{categoryId} {
+      allow read, write: if true;
+    }
+
+    // Users collection & subcollections (e.g., users/{userId}/purchases/{purchaseId})
+    match /users/{userId} {
+      allow read, write: if true;
+
+      match /{allSubcollections=**} {
+        allow read, write: if true;
+      }
+    }
+
+    // Purchases & Order transactions
+    match /purchases/{purchaseId} {
+      allow read, write: if true;
+    }
+
+    match /orders/{orderId} {
+      allow read, write: if true;
+    }
+
+    match /book_analytics/{bookId} {
+      allow read, write: if true;
+    }
+
+    match /reviews/{reviewId} {
+      allow read, write: if true;
+    }
+
+    // Catch-all
     match /{document=**} {
-      allow read: if true;
-      allow write: if true;
+      allow read, write: if true;
     }
   }
 }
-

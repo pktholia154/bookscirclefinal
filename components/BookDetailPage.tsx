@@ -339,7 +339,7 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
             >
               <ShoppingBag className="w-4 h-4 text-white" />
               <span>
-                {isInCart ? `Buy Now (₹${book.buy_price})` : `Buy for ₹${book.buy_price}`}
+                Buy Now (₹{book.buy_price})
               </span>
             </button>
           )}

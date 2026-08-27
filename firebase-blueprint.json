@@ -1,0 +1,71 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User account profile and library entitlements",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Unique identifier matching Firebase Auth UID" },
+        "email": { "type": "string", "description": "Email address of the user" },
+        "displayName": { "type": "string", "description": "User display name" },
+        "photoURL": { "type": "string", "description": "Profile picture URL" },
+        "providerId": { "type": "string", "description": "Auth provider such as google.com or password" },
+        "role": { "type": "string", "enum": ["user", "admin", "subscriber"] },
+        "purchasedBooks": { "type": "array", "description": "List of book IDs owned by the user" },
+        "purchasesCount": { "type": "number", "description": "Total number of purchased books" },
+        "totalSpent": { "type": "number", "description": "Total amount spent in INR" },
+        "lastLoginAt": { "type": "string", "description": "Timestamp of last login" },
+        "createdAt": { "type": "string", "description": "Account creation timestamp" },
+        "updatedAt": { "type": "string", "description": "Last update timestamp" }
+      },
+      "required": ["uid"]
+    },
+    "Purchase": {
+      "title": "Purchase",
+      "description": "Master transaction record for ebook orders",
+      "type": "object",
+      "properties": {
+        "orderId": { "type": "string", "description": "Order reference ID" },
+        "paymentId": { "type": "string", "description": "Payment reference ID" },
+        "amount": { "type": "number", "description": "Amount paid in INR" },
+        "currency": { "type": "string", "description": "Currency code" },
+        "status": { "type": "string", "enum": ["verified", "completed", "pending"] },
+        "purchasedAt": { "type": "string", "description": "ISO timestamp of transaction" },
+        "userId": { "type": "string", "description": "Buyer user UID" },
+        "userEmail": { "type": "string", "description": "Buyer email address" },
+        "bookIds": { "type": "array", "description": "Array of purchased book IDs" }
+      },
+      "required": ["orderId", "paymentId", "amount", "status", "purchasedAt", "bookIds"]
+    },
+    "Book": {
+      "title": "Book",
+      "description": "Ebook item details in the catalog",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Book unique identifier" },
+        "title": { "type": "string", "description": "Title of the book" },
+        "slug": { "type": "string", "description": "SEO friendly URL slug" },
+        "buy_price": { "type": "number", "description": "Purchase price in INR" },
+        "list_price": { "type": "number", "description": "Original list price in INR" },
+        "category": { "type": "string", "description": "Category name" },
+        "cover": { "type": "string", "description": "Cover image URL" },
+        "isActive": { "type": "boolean", "description": "Whether book is active for sale" }
+      },
+      "required": ["id", "title", "buy_price", "category"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile and owned ebook library"
+    },
+    "/users/{userId}/purchases/{purchaseId}": {
+      "schema": "Purchase",
+      "description": "User purchase transaction records subcollection under user"
+    },
+    "/books/{bookId}": {
+      "schema": "Book",
+      "description": "Ebooks catalog"
+    }
+  }
+}

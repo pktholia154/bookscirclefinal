@@ -28,12 +28,13 @@ import { Book, Review, CartItem } from '@/lib/types';
 import { DEFAULT_BOOK_COVER } from '@/lib/data';
 import { PDFReaderModal } from '@/components/PDFReaderModal';
 import { CartDrawer } from '@/components/CartDrawer';
-import { GoogleSignInModal } from '@/components/GoogleSignInModal';
 import { UserProfile } from '@/components/Header';
 import { processRazorpayPayment, loadRazorpayScript } from '@/lib/services/razorpay';
 import { recordUserPurchaseInFirestore, syncUserPurchases } from '@/lib/services/purchases';
+import { syncUserProfileToFirestore } from '@/lib/services/users';
 import { getPurchasedBookIdsFromLocal, savePurchasedBookIds } from '@/lib/offline-storage';
-import { auth } from '@/lib/firebase';
+import { addToCartAction, getCartFromLocal, subscribeToCartChanges } from '@/lib/services/cart';
+import { auth, signInWithGoogle } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -82,13 +83,16 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
       } catch {}
 
       try {
-        const savedCart = localStorage.getItem('bookscircle_cart');
-        if (savedCart) {
-          const parsed = JSON.parse(savedCart);
-          if (Array.isArray(parsed)) setCart(parsed);
+        const savedCart = getCartFromLocal();
+        if (savedCart && savedCart.length > 0) {
+          setCart(savedCart);
         }
       } catch {}
     }, 0);
+
+    const unsubCart = subscribeToCartChanges((newCart) => {
+      setCart(newCart);
+    });
 
     const unsub = onAuthStateChanged(auth, async (user) => {
       if (user && !user.isAnonymous) {
@@ -108,6 +112,7 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
 
     return () => {
       clearTimeout(timer);
+      unsubCart();
       unsub();
     };
   }, []);
@@ -143,16 +148,17 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
   };
 
   const handleAddToCart = () => {
-    setCart((prev) => {
-      const existing = prev.find((item) => item.book.id === book.id);
-      if (existing) {
-        return prev.map((item) =>
-          item.book.id === book.id ? { ...item, quantity: item.quantity + 1 } : item
-        );
-      }
-      return [...prev, { book, quantity: 1 }];
-    });
-    showToast(`Added "${book.title.slice(0, 20)}..." to Cart`);
+    if (isPurchased) {
+      showToast(`You already own "${book.title.slice(0, 20)}...". Available in your library.`);
+      return;
+    }
+    const { updatedCart, isNewItem } = addToCartAction(book);
+    setCart(updatedCart);
+    if (isNewItem) {
+      showToast(`Added "${book.title.slice(0, 20)}..." to Cart`);
+    } else {
+      showToast(`"${book.title.slice(0, 20)}..." is already in your Cart`);
+    }
   };
 
   const executeRazorpayCheckout = async (itemsToBuy: CartItem[], userOverride?: UserProfile | null) => {
@@ -203,17 +209,63 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
     }
   };
 
-  // Instant 1-Click Buy Now
+  const triggerDirectGoogleSignIn = async (callback?: (user: UserProfile) => void) => {
+    try {
+      showToast('Initiating Google sign in...');
+      const res = await signInWithGoogle();
+      if (res.user) {
+        const profile: UserProfile = {
+          uid: res.user.uid,
+          email: res.user.email,
+          displayName: res.user.displayName || (res.user.email ? res.user.email.split('@')[0] : 'Google User'),
+          photoURL: res.user.photoURL,
+        };
+        setCurrentUser(profile);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('bookscircle_user_session', JSON.stringify(profile));
+        }
+        showToast(`Signed in as ${profile.displayName || profile.email}`);
+        syncUserProfileToFirestore({
+          uid: profile.uid,
+          email: profile.email,
+          displayName: profile.displayName,
+          photoURL: profile.photoURL,
+          providerId: 'google.com',
+        }).catch((err) => console.warn('Sync profile note:', err));
+        
+        try {
+          const mergedBookIds = await syncUserPurchases(profile.uid, profile.email || undefined);
+          setPurchasedBookIds(mergedBookIds);
+        } catch {
+          // Sync note
+        }
+
+        if (callback) {
+          callback(profile);
+        }
+      } else if (res.fallbackNeeded) {
+        showToast('Firebase Google Sign-In domain check in progress.');
+      } else if (res.cancelled) {
+        showToast('Google sign in was cancelled.');
+      }
+    } catch (err: any) {
+      if (!err?.message?.includes('popup-closed-by-user')) {
+        showToast('Google sign in error: ' + (err?.message || 'Failed'));
+      }
+    }
+  };
+
+  // Direct 1-Click Buy Now without adding to cart
   const handleBuyNow = () => {
     if (isPurchased) {
       setActivePdfReaderMode('full');
       return;
     }
     const buyItem: CartItem = { book, quantity: 1 };
-    handleAddToCart();
     if (!currentUser || !currentUser.email) {
-      setPendingActionAfterLogin(() => (user: UserProfile) => executeRazorpayCheckout([buyItem], user));
-      setIsGoogleModalOpen(true);
+      triggerDirectGoogleSignIn((loggedInUser: UserProfile) => {
+        executeRazorpayCheckout([buyItem], loggedInUser);
+      });
     } else {
       executeRazorpayCheckout([buyItem], currentUser);
     }
@@ -748,23 +800,6 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
           isPurchased={isPurchased}
         />
       )}
-
-      {/* Login Modal */}
-      <GoogleSignInModal
-        isOpen={isGoogleModalOpen}
-        onClose={() => {
-          setIsGoogleModalOpen(false);
-          setPendingActionAfterLogin(null);
-        }}
-        onSelectUser={(profile) => {
-          setCurrentUser(profile);
-          if (pendingActionAfterLogin) {
-            const act = pendingActionAfterLogin;
-            setPendingActionAfterLogin(null);
-            setTimeout(() => act(profile), 300);
-          }
-        }}
-      />
 
       {/* Cart Drawer */}
       <CartDrawer

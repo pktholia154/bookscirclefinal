@@ -33,6 +33,18 @@ googleProvider.setCustomParameters({ prompt: 'select_account' });
 export async function signInWithGoogle(): Promise<{ user: User | null; fallbackNeeded?: boolean; cancelled?: boolean; error?: any }> {
   try {
     const result = await signInWithPopup(auth, googleProvider);
+    if (result.user) {
+      // Automatically sync user profile document to /users/{uid} in Firestore
+      import('./services/users').then(({ syncUserProfileToFirestore }) => {
+        syncUserProfileToFirestore({
+          uid: result.user.uid,
+          email: result.user.email,
+          displayName: result.user.displayName,
+          photoURL: result.user.photoURL,
+          providerId: 'google.com',
+        }).catch((err) => console.warn('User profile sync on Google sign in note:', err));
+      });
+    }
     return { user: result.user };
   } catch (error: any) {
     if (error?.code === 'auth/unauthorized-domain' || error?.message?.includes('unauthorized-domain')) {
@@ -57,12 +69,34 @@ export async function signInWithGoogle(): Promise<{ user: User | null; fallbackN
 export async function signInWithEmail(email: string, password: string): Promise<User> {
   try {
     const cred = await signInWithEmailAndPassword(auth, email, password);
+    if (cred.user) {
+      import('./services/users').then(({ syncUserProfileToFirestore }) => {
+        syncUserProfileToFirestore({
+          uid: cred.user.uid,
+          email: cred.user.email,
+          displayName: cred.user.displayName,
+          photoURL: cred.user.photoURL,
+          providerId: 'password',
+        }).catch((err) => console.warn('User profile sync on email sign in note:', err));
+      });
+    }
     return cred.user;
   } catch (error: any) {
     // If account doesn't exist yet, try creating it automatically for seamless test login
     if (error?.code === 'auth/user-not-found' || error?.code === 'auth/invalid-credential') {
       try {
         const newCred = await createUserWithEmailAndPassword(auth, email, password);
+        if (newCred.user) {
+          import('./services/users').then(({ syncUserProfileToFirestore }) => {
+            syncUserProfileToFirestore({
+              uid: newCred.user.uid,
+              email: newCred.user.email,
+              displayName: newCred.user.displayName || email.split('@')[0],
+              photoURL: newCred.user.photoURL,
+              providerId: 'password',
+            }).catch((err) => console.warn('User profile sync on new user note:', err));
+          });
+        }
         return newCred.user;
       } catch (createErr) {
         throw error;
@@ -77,6 +111,17 @@ export async function signUpWithEmail(email: string, password: string, displayNa
   const cred = await createUserWithEmailAndPassword(auth, email, password);
   if (displayName && cred.user) {
     await updateProfile(cred.user, { displayName });
+  }
+  if (cred.user) {
+    import('./services/users').then(({ syncUserProfileToFirestore }) => {
+      syncUserProfileToFirestore({
+        uid: cred.user.uid,
+        email: cred.user.email,
+        displayName: displayName || cred.user.displayName || email.split('@')[0],
+        photoURL: cred.user.photoURL,
+        providerId: 'password',
+      }).catch((err) => console.warn('User profile sync on signup note:', err));
+    });
   }
   return cred.user;
 }

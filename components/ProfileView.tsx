@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { getOfflineStorageStats, clearAllOfflinePdfs } from '@/lib/offline-storage';
 import { UserProfile } from '@/components/Header';
+import { syncUserProfileToFirestore } from '@/lib/services/users';
 
 // Crisp Google 'G' vector icon component
 const GoogleIcon: React.FC<{ className?: string }> = ({ className = 'w-4 h-4' }) => (
@@ -247,17 +248,19 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 <span>Login</span>
               </button>
             ) : (
-              <button
-                id="profile-signout-btn"
-                onClick={() => {
-                  onSignOut();
-                  showToast('Signed out successfully.');
-                }}
-                className="px-3.5 py-1.5 bg-white hover:bg-red-50 border border-gray-200 hover:border-red-200 text-red-600 text-xs font-bold rounded-xl active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-                <span>Sign Out</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  id="profile-signout-btn"
+                  onClick={() => {
+                    onSignOut();
+                    showToast('Signed out successfully.');
+                  }}
+                  className="px-4 py-2 bg-white hover:bg-red-50 border border-gray-200 hover:border-red-200 text-red-600 text-xs font-bold rounded-xl active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>Sign Out</span>
+                </button>
+              </div>
             )}
           </div>
         </div>
