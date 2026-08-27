@@ -20,6 +20,10 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Book, Review } from '@/lib/types';
 import { DEFAULT_BOOK_COVER } from '@/lib/data';
 import { PDFReaderModal } from '@/components/PDFReaderModal';
+import { loadRazorpayScript } from '@/lib/services/razorpay';
+import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import remarkBreaks from 'remark-breaks';
 
 interface BookDetailPageProps {
   book: Book;
@@ -135,6 +139,24 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
   const publisherName = book.publisher || 'Jaico Publishing House';
   const pageCount = book.pages || 236;
 
+  // 6 tags for the book details page
+  const displayTags = useMemo(() => {
+    const rawTags = Array.isArray(book.tags) ? book.tags.filter((t) => Boolean(t && t.trim())) : [];
+    if (rawTags.length >= 6) {
+      return rawTags.slice(0, 6);
+    }
+    const defaultTagPool = [
+      book.category || 'Competitive Exam',
+      `${book.category || 'Exam'} PDF`,
+      'Study Guide',
+      'Solved Papers',
+      'Revision Notes',
+      'Instant Download',
+    ];
+    const combined = Array.from(new Set([...rawTags, ...defaultTagPool]));
+    return combined.slice(0, 6);
+  }, [book.tags, book.category]);
+
   // Rating percentage bars (approx distribution)
   const ratingBars = [
     { stars: 5, pct: 68 },
@@ -200,6 +222,7 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
               src={imgSrc}
               alt={book.title}
               fill
+              unoptimized
               sizes="(max-width: 640px) 96px, 128px"
               className="object-cover rounded-none"
               priority
@@ -216,6 +239,16 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
             <p className="text-xs text-gray-500 font-normal mt-1">
               {publisherName}
             </p>
+
+            {/* Metadata row below publication: category, language, type (values only, no labels) */}
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-gray-500 mt-2 pt-1.5 border-t border-gray-100">
+              <span className="font-medium text-gray-700">{book.category || 'General'}</span>
+              <span className="text-gray-300 text-[9px]">•</span>
+              <span>{book.language || 'English'}</span>
+              <span className="text-gray-300 text-[9px]">•</span>
+              <span>{book.type || 'PDF Ebook'}</span>
+            </div>
+
             <div className="flex items-baseline gap-2 mt-2.5">
               <span className="text-xl sm:text-2xl font-black text-gray-950 tracking-tight">
                 ₹{book.buy_price}
@@ -299,6 +332,8 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
           ) : (
             <button
               id="book-detail-buy-btn"
+              onMouseEnter={() => loadRazorpayScript()}
+              onTouchStart={() => loadRazorpayScript()}
               onClick={() => onBuyNow(book)}
               className="w-full py-2.5 px-4 rounded-lg bg-[#4029AB] hover:bg-[#34208e] text-white text-xs sm:text-sm font-bold transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
             >
@@ -311,35 +346,85 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
         </section>
 
         {/* 5. "About this book" Section */}
-        <section className="space-y-3 pt-2">
+        <section className="space-y-3.5 pt-2">
           <h2 className="text-base sm:text-lg font-bold text-gray-950">
             About this book
           </h2>
 
-          <div className="space-y-3 text-xs sm:text-sm leading-relaxed">
-            {/* SEO Description */}
+          <div className="space-y-3.5 text-xs sm:text-sm leading-relaxed">
+            {/* Aspect 1: seoDescription: text field */}
             {(book.seo_description || book.seoDescription) && (
-              <p className="font-semibold text-gray-900 bg-gray-50/80 p-3.5 rounded-xl border border-gray-100/90 text-xs sm:text-sm leading-relaxed">
-                {book.seo_description || book.seoDescription}
-              </p>
+              <div className="p-3.5 rounded-xl bg-gray-50 border border-gray-100">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-1">
+                  Summary
+                </span>
+                <p className="font-semibold text-gray-900 text-xs sm:text-sm leading-relaxed">
+                  {book.seo_description || book.seoDescription}
+                </p>
+              </div>
             )}
 
-            {/* Full Description */}
-            {(book.full_description || book.fullDescription) &&
-              (book.full_description || book.fullDescription) !==
-                (book.seo_description || book.seoDescription) && (
-                <div className="text-gray-700 leading-relaxed whitespace-pre-line text-xs sm:text-sm">
-                  {book.full_description || book.fullDescription}
+            {/* Aspect 2: fullDescription: markdown field with basic markdown syntax, parsed in markdown and treating \n as line break */}
+            {(book.full_description || book.fullDescription) ? (
+              <div className="text-gray-700 leading-relaxed text-xs sm:text-sm">
+                <div className="markdown-body">
+                  <Markdown
+                    remarkPlugins={[remarkGfm, remarkBreaks]}
+                    components={{
+                      p: ({ children }) => <p className="mb-2 leading-relaxed text-gray-700 last:mb-0">{children}</p>,
+                      h1: ({ children }) => <h1 className="text-sm sm:text-base font-bold text-gray-950 mt-3 mb-1.5">{children}</h1>,
+                      h2: ({ children }) => <h2 className="text-xs sm:text-sm font-bold text-gray-950 mt-2.5 mb-1">{children}</h2>,
+                      h3: ({ children }) => <h3 className="text-xs font-bold text-gray-900 mt-2 mb-1">{children}</h3>,
+                      ul: ({ children }) => <ul className="list-disc pl-4 space-y-1 my-2 text-gray-700">{children}</ul>,
+                      ol: ({ children }) => <ol className="list-decimal pl-4 space-y-1 my-2 text-gray-700">{children}</ol>,
+                      li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+                      strong: ({ children }) => <strong className="font-bold text-gray-950">{children}</strong>,
+                      em: ({ children }) => <em className="italic text-gray-800">{children}</em>,
+                      blockquote: ({ children }) => (
+                        <blockquote className="border-l-2 border-[#4029AB] pl-3 italic text-gray-600 my-2">
+                          {children}
+                        </blockquote>
+                      ),
+                      code: ({ children }) => (
+                        <code className="bg-gray-100 px-1.5 py-0.5 rounded text-[11px] font-mono text-gray-900">
+                          {children}
+                        </code>
+                      ),
+                      a: ({ href, children }) => (
+                        <a href={href} className="text-[#4029AB] underline font-medium hover:text-[#34208e]">
+                          {children}
+                        </a>
+                      ),
+                    }}
+                  >
+                    {(book.full_description || book.fullDescription || '').replace(/\\n/g, '\n')}
+                  </Markdown>
                 </div>
-              )}
-
-            {/* Fallback if neither is present */}
-            {!(book.seo_description || book.seoDescription) &&
-              !(book.full_description || book.fullDescription) && (
+              </div>
+            ) : (
+              !(book.seo_description || book.seoDescription) && (
                 <p className="text-gray-500 italic text-xs">
                   No detailed description provided for this title.
                 </p>
-              )}
+              )
+            )}
+
+            {/* Aspect 3: tags: array fields with 6 tags rendered as flexible chip buttons */}
+            <div className="pt-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-2">
+                Topic Tags
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {displayTags.map((tag, idx) => (
+                  <span
+                    key={idx}
+                    className="inline-flex items-center px-2.5 py-1 text-[11px] font-medium text-gray-700 bg-gray-100 hover:bg-gray-200/80 rounded-full transition-colors cursor-default"
+                  >
+                    #{tag.replace(/^#/, '')}
+                  </span>
+                ))}
+              </div>
+            </div>
           </div>
         </section>
 
@@ -549,6 +634,7 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
                       src={relBook.cover || DEFAULT_BOOK_COVER}
                       alt={relBook.title}
                       fill
+                      unoptimized
                       sizes="96px"
                       className="object-cover rounded-none group-hover:scale-105 transition-transform"
                       referrerPolicy="no-referrer"
@@ -599,6 +685,8 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
             ) : (
               <button
                 onClick={() => onBuyNow(book)}
+                onMouseEnter={() => loadRazorpayScript()}
+                onTouchStart={() => loadRazorpayScript()}
                 className="px-5 py-2 rounded-lg bg-[#4029AB] hover:bg-[#34208e] text-white text-xs font-bold transition-all shadow-xs active:scale-95 cursor-pointer"
               >
                 Buy Ebook

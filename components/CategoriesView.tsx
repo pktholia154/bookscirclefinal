@@ -159,6 +159,7 @@ export const CategoriesView: React.FC<CategoriesViewProps> = ({
                       src={book.cover || DEFAULT_BOOK_COVER}
                       alt={book.title}
                       fill
+                      unoptimized
                       sizes="64px"
                       className="object-cover rounded-none group-hover:scale-105 transition-transform"
                       referrerPolicy="no-referrer"
@@ -168,17 +169,23 @@ export const CategoriesView: React.FC<CategoriesViewProps> = ({
                   {/* Info */}
                   <div className="flex-1 min-w-0 flex flex-col justify-between self-stretch">
                     <div>
-                      <span className="text-[9px] font-bold text-[#4029AB] bg-[#4029AB]/10 px-1.5 py-0.2 rounded uppercase">
-                        {book.category}
-                      </span>
                       <h4
-                        className="font-bold text-xs sm:text-sm text-gray-950 truncate mt-1 leading-snug group-hover:text-[#4029AB] transition-colors"
+                        className="font-bold text-xs sm:text-sm text-gray-950 truncate leading-snug group-hover:text-[#4029AB] transition-colors"
                         title={book.title}
                       >
                         {book.title}
                       </h4>
-                      <p className="text-[11px] text-gray-500 mt-0.5 truncate">
-                        {book.author || 'BooksCircle'} • {book.pages || 220} Pages
+                      {/* Category, Language & Type in same row (display only field values, not field labels) */}
+                      <div className="flex items-center gap-1.5 text-[11px] text-gray-500 truncate mt-1">
+                        <span className="font-medium text-gray-600">{book.category || 'General'}</span>
+                        <span className="text-gray-300 text-[9px]">•</span>
+                        <span>{book.language || 'English'}</span>
+                        <span className="text-gray-300 text-[9px]">•</span>
+                        <span>{book.type || 'PDF Ebook'}</span>
+                      </div>
+                      {/* Publication below above row */}
+                      <p className="text-[11px] text-gray-400 mt-0.5 truncate">
+                        {book.publisher || book.publication || 'Exam Kart'}
                       </p>
                     </div>
 

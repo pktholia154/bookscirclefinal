@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
-import { Loader2, ArrowLeft, ZoomIn, ZoomOut, RotateCcw, AlertCircle } from 'lucide-react';
+import { Loader2, ArrowLeft, ZoomIn, ZoomOut, AlertCircle, Download, CheckCircle2, ShieldCheck, Lock, Sparkles, ShoppingBag } from 'lucide-react';
 import { fetchFirestoreBookBySlugOrId } from '@/lib/books-store';
-import { getPdfOffline } from '@/lib/offline-storage';
+import { getPdfOffline, getPurchasedBookIdsFromLocal } from '@/lib/offline-storage';
 import { createEngine, PdfEngine, PdfDocument } from 'clawpdf/browser';
+import { resolveBookSampleUrl, getVerifiedFullPdfSignedUrl, resolveFullBookStoragePath } from '@/lib/services/storage';
 
 export default function PDFReader() {
   const params = useParams();
@@ -20,8 +21,10 @@ export default function PDFReader() {
   const explicitUrl = searchParams?.get('file') || searchParams?.get('url');
 
   const [bookTitle, setBookTitle] = useState<string>('PDF Book Viewer');
+  const [bookData, setBookData] = useState<any>(null);
   const [fileUrl, setFileUrl] = useState<string>('');
   const [isUrlResolved, setIsUrlResolved] = useState(false);
+  const [isPurchased, setIsPurchased] = useState(false);
 
   const [isPdfLoaded, setIsPdfLoaded] = useState<boolean>(false);
   const [numPages, setNumPages] = useState<number>(0);
@@ -31,6 +34,7 @@ export default function PDFReader() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [noUrlError, setNoUrlError] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   const scrollViewRef = useRef<HTMLDivElement | null>(null);
   const canvasContainerRef = useRef<HTMLDivElement | null>(null);
@@ -42,6 +46,7 @@ export default function PDFReader() {
 
   const engineRef = useRef<PdfEngine | null>(null);
   const pdfDocRef = useRef<PdfDocument | null>(null);
+  const rawBufferRef = useRef<ArrayBuffer | null>(null);
 
   const scaleRef = useRef<number>(1.0);
   const fitToWidthRef = useRef<boolean>(true);
@@ -68,18 +73,29 @@ export default function PDFReader() {
         return;
       }
 
-      let firestoreUrl = '';
+      let resolvedTargetUrl = '';
 
       if (decodedBookId) {
         try {
-          const bookData = await fetchFirestoreBookBySlugOrId(decodedBookId);
-          if (active && bookData) {
-            if (bookData.title) setBookTitle(bookData.title);
+          const purchasedIds = getPurchasedBookIdsFromLocal();
+          const userOwnsBook = purchasedIds.includes(decodedBookId);
+          setIsPurchased(userOwnsBook);
+
+          const fetchedBook = await fetchFirestoreBookBySlugOrId(decodedBookId);
+          if (active && fetchedBook) {
+            setBookData(fetchedBook);
+            if (fetchedBook.title) setBookTitle(fetchedBook.title);
 
             if (readType === 'sample') {
-              firestoreUrl = bookData.sample_file || bookData.pdf_file || '';
+              // Public Sample PDF for all visitors
+              resolvedTargetUrl = resolveBookSampleUrl(fetchedBook.sample_file || fetchedBook.sampleUrl, fetchedBook.id);
             } else {
-              firestoreUrl = bookData.pdf_file || bookData.sample_file || '';
+              // Full PDF: Check purchase and get verified signed URL
+              const signed = await getVerifiedFullPdfSignedUrl({
+                bookId: fetchedBook.id,
+                pdfStoragePath: fetchedBook.pdfStoragePath || fetchedBook.pdf_file,
+              });
+              resolvedTargetUrl = signed.secureProxyUrl || signed.url;
             }
           }
         } catch (e) {
@@ -87,11 +103,11 @@ export default function PDFReader() {
         }
       }
 
-      const targetUrl = firestoreUrl || (explicitUrl ? decodeURIComponent(explicitUrl) : '');
+      const finalUrl = resolvedTargetUrl || (explicitUrl ? decodeURIComponent(explicitUrl) : '');
 
       if (active) {
-        if (targetUrl) {
-          setFileUrl(targetUrl);
+        if (finalUrl) {
+          setFileUrl(finalUrl);
           setIsUrlResolved(true);
         } else {
           setNoUrlError(true);
@@ -357,6 +373,8 @@ export default function PDFReader() {
 
         if (!active) return;
 
+        rawBufferRef.current = arrayBuffer;
+
         if (pdfDocRef.current) pdfDocRef.current[Symbol.dispose]();
         if (engineRef.current) engineRef.current.destroy();
 
@@ -389,14 +407,14 @@ export default function PDFReader() {
           return;
         }
 
-        console.warn('Direct fetch ArrayBuffer failed/CORS. Attempting proxy load...', fetchErr);
+        console.warn('Direct fetch failed. Attempting proxy load...', fetchErr);
         if (!active) return;
         tryProxyLoad();
       }
     }
 
     async function tryProxyLoad() {
-      const proxyUrl = '/api/pdf?url=' + encodeURIComponent(fileUrl);
+      const proxyUrl = '/api/pdf?url=' + encodeURIComponent(fileUrl) + '&bookId=' + encodeURIComponent(decodedBookId || '');
 
       try {
         const response = await fetch(proxyUrl);
@@ -404,6 +422,8 @@ export default function PDFReader() {
         const arrayBuffer = await response.arrayBuffer();
 
         if (!active) return;
+
+        rawBufferRef.current = arrayBuffer;
 
         if (pdfDocRef.current) pdfDocRef.current[Symbol.dispose]();
         if (engineRef.current) engineRef.current.destroy();
@@ -447,11 +467,32 @@ export default function PDFReader() {
     };
   }, [fileUrl, isUrlResolved, noUrlError, setupPages, decodedBookId, readType]);
 
+  const handleDownload = () => {
+    if (!rawBufferRef.current) return;
+    setIsDownloading(true);
+    try {
+      const blob = new Blob([rawBufferRef.current], { type: 'application/pdf' });
+      const blobUrl = URL.createObjectURL(blob);
+      const cleanTitle = bookTitle.replace(/[^a-zA-Z0-9_-]/g, '_');
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = `${cleanTitle}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
+    } catch (e) {
+      console.error('Download error:', e);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-[100] w-screen h-screen bg-white text-slate-900 flex flex-col overflow-hidden select-none">
       {/* Top Bar */}
       <header className="h-14 bg-white border-b border-slate-200 px-4 flex items-center justify-between z-30 shrink-0">
-        <div className="flex items-center gap-3 min-w-0">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
           <button
             onClick={() => router.back()}
             className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 active:scale-95 flex items-center justify-center text-slate-700 transition-all cursor-pointer shrink-0"
@@ -459,6 +500,25 @@ export default function PDFReader() {
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
+          <div className="truncate">
+            <h2 className="text-xs sm:text-sm font-bold text-slate-900 truncate">{bookTitle}</h2>
+            <span className="text-[10px] text-slate-500 font-semibold">
+              {readType === 'sample' ? 'Sample Preview' : 'Full eBook'}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {isPdfLoaded && (
+            <button
+              onClick={handleDownload}
+              disabled={isDownloading}
+              className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
+            >
+              <Download className="w-3.5 h-3.5 text-[#4029AB]" />
+              <span className="hidden sm:inline">Download</span>
+            </button>
+          )}
         </div>
       </header>
 
@@ -494,6 +554,30 @@ export default function PDFReader() {
               ref={canvasContainerRef}
               className="w-max min-w-full mx-auto flex flex-col items-center origin-top pb-24"
             />
+
+            {/* End of sample preview CTA */}
+            {readType === 'sample' && !isPurchased && !isLoading && numPages > 0 && (
+              <div className="max-w-md mx-auto my-10 p-6 bg-white rounded-2xl border border-slate-200 text-center space-y-3.5 shadow-xl">
+                <div className="w-12 h-12 rounded-2xl bg-[#4029AB]/10 text-[#4029AB] flex items-center justify-center mx-auto">
+                  <Sparkles className="w-6 h-6" />
+                </div>
+                <div className="space-y-1">
+                  <h4 className="text-base font-bold text-slate-900">End of Sample Preview</h4>
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    You have reached the end of this dedicated sample preview ({numPages} {numPages === 1 ? 'page' : 'pages'}). Purchase the complete e-book {bookData?.pages ? `(${bookData.pages} pages)` : ''} with full syllabus coverage, answers, and offline downloads.
+                  </p>
+                </div>
+                {bookData && (
+                  <button
+                    onClick={() => router.push(`/book/${bookData.slug || bookData.id}`)}
+                    className="w-full py-3 rounded-xl bg-[#4029AB] hover:bg-[#34208e] text-white font-bold text-xs shadow-lg transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <ShoppingBag className="w-4 h-4" />
+                    <span>Purchase Complete eBook (₹{bookData.buy_price})</span>
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         )}
 

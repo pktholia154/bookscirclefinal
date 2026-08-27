@@ -41,6 +41,7 @@ export const BookCard: React.FC<BookCardProps> = ({
           src={imgSrc}
           alt={book.title}
           fill
+          unoptimized
           sizes="(max-width: 640px) 100px, (max-width: 768px) 140px, 175px"
           className="object-cover rounded-none group-hover:scale-105 transition-transform duration-300"
           referrerPolicy="no-referrer"

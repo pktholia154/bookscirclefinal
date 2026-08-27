@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { Search, ShoppingCart, X, LogIn, Sparkles } from 'lucide-react';
+import { Search, ShoppingCart, X, LogIn, Sparkles, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 export interface UserProfile {
@@ -22,6 +22,8 @@ interface HeaderProps {
   onGoogleSignIn: () => void;
   onNavigateToProfile: () => void;
   onOpenDedicatedSearch?: () => void;
+  isInstallable?: boolean;
+  onInstall?: () => void;
 }
 
 const ANIMATED_PLACEHOLDERS = [
@@ -43,6 +45,8 @@ export const Header: React.FC<HeaderProps> = ({
   onGoogleSignIn,
   onNavigateToProfile,
   onOpenDedicatedSearch,
+  isInstallable = false,
+  onInstall,
 }) => {
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
 
@@ -69,10 +73,19 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-gray-100 transition-all">
       {/* Main Top Header Bar (Brand + Actions) */}
-      <div className="flex items-center justify-between px-4 sm:px-6 py-2 gap-3">
+      <div className="flex items-center justify-between px-4 sm:px-6 py-2 gap-2 sm:gap-3">
         {/* Brand Logo & Name */}
-        <div onClick={onNavigateToProfile} className="cursor-pointer select-none">
-          <h1 className="text-xl sm:text-2xl font-black tracking-tight text-[#4029AB]">
+        <div onClick={onNavigateToProfile} className="flex items-center gap-2 cursor-pointer select-none group">
+          <div className="relative w-7 h-7 sm:w-8 sm:h-8 shrink-0 transition-transform group-hover:scale-105">
+            <Image
+              src="/logo.svg"
+              alt="BooksCircle Logo"
+              fill
+              priority
+              className="object-contain"
+            />
+          </div>
+          <h1 className="text-xl sm:text-2xl font-black tracking-tight text-[#4029AB] leading-none">
             BooksCircle
           </h1>
         </div>
@@ -129,8 +142,21 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* Right Actions (Login / Account + Cart) */}
-        <div className="flex items-center gap-2">
+        {/* Right Actions (Install + Login / Account + Cart) */}
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* PWA Install Button: Visible only when not installed / not in standalone */}
+          {isInstallable && onInstall && (
+            <button
+              id="header-install-app-btn"
+              onClick={onInstall}
+              className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs font-black text-[#4029AB] bg-[#4029AB]/10 hover:bg-[#4029AB]/20 active:scale-95 transition-all shadow-2xs border border-[#4029AB]/20 cursor-pointer"
+              title="Add BooksCircle to Home Screen"
+            >
+              <Download className="w-3.5 h-3.5 text-[#4029AB] shrink-0 stroke-[2.5]" />
+              <span className="leading-none">Install</span>
+            </button>
+          )}
+
           {/* Login / User Profile Action */}
           {currentUser ? (
             <button

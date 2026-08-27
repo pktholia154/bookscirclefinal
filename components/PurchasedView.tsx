@@ -368,6 +368,7 @@ export const PurchasedView: React.FC<PurchasedViewProps> = ({
                       src={book.cover || DEFAULT_BOOK_COVER}
                       alt={book.title}
                       fill
+                      unoptimized
                       sizes="80px"
                       className="object-cover rounded-none group-hover:scale-105 transition-transform"
                       referrerPolicy="no-referrer"

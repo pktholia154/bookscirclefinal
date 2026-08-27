@@ -15,11 +15,20 @@ import {
   BookOpen,
   Sparkles,
   ShoppingBag,
-  RotateCcw
+  Lock,
+  Eye,
+  CheckCircle2,
+  ShieldCheck,
 } from 'lucide-react';
 import { createEngine, PdfEngine, PdfDocument } from 'clawpdf/browser';
 import { Book } from '@/lib/types';
 import { getPdfOffline } from '@/lib/offline-storage';
+import {
+  resolveBookSampleUrl,
+  resolveFullBookStoragePath,
+  getVerifiedFullPdfSignedUrl,
+  formatFirebaseStorageUrl,
+} from '@/lib/services/storage';
 
 interface PDFReaderModalProps {
   book: Book;
@@ -31,11 +40,12 @@ interface PDFReaderModalProps {
 
 export const PDFReaderModal: React.FC<PDFReaderModalProps> = ({
   book,
-  mode,
+  mode: initialMode,
   onClose,
   onBuyNow,
   isPurchased = false,
 }) => {
+  const [activeMode, setActiveMode] = useState<'sample' | 'full' | 'offline'>(initialMode);
   const [numPages, setNumPages] = useState<number>(0);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [scale, setScale] = useState<number>(1.0);
@@ -44,6 +54,9 @@ export const PDFReaderModal: React.FC<PDFReaderModalProps> = ({
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isDownloading, setIsDownloading] = useState<boolean>(false);
+  const [downloadSuccess, setDownloadSuccess] = useState<boolean>(false);
+  const [verifiedSignedUrl, setVerifiedSignedUrl] = useState<string | null>(null);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const scrollViewRef = useRef<HTMLDivElement | null>(null);
@@ -56,6 +69,7 @@ export const PDFReaderModal: React.FC<PDFReaderModalProps> = ({
 
   const engineRef = useRef<PdfEngine | null>(null);
   const pdfDocRef = useRef<PdfDocument | null>(null);
+  const rawPdfBufferRef = useRef<ArrayBuffer | null>(null);
 
   const scaleRef = useRef<number>(1.0);
   const fitToWidthRef = useRef<boolean>(true);
@@ -68,17 +82,6 @@ export const PDFReaderModal: React.FC<PDFReaderModalProps> = ({
   useEffect(() => {
     fitToWidthRef.current = fitToWidth;
   }, [fitToWidth]);
-
-  // Determine target PDF URL
-  const targetPdfUrl = useMemo(() => {
-    if (mode === 'sample') {
-      return book.sample_file || book.pdf_file || '';
-    }
-    return book.pdf_file || book.sample_file || '';
-  }, [book, mode]);
-
-  // Maximum pages visible in sample mode (if sample file has many pages, limit to 5 pages for sample)
-  const maxSamplePages = 5;
 
   // Render a single page canvas with exact proportional scaling and high-DPI sharpness
   const renderPage = useCallback(
@@ -217,10 +220,8 @@ export const PDFReaderModal: React.FC<PDFReaderModalProps> = ({
         { root: scrollView, threshold: 0.25 }
       );
 
-      // Limit pages in sample mode if needed
-      const renderCount = mode === 'sample' && !isPurchased ? Math.min(totalPages, maxSamplePages) : totalPages;
-
-      for (let i = 1; i <= renderCount; i++) {
+      // Render all pages in document
+      for (let i = 1; i <= totalPages; i++) {
         const wrapper = document.createElement('div');
         wrapper.className = 'pdf-page-wrapper relative my-3 shadow-md bg-white border border-gray-200 transition-all';
         wrapper.setAttribute('data-page-num', i.toString());
@@ -247,7 +248,7 @@ export const PDFReaderModal: React.FC<PDFReaderModalProps> = ({
         activePageObserverRef.current.observe(wrapper);
       }
     },
-    [renderPage, mode, isPurchased]
+    [renderPage]
   );
 
   // Apply zoom changes across existing canvases
@@ -322,35 +323,60 @@ export const PDFReaderModal: React.FC<PDFReaderModalProps> = ({
     let active = true;
 
     async function loadPdfDocument() {
+      // If user wants full book but has not purchased, stop and show purchase required view
+      if (activeMode === 'full' && !isPurchased) {
+        setIsLoading(false);
+        setErrorMessage(null);
+        return;
+      }
+
       setIsLoading(true);
       setErrorMessage(null);
 
       try {
         let arrayBuffer: ArrayBuffer;
 
-        if (mode === 'offline') {
+        if (activeMode === 'offline') {
           const offlineData = await getPdfOffline(book.id);
           if (!offlineData) {
             throw new Error('Offline PDF file not found in device storage. Please download it while connected to internet.');
           }
           arrayBuffer = offlineData;
-        } else {
-          if (!targetPdfUrl) {
-            if (active) {
-              setErrorMessage('No PDF file or sample link provided for this book.');
-              setIsLoading(false);
-            }
-            return;
-          }
+        } else if (activeMode === 'full') {
+          // 1. Full PDF (Paid Users Only): Generate verified lifetime Signed URL
+          const signedResult = await getVerifiedFullPdfSignedUrl({
+            bookId: book.id,
+            pdfStoragePath: book.pdfStoragePath || book.pdf_file,
+          });
 
-          // Try direct fetch first
+          if (!active) return;
+          setVerifiedSignedUrl(signedResult.url);
+
+          const fullFetchUrl = signedResult.secureProxyUrl || signedResult.url;
           try {
-            const response = await fetch(targetPdfUrl, { mode: 'cors' });
+            const response = await fetch(fullFetchUrl, { mode: 'cors' });
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             arrayBuffer = await response.arrayBuffer();
           } catch {
-            // If direct fetch fails (CORS or network), use server proxy route
-            const proxyUrl = `/api/pdf?url=${encodeURIComponent(targetPdfUrl)}`;
+            const fallbackProxyUrl = `/api/pdf?url=${encodeURIComponent(signedResult.url)}&bookId=${encodeURIComponent(book.id || '')}`;
+            const proxyRes = await fetch(fallbackProxyUrl);
+            if (!proxyRes.ok) throw new Error(`Proxy fetch error ${proxyRes.status}`);
+            arrayBuffer = await proxyRes.arrayBuffer();
+          }
+        } else {
+          // 2. Sample PDF (All Visitors): Public samples folder
+          const sampleUrl = resolveBookSampleUrl(book.sample_file || book.sampleUrl, book.id);
+          const proxyUrl = `/api/pdf?url=${encodeURIComponent(sampleUrl || `public/samples/${book.id}.pdf`)}&bookId=${encodeURIComponent(book.id || '')}`;
+
+          try {
+            if (sampleUrl) {
+              const response = await fetch(sampleUrl, { mode: 'cors' });
+              if (!response.ok) throw new Error(`HTTP ${response.status}`);
+              arrayBuffer = await response.arrayBuffer();
+            } else {
+              throw new Error('Using proxy reader');
+            }
+          } catch {
             const proxyRes = await fetch(proxyUrl);
             if (!proxyRes.ok) throw new Error(`Proxy error ${proxyRes.status}`);
             arrayBuffer = await proxyRes.arrayBuffer();
@@ -358,6 +384,8 @@ export const PDFReaderModal: React.FC<PDFReaderModalProps> = ({
         }
 
         if (!active) return;
+
+        rawPdfBufferRef.current = arrayBuffer;
 
         if (pdfDocRef.current) pdfDocRef.current[Symbol.dispose]();
         if (engineRef.current) engineRef.current.destroy();
@@ -385,7 +413,7 @@ export const PDFReaderModal: React.FC<PDFReaderModalProps> = ({
         console.error('PDF Engine error:', err);
         if (active) {
           setErrorMessage(
-            err?.message || 'Failed to load PDF file. Please verify the link or try again.'
+            err?.message || 'Failed to load PDF file. Please verify network connection and try again.'
           );
           setIsLoading(false);
         }
@@ -401,7 +429,7 @@ export const PDFReaderModal: React.FC<PDFReaderModalProps> = ({
       if (pdfDocRef.current) pdfDocRef.current[Symbol.dispose]();
       if (engineRef.current) engineRef.current.destroy();
     };
-  }, [targetPdfUrl, setupPages, book.id, mode]);
+  }, [book, activeMode, isPurchased, setupPages]);
 
   // Touch and Trackpad Pinch-to-zoom
   useEffect(() => {
@@ -570,6 +598,46 @@ export const PDFReaderModal: React.FC<PDFReaderModalProps> = ({
     };
   }, [applyZoom]);
 
+  // Handle downloading full verified PDF
+  const handleDownloadFullPdf = async () => {
+    if (!isPurchased) {
+      if (onBuyNow) onBuyNow(book);
+      return;
+    }
+
+    setIsDownloading(true);
+    try {
+      let buffer = rawPdfBufferRef.current;
+      if (!buffer) {
+        const signed = await getVerifiedFullPdfSignedUrl({
+          bookId: book.id,
+          pdfStoragePath: book.pdfStoragePath || book.pdf_file,
+        });
+        const res = await fetch(signed.secureProxyUrl || signed.url);
+        buffer = await res.arrayBuffer();
+      }
+
+      const blob = new Blob([buffer], { type: 'application/pdf' });
+      const blobUrl = URL.createObjectURL(blob);
+      const cleanTitle = (book.title || 'ebook').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = `${cleanTitle}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
+
+      setDownloadSuccess(true);
+      setTimeout(() => setDownloadSuccess(false), 3000);
+    } catch (e) {
+      console.error('Download error:', e);
+      alert('Could not download PDF file. Please try again.');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   // Jump to specific page
   const scrollToPage = (pageNum: number) => {
     if (pageNum >= 1 && pageNum <= numPages) {
@@ -628,8 +696,72 @@ export const PDFReaderModal: React.FC<PDFReaderModalProps> = ({
     }
   };
 
-  const isSampleLimited = mode === 'sample' && !isPurchased && numPages > maxSamplePages;
-  const effectiveMaxPages = isSampleLimited ? maxSamplePages : numPages;
+  const showSampleEndCta = activeMode === 'sample' && !isPurchased;
+  const effectiveMaxPages = numPages;
+
+  // Unpurchased Full Book Lock View
+  if (activeMode === 'full' && !isPurchased) {
+    return (
+      <div
+        ref={containerRef}
+        className="fixed inset-0 z-50 w-screen h-screen bg-white text-slate-900 flex flex-col justify-between overflow-hidden select-none"
+      >
+        <header className="h-14 bg-white border-b border-slate-200 px-4 flex items-center justify-between z-30 shrink-0">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <button
+              onClick={onClose}
+              className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 active:scale-95 flex items-center justify-center text-slate-700 transition-all cursor-pointer shrink-0"
+              title="Back"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+            <h2 className="text-xs sm:text-sm font-bold text-slate-900 truncate">{book.title}</h2>
+          </div>
+        </header>
+
+        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center max-w-md mx-auto space-y-4">
+          <div className="w-16 h-16 rounded-3xl bg-[#4029AB]/10 text-[#4029AB] flex items-center justify-center shadow-inner">
+            <Lock className="w-8 h-8" />
+          </div>
+          <div className="space-y-1.5">
+            <span className="text-[10px] font-black uppercase tracking-wider text-[#4029AB] bg-[#4029AB]/10 px-2 py-0.5 rounded">
+              Paid Digital Edition
+            </span>
+            <h3 className="text-lg font-black text-slate-950">Full PDF eBook Protected</h3>
+            <p className="text-xs text-slate-500 leading-relaxed max-w-xs mx-auto">
+              The complete syllabus PDF ({book.pages || 'All'} pages) is reserved for verified purchasers. Instant delivery upon purchase.
+            </p>
+          </div>
+
+          <div className="w-full space-y-2.5 pt-2">
+            {onBuyNow && (
+              <button
+                onClick={() => onBuyNow(book)}
+                className="w-full py-3 px-4 rounded-xl bg-[#4029AB] hover:bg-[#34208e] text-white font-bold text-xs shadow-md transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2"
+              >
+                <ShoppingBag className="w-4 h-4" />
+                <span>Instant Buy Now (₹{book.buy_price})</span>
+              </button>
+            )}
+            <button
+              onClick={() => setActiveMode('sample')}
+              className="w-full py-2.5 px-4 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2"
+            >
+              <Eye className="w-4 h-4 text-[#4029AB]" />
+              <span>Read Free Sample Preview (All Visitors)</span>
+            </button>
+          </div>
+        </div>
+
+        <footer className="p-4 border-t border-slate-100 text-center">
+          <p className="text-[11px] text-slate-400 font-medium flex items-center justify-center gap-1">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+            <span>Secure Razorpay Gateway &amp; Lifetime Cloud Delivery</span>
+          </p>
+        </footer>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -650,10 +782,47 @@ export const PDFReaderModal: React.FC<PDFReaderModalProps> = ({
             <h2 className="text-xs sm:text-sm font-bold text-slate-900 truncate tracking-tight">
               {book.title}
             </h2>
+            <div className="flex items-center gap-1.5 text-[10px] font-semibold text-slate-500">
+              {activeMode === 'sample' ? (
+                <span className="text-[#4029AB] font-bold">Free Sample Preview</span>
+              ) : isPurchased ? (
+                <span className="text-emerald-600 font-bold flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                  <span>Full eBook (Purchased)</span>
+                </span>
+              ) : (
+                <span>Digital Edition</span>
+              )}
+            </div>
           </div>
         </div>
 
         <div className="flex items-center gap-1 sm:gap-2 shrink-0 ml-auto">
+          {/* Download button for verified paid users */}
+          {isPurchased && (
+            <button
+              onClick={handleDownloadFullPdf}
+              disabled={isDownloading}
+              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 active:scale-95 ${
+                downloadSuccess
+                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-800'
+              }`}
+              title="Download Full PDF"
+            >
+              {isDownloading ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-[#4029AB]" />
+              ) : downloadSuccess ? (
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+              ) : (
+                <Download className="w-3.5 h-3.5 text-[#4029AB]" />
+              )}
+              <span className="hidden md:inline">
+                {downloadSuccess ? 'Downloaded!' : isDownloading ? 'Preparing...' : 'Download PDF'}
+              </span>
+            </button>
+          )}
+
           {/* Zoom controls */}
           <button
             onClick={handleZoomOut}
@@ -700,12 +869,22 @@ export const PDFReaderModal: React.FC<PDFReaderModalProps> = ({
             </div>
             <h3 className="text-sm font-bold text-slate-900">PDF Load Error</h3>
             <p className="text-xs text-slate-500 leading-relaxed">{errorMessage}</p>
-            <button
-              onClick={onClose}
-              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold cursor-pointer"
-            >
-              Close Reader
-            </button>
+            <div className="flex gap-2 justify-center pt-2">
+              <button
+                onClick={onClose}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold cursor-pointer"
+              >
+                Close Reader
+              </button>
+              {activeMode === 'full' && (
+                <button
+                  onClick={() => setActiveMode('sample')}
+                  className="px-4 py-2 bg-[#4029AB] hover:bg-[#34208e] text-white rounded-xl text-xs font-bold cursor-pointer"
+                >
+                  Try Sample Preview
+                </button>
+              )}
+            </div>
           </div>
         ) : (
           <div
@@ -716,9 +895,13 @@ export const PDFReaderModal: React.FC<PDFReaderModalProps> = ({
             {isLoading && (
               <div className="flex flex-col items-center justify-center h-full min-h-[300px] gap-3 text-slate-500">
                 <Loader2 className="w-8 h-8 animate-spin text-[#4029AB]" />
-                <p className="text-xs font-bold text-slate-700">Initializing PDFium WASM Engine...</p>
+                <p className="text-xs font-bold text-slate-700">
+                  {activeMode === 'full'
+                    ? 'Verifying purchase & loading full eBook...'
+                    : 'Loading Sample Preview...'}
+                </p>
                 <p className="text-[11px] text-slate-500 max-w-xs text-center">
-                  Loading high-precision vector rendering for crystal-clear readability.
+                  Crystal-clear vector rendering via PDFium WASM Engine.
                 </p>
               </div>
             )}
@@ -728,23 +911,25 @@ export const PDFReaderModal: React.FC<PDFReaderModalProps> = ({
               className="w-max min-w-full mx-auto flex flex-col items-center origin-top pb-24"
             />
 
-            {/* Sample limit banner at the bottom of sample mode */}
-            {isSampleLimited && !isLoading && (
-              <div className="max-w-md mx-auto my-8 p-6 bg-white rounded-2xl border border-slate-200 text-center space-y-3 shadow-xl">
+            {/* Call to action at the end of the dedicated sample file */}
+            {showSampleEndCta && !isLoading && numPages > 0 && (
+              <div className="max-w-md mx-auto my-10 p-6 bg-white rounded-2xl border border-slate-200 text-center space-y-3.5 shadow-xl">
                 <div className="w-12 h-12 rounded-2xl bg-[#4029AB]/10 text-[#4029AB] flex items-center justify-center mx-auto">
                   <Sparkles className="w-6 h-6" />
                 </div>
-                <h4 className="text-base font-bold text-slate-900">Sample Preview Finished</h4>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  You have viewed the {maxSamplePages}-page preview. Purchase the full e-book (₹{book.buy_price}) to unlock all {numPages || book.pages} pages with formulas, diagrams, and offline access.
-                </p>
+                <div className="space-y-1">
+                  <h4 className="text-base font-bold text-slate-900">End of Sample Preview</h4>
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    You have finished reading all {numPages} pages of the dedicated sample edition. Get the full eBook ({book.pages ? `${book.pages} pages` : 'complete syllabus edition'}) with complete chapters, mock tests, and lifetime offline downloads.
+                  </p>
+                </div>
                 {onBuyNow && (
                   <button
                     onClick={() => onBuyNow(book)}
-                    className="w-full py-2.5 rounded-xl bg-[#4029AB] hover:bg-[#34208e] text-white font-bold text-xs shadow-lg transition-all active:scale-98 cursor-pointer flex items-center justify-center gap-2"
+                    className="w-full py-3 rounded-xl bg-[#4029AB] hover:bg-[#34208e] text-white font-bold text-xs shadow-lg transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2"
                   >
                     <ShoppingBag className="w-4 h-4" />
-                    <span>Purchase Full eBook (₹{book.buy_price})</span>
+                    <span>Purchase Complete eBook (₹{book.buy_price})</span>
                   </button>
                 )}
               </div>

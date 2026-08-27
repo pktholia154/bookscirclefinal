@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%" fill="none">
+  <!-- Orange Right Lobes (Stylized Book Circle Accent) -->
+  <g fill="#FF6E1D">
+    <!-- Top Right Arc -->
+    <circle cx="316" cy="198" r="132" />
+    <!-- Bottom Right Arc -->
+    <circle cx="316" cy="314" r="132" />
+  </g>
+  
+  <!-- Foreground Primary Indigo Circle -->
+  <circle cx="248" cy="256" r="172" fill="#4631B7" />
+</svg>

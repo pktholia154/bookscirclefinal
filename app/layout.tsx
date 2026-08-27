@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Roboto } from 'next/font/google';
 import './globals.css';
 import { generateWebsiteSchema, SITE_URL, SITE_NAME } from '@/lib/seo';
+import { PWARegister } from '@/components/PWARegister';
 
 const roboto = Roboto({
   weight: ['300', '400', '500', '700', '900'],
@@ -13,8 +14,13 @@ const roboto = Roboto({
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 5,
-  themeColor: '#4029AB',
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: 'cover',
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#4029AB' },
+    { media: '(prefers-color-scheme: dark)', color: '#4029AB' },
+  ],
 };
 
 export const metadata: Metadata = {
@@ -38,6 +44,40 @@ export const metadata: Metadata = {
   authors: [{ name: 'Exam Kart Editorial Board', url: SITE_URL }],
   creator: 'Pardeep Kumar',
   publisher: 'Exam Kart',
+  manifest: '/manifest.json',
+  applicationName: 'BooksCircle',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'BooksCircle',
+  },
+  icons: {
+    icon: [
+      { url: '/logo.svg', type: 'image/svg+xml' },
+      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+      { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+    ],
+    other: [
+      {
+        rel: 'mask-icon',
+        url: '/logo.svg',
+        color: '#4029AB',
+      },
+    ],
+  },
+  other: {
+    'mobile-web-app-capable': 'yes',
+    'apple-mobile-web-app-capable': 'yes',
+    'apple-mobile-web-app-status-bar-style': 'black-translucent',
+    'theme-color': '#4029AB',
+    'msapplication-navbutton-color': '#4029AB',
+    'msapplication-TileColor': '#4029AB',
+  },
   alternates: {
     canonical: SITE_URL,
   },
@@ -89,6 +129,12 @@ export default function RootLayout({
   return (
     <html lang="en" className={roboto.variable}>
       <head>
+        {/* Preconnect & DNS-Prefetch to Razorpay for lightning-fast instant gateway launch */}
+        <link rel="preconnect" href="https://checkout.razorpay.com" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://checkout.razorpay.com" />
+        <link rel="preconnect" href="https://api.razorpay.com" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://api.razorpay.com" />
+
         {/* Injected Organization & WebSite JSON-LD Schema */}
         <script
           type="application/ld+json"
@@ -101,6 +147,7 @@ export default function RootLayout({
       >
         {/* Standard Boxed Limits Container for PC/Desktop screens */}
         <div className="w-full max-w-2xl lg:max-w-3xl min-h-screen bg-white md:shadow-2xl md:shadow-gray-300/40 md:border-x md:border-gray-200/80 flex flex-col relative">
+          <PWARegister />
           {children}
         </div>
       </body>

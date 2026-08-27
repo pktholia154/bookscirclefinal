@@ -16,6 +16,16 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     overscroll-behavior-y: none;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
+
+/* Standalone Native App Mode Enhancements */
+@media all and (display-mode: standalone), (display-mode: fullscreen) {
+  body {
+    overscroll-behavior: none;
+    touch-action: pan-y;
   }
 }
 

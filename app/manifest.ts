@@ -1,0 +1,53 @@
+import { MetadataRoute } from 'next';
+
+export default function manifest(): MetadataRoute.Manifest {
+  return {
+    name: 'BooksCircle - Buy PDF E-Books & Exam Guides',
+    short_name: 'BooksCircle',
+    description: 'Digital PDF eBooks & competitive exam guides marketplace with instant preview and secure checkout.',
+    start_url: '/?source=pwa',
+    id: '/?source=pwa',
+    display: 'standalone',
+    display_override: ['window-controls-overlay', 'standalone', 'minimal-ui'],
+    background_color: '#FFFFFF',
+    theme_color: '#4029AB',
+    orientation: 'portrait-primary',
+    scope: '/',
+    categories: ['education', 'books', 'shopping'],
+    icons: [
+      {
+        src: '/icon-192.png',
+        sizes: '192x192',
+        type: 'image/png',
+        purpose: 'any',
+      },
+      {
+        src: '/icon-512.png',
+        sizes: '512x512',
+        type: 'image/png',
+        purpose: 'any',
+      },
+      {
+        src: '/icon-maskable-512.png',
+        sizes: '512x512',
+        type: 'image/png',
+        purpose: 'maskable',
+      },
+      {
+        src: '/logo.svg',
+        sizes: 'any',
+        type: 'image/svg+xml',
+        purpose: 'any',
+      },
+    ],
+    shortcuts: [
+      {
+        name: 'Search Books',
+        short_name: 'Search',
+        description: 'Search competitive exam e-books',
+        url: '/search',
+        icons: [{ src: '/icon-192.png', sizes: '192x192' }],
+      },
+    ],
+  };
+}

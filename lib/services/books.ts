@@ -7,6 +7,11 @@ import {
 import { db, defaultDb, ensureFirebaseAuth } from '../firebase';
 import { Book, Category } from '../types';
 import { DEFAULT_BOOK_COVER } from '../data';
+import {
+  resolveBookCoverUrl,
+  resolveBookSampleUrl,
+  resolveFullBookStoragePath,
+} from './storage';
 
 const LOCAL_STORAGE_BOOKS_KEY = 'bookscircle_live_books_cache';
 const LOCAL_STORAGE_CATEGORIES_KEY = 'bookscircle_live_categories_cache';
@@ -41,7 +46,8 @@ export async function getBooksFromFirestore(): Promise<Book[]> {
         snapshot.forEach((docSnap) => {
           const data = docSnap.data();
           
-          // Flexible mapping supporting various field names
+          // Flexible mapping supporting various field names & storage paths
+          const bookId = docSnap.id;
           const buyPrice = Number(data.buyprice ?? data.buy_price ?? data.price ?? data.sale_price ?? 0);
           const listPrice = Number(data.listprice ?? data.list_price ?? data.mrp ?? data.original_price ?? buyPrice);
           const rating = Number(data.averageRating ?? data.rating ?? data.avg_rating ?? 0);
@@ -50,31 +56,50 @@ export async function getBooksFromFirestore(): Promise<Book[]> {
 
           const seoDesc = String(data.seo_description ?? data.seoDescription ?? data.short_description ?? data.shortDescription ?? data.subtitle ?? '').trim();
           const fullDesc = String(data.full_description ?? data.fullDescription ?? data.description ?? data.summary ?? data.content ?? '').trim();
+          const seoslug = String(data.seoslug ?? data.slug ?? bookId).trim();
+          const categorySlug = String(data.categorySlug ?? data.category_slug ?? '').trim();
+
+          const rawCover = data.imageUrl || data.cover || data.cover_image || data.image || data.thumbnail || data.image_url || '';
+          const resolvedCover = resolveBookCoverUrl(rawCover, bookId);
+
+          const rawSample = data.sampleUrl || data.sampleurl || data.sample_file || data.sample_pdf || data.sample_url || '';
+          const resolvedSample = resolveBookSampleUrl(rawSample, bookId);
+
+          const rawPdfStoragePath = data.pdfStoragePath || data.pdf_storage_path || data.pdfurl || data.pdf_file || data.pdf_url || '';
+          const resolvedFullStoragePath = resolveFullBookStoragePath(rawPdfStoragePath, bookId);
 
           books.push({
-            id: docSnap.id,
+            id: bookId,
             title: data.title || data.name || 'Untitled Book',
-            slug: data.slug || docSnap.id,
+            slug: seoslug,
+            seoslug: seoslug,
             seo_description: seoDesc,
             full_description: fullDesc,
             seoDescription: seoDesc,
             fullDescription: fullDesc,
             category: data.category || 'General',
+            categorySlug: categorySlug,
             tags: Array.isArray(data.tags) ? data.tags : [],
             isActive: data.isActive !== undefined ? Boolean(data.isActive) : true,
             buy_price: buyPrice,
             list_price: listPrice,
-            pdf_file: data.pdfurl || data.pdf_file || data.pdf_url || data.file_url || '',
-            cover: data.imageUrl || data.cover || data.cover_image || data.image || data.thumbnail || data.image_url || DEFAULT_BOOK_COVER,
-            sample_file: data.sampleurl || data.sample_file || data.sample_pdf || data.sample_url || '',
+            pdf_file: resolvedFullStoragePath,
+            pdfStoragePath: resolvedFullStoragePath,
+            hasFullPdf: data.hasFullPdf !== undefined ? Boolean(data.hasFullPdf) : true,
+            cover: resolvedCover,
+            imageUrl: resolvedCover,
+            sample_file: resolvedSample,
+            sampleUrl: resolvedSample,
             rating: rating > 0 ? rating : 4.5,
             rating_count: ratingCount > 0 ? ratingCount : 0,
-            author: data.author || data.authors || 'Unknown Author',
-            publisher: data.publisher || 'Publisher',
+            author: data.author || data.authors || 'Exam Editorial Panel',
+            publisher: data.publisher || data.publication || 'Exam Kart',
+            publication: data.publication || data.publisher || 'Exam Kart',
             published_date: data.published_date || data.published_year || data.publish_date || '',
             isbn: data.isbn || '',
             pages: pages > 0 ? pages : 0,
             language: data.language || 'English',
+            type: data.type || data.format || data.book_type || data.edition || 'PDF Ebook',
             file_size: data.fileSizeInMB ? `${data.fileSizeInMB} MB` : (data.file_size || ''),
             topics: Array.isArray(data.topics) ? data.topics : (Array.isArray(data.features) ? data.features : []),
             reviews: Array.isArray(data.reviews) ? data.reviews : [],

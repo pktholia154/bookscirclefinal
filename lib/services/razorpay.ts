@@ -24,14 +24,23 @@ export interface RazorpayCheckoutOptions {
   onDismiss?: () => void;
 }
 
-// Dynamically load Razorpay SDK in the browser
-export const loadRazorpayScript = (): Promise<boolean> => {
-  return new Promise((resolve) => {
-    if (typeof window === 'undefined') {
-      resolve(false);
-      return;
-    }
+let razorpayScriptPromise: Promise<boolean> | null = null;
 
+// Dynamically load & prewarm Razorpay SDK in the browser with lightning speed
+export const loadRazorpayScript = (): Promise<boolean> => {
+  if (typeof window === 'undefined') {
+    return Promise.resolve(false);
+  }
+
+  if (window.Razorpay) {
+    return Promise.resolve(true);
+  }
+
+  if (razorpayScriptPromise) {
+    return razorpayScriptPromise;
+  }
+
+  razorpayScriptPromise = new Promise((resolve) => {
     if (window.Razorpay) {
       resolve(true);
       return;
@@ -41,19 +50,41 @@ export const loadRazorpayScript = (): Promise<boolean> => {
       'script[src="https://checkout.razorpay.com/v1/checkout.js"]'
     );
     if (existingScript) {
-      existingScript.addEventListener('load', () => resolve(true));
-      existingScript.addEventListener('error', () => resolve(false));
+      if ((existingScript as any).dataset?.loaded === 'true') {
+        resolve(true);
+        return;
+      }
+      existingScript.addEventListener('load', () => resolve(true), { once: true });
+      existingScript.addEventListener('error', () => resolve(false), { once: true });
       return;
     }
 
     const script = document.createElement('script');
     script.src = 'https://checkout.razorpay.com/v1/checkout.js';
     script.async = true;
-    script.onload = () => resolve(true);
-    script.onerror = () => resolve(false);
-    document.body.appendChild(script);
+    script.crossOrigin = 'anonymous';
+    script.onload = () => {
+      script.dataset.loaded = 'true';
+      resolve(true);
+    };
+    script.onerror = () => {
+      razorpayScriptPromise = null;
+      resolve(false);
+    };
+    document.head.appendChild(script);
   });
+
+  return razorpayScriptPromise;
 };
+
+// Eagerly prewarm in browser environment
+if (typeof window !== 'undefined') {
+  if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    loadRazorpayScript();
+  } else {
+    window.addEventListener('DOMContentLoaded', () => loadRazorpayScript(), { once: true });
+  }
+}
 
 export async function processRazorpayPayment(options: RazorpayCheckoutOptions): Promise<void> {
   const {

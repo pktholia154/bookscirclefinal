@@ -39,6 +39,7 @@ const CartItemRow: React.FC<{
           src={imgSrc}
           alt={item.book.title}
           fill
+          unoptimized
           sizes="60px"
           className="object-cover rounded-none"
           referrerPolicy="no-referrer"

@@ -14,6 +14,7 @@ import { CategoriesView } from '@/components/CategoriesView';
 import { DedicatedSearchView } from '@/components/DedicatedSearchView';
 import { ProfileView } from '@/components/ProfileView';
 import { GoogleSignInModal } from '@/components/GoogleSignInModal';
+import { IOSInstallGuideModal } from '@/components/IOSInstallGuideModal';
 import { Footer } from '@/components/Footer';
 import { Book, Category, CartItem } from '@/lib/types';
 import { DEFAULT_BOOK_COVER } from '@/lib/data';
@@ -23,6 +24,7 @@ import { recordUserPurchaseInFirestore, syncUserPurchases } from '@/lib/services
 import { processRazorpayPayment } from '@/lib/services/razorpay';
 import { auth, signInWithGoogle, signOutUser } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
+import { usePWAInstall } from '@/hooks/use-pwa-install';
 import { Check, ShoppingBag, RefreshCw, Lock } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -58,6 +60,14 @@ export default function HomePage() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isCartTabCheckingOut, setIsCartTabCheckingOut] = useState<boolean>(false);
   const [, startTransition] = useTransition();
+
+  // PWA Install State & Handlers
+  const {
+    isInstallable,
+    promptInstall,
+    isIOSPromptOpen,
+    closeIOSPrompt,
+  } = usePWAInstall();
 
   // Load client persisted data after initial mount to prevent SSR hydration mismatches
   useEffect(() => {
@@ -482,7 +492,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-white text-gray-900 pb-24 selection:bg-[#4029AB] selection:text-white">
-      {/* 1. Header with Search, Login, and Cart (ONLY ON HOME PAGE) */}
+      {/* 1. Header with Search, Login, Cart and PWA Install (ONLY ON HOME PAGE) */}
       {activeTab === 'home' && !selectedBook && (
         <Header
           cartCount={totalCartCount}
@@ -496,6 +506,8 @@ export default function HomePage() {
           onGoogleSignIn={handleOpenLogin}
           onNavigateToProfile={() => handleTabChange('profile')}
           onOpenDedicatedSearch={() => setActiveTab('search')}
+          isInstallable={isInstallable}
+          onInstall={promptInstall}
         />
       )}
 
@@ -677,6 +689,7 @@ export default function HomePage() {
                               src={book.cover || DEFAULT_BOOK_COVER}
                               alt={book.title}
                               fill
+                              unoptimized
                               sizes="56px"
                               className="object-cover rounded-none"
                               referrerPolicy="no-referrer"
@@ -824,6 +837,12 @@ export default function HomePage() {
         onSelectUser={handleSelectUserProfile}
         title={loginModalConfig.title}
         subtitle={loginModalConfig.subtitle}
+      />
+
+      {/* iOS Add to Home Screen Instructions Modal */}
+      <IOSInstallGuideModal
+        isOpen={isIOSPromptOpen}
+        onClose={closeIOSPrompt}
       />
 
       {/* Fixed High Density Bottom Navigation */}

@@ -311,6 +311,7 @@ export const DedicatedSearchView: React.FC<DedicatedSearchViewProps> = ({
                       src={book.cover || DEFAULT_BOOK_COVER}
                       alt={book.title}
                       fill
+                      unoptimized
                       sizes="64px"
                       className="object-cover rounded-none group-hover:scale-105 transition-transform duration-300"
                       referrerPolicy="no-referrer"
@@ -319,23 +320,22 @@ export const DedicatedSearchView: React.FC<DedicatedSearchViewProps> = ({
 
                   {/* Middle Book Details */}
                   <div className="flex-1 min-w-0 pr-1">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-[9px] font-bold text-[#4029AB] bg-[#4029AB]/10 px-1.5 py-0.2 rounded uppercase">
-                        {book.category}
-                      </span>
-                      {discountPercent > 0 && (
-                        <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded">
-                          {discountPercent}% OFF
-                        </span>
-                      )}
-                    </div>
-
-                    <h3 className="font-bold text-xs sm:text-sm text-gray-950 line-clamp-2 leading-snug group-hover:text-[#4029AB] transition-colors mt-1">
+                    <h3 className="font-bold text-xs sm:text-sm text-gray-950 line-clamp-2 leading-snug group-hover:text-[#4029AB] transition-colors">
                       {book.title}
                     </h3>
 
-                    <p className="text-[11px] text-gray-500 truncate mt-0.5">
-                      {book.author || 'BooksCircle'} • {book.pages || 220} Pages • PDF
+                    {/* Category, Language & Type in same row (display only field values, not field labels) */}
+                    <div className="flex items-center gap-1.5 text-[11px] text-gray-500 truncate mt-1">
+                      <span className="font-medium text-gray-600">{book.category || 'General'}</span>
+                      <span className="text-gray-300 text-[9px]">•</span>
+                      <span>{book.language || 'English'}</span>
+                      <span className="text-gray-300 text-[9px]">•</span>
+                      <span>{book.type || 'PDF Ebook'}</span>
+                    </div>
+
+                    {/* Publication below above row */}
+                    <p className="text-[11px] text-gray-400 truncate mt-0.5">
+                      {book.publisher || book.publication || 'Exam Kart'}
                     </p>
 
                     <div className="flex items-center gap-1 text-amber-500 mt-1">

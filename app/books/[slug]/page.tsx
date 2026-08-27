@@ -1,8 +1,8 @@
 import BookSSRPage, {
   generateMetadata,
   generateStaticParams,
-  revalidate,
 } from '../../book/[slug]/page';
 
-export { generateMetadata, generateStaticParams, revalidate };
+export const revalidate = 60;
+export { generateMetadata, generateStaticParams };
 export default BookSSRPage;

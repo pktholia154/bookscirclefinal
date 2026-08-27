@@ -37,6 +37,7 @@ const BookListItem: React.FC<{
           src={imgSrc}
           alt={book.title}
           fill
+          unoptimized
           sizes="(max-width: 640px) 64px, 80px"
           className="object-cover rounded-none group-hover:scale-105 transition-transform duration-300"
           referrerPolicy="no-referrer"
@@ -51,9 +52,18 @@ const BookListItem: React.FC<{
           {book.title}
         </h3>
 
-        {/* Subtitle / Category */}
-        <p className="text-[11px] text-gray-500 truncate mt-0.5 mb-1.5">
-          {book.category}
+        {/* Category, Language & Type in same row (display only field values, not field labels) */}
+        <div className="flex items-center gap-1.5 text-[11px] text-gray-500 truncate mt-1">
+          <span className="font-medium text-gray-600">{book.category || 'General'}</span>
+          <span className="text-gray-300 text-[9px]">•</span>
+          <span>{book.language || 'English'}</span>
+          <span className="text-gray-300 text-[9px]">•</span>
+          <span>{book.type || 'PDF Ebook'}</span>
+        </div>
+
+        {/* Publication below above row */}
+        <p className="text-[11px] text-gray-400 truncate mt-0.5">
+          {book.publisher || book.publication || 'Exam Kart'}
         </p>
       </div>
 
