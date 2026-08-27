@@ -11,6 +11,20 @@ interface BooksCircleDB extends DBSchema {
       title: string;
     };
   };
+  pendingPurchases: {
+    key: string;
+    value: {
+      id: string;
+      userId: string;
+      userEmail: string;
+      paymentId: string;
+      orderId: string;
+      amount: number;
+      bookIds: string[];
+      items: any[];
+      createdAt: string;
+    };
+  };
   offlinePdfs: {
     key: string;
     value: {
@@ -25,10 +39,13 @@ let dbPromise: Promise<IDBPDatabase<BooksCircleDB>> | null = null;
 
 function getDb(): Promise<IDBPDatabase<BooksCircleDB>> {
   if (!dbPromise) {
-    dbPromise = openDB<BooksCircleDB>('bookscircle-storage', 1, {
-      upgrade(db) {
+    dbPromise = openDB<BooksCircleDB>('bookscircle-storage', 2, {
+      upgrade(db, oldVersion) {
         if (!db.objectStoreNames.contains('purchases')) {
           db.createObjectStore('purchases', { keyPath: 'bookId' });
+        }
+        if (!db.objectStoreNames.contains('pendingPurchases')) {
+          db.createObjectStore('pendingPurchases', { keyPath: 'id' });
         }
         if (!db.objectStoreNames.contains('offlinePdfs')) {
           db.createObjectStore('offlinePdfs', { keyPath: 'bookId' });
@@ -169,5 +186,48 @@ export async function clearAllOfflinePdfs(): Promise<void> {
     await db.clear('offlinePdfs');
   } catch (e) {
     console.warn('Failed to clear offline storage:', e);
+  }
+}
+
+export async function queuePendingPurchase(data: {
+  userId: string;
+  userEmail: string;
+  paymentId: string;
+  orderId: string;
+  amount: number;
+  bookIds: string[];
+  items: any[];
+}): Promise<void> {
+  if (typeof window === 'undefined') return;
+  try {
+    const db = await getDb();
+    await db.put('pendingPurchases', {
+      id: data.paymentId || `pending_${Date.now()}`,
+      ...data,
+      createdAt: new Date().toISOString(),
+    });
+  } catch (e) {
+    console.warn('Failed to queue pending purchase in offline storage:', e);
+  }
+}
+
+export async function getPendingPurchases(): Promise<any[]> {
+  if (typeof window === 'undefined') return [];
+  try {
+    const db = await getDb();
+    return await db.getAll('pendingPurchases');
+  } catch (e) {
+    console.warn('Failed to retrieve pending purchases:', e);
+    return [];
+  }
+}
+
+export async function removePendingPurchase(id: string): Promise<void> {
+  if (typeof window === 'undefined') return;
+  try {
+    const db = await getDb();
+    await db.delete('pendingPurchases', id);
+  } catch (e) {
+    console.warn('Failed to delete pending purchase:', e);
   }
 }

@@ -8,6 +8,10 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: false,
   },
+  experimental: {
+    webpackBuildWorker: false,
+    cpus: 1,
+  },
   images: {
     formats: ['image/avif', 'image/webp'],
     deviceSizes: [360, 480, 640, 750, 828, 1080, 1200],
@@ -78,7 +82,6 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  output: 'standalone',
   transpilePackages: ['motion'],
   webpack: (config, {dev, isServer, webpack}) => {
     if (dev && process.env.DISABLE_HMR === 'true') {

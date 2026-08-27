@@ -792,9 +792,17 @@ export default function HomePage() {
               <PurchasedView
                 books={books}
                 purchasedBookIds={purchasedBookIds}
+                currentUser={currentUser}
                 onSelectBook={(book) => setSelectedBook(book)}
                 onNavigateHome={() => handleTabChange('home')}
                 onUnlockDemoBook={handleUnlockDemoBook}
+                onSyncPurchases={async () => {
+                  const merged = await syncUserPurchases(
+                    currentUser?.uid,
+                    currentUser?.email || undefined
+                  );
+                  setPurchasedBookIds(merged);
+                }}
               />
             )}
 

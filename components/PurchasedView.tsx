@@ -12,7 +12,14 @@ import {
   ShoppingBag,
   Sparkles,
   WifiOff,
-  Wifi
+  Wifi,
+  Receipt,
+  FileText,
+  ShieldCheck,
+  Clock,
+  ChevronRight,
+  CreditCard,
+  Layers,
 } from 'lucide-react';
 import { Book } from '@/lib/types';
 import { DEFAULT_BOOK_COVER } from '@/lib/data';
@@ -22,16 +29,24 @@ import {
   deleteOfflinePdf,
   getAllOfflineBookIds,
   isPdfOfflineAvailable,
-  savePurchasedBookIds
+  savePurchasedBookIds,
 } from '@/lib/offline-storage';
+import {
+  getUserPurchaseHistory,
+  syncUserPurchases,
+  PurchaseRecord,
+} from '@/lib/services/purchases';
 import { PDFReaderModal } from '@/components/PDFReaderModal';
+import { UserProfile } from '@/components/Header';
 
 interface PurchasedViewProps {
   books: Book[];
   purchasedBookIds: string[];
+  currentUser?: UserProfile | null;
   onSelectBook: (book: Book) => void;
   onNavigateHome: () => void;
   onUnlockDemoBook?: (bookId: string) => void;
+  onSyncPurchases?: () => Promise<void>;
 }
 
 interface DownloadState {
@@ -45,10 +60,13 @@ interface DownloadState {
 export const PurchasedView: React.FC<PurchasedViewProps> = ({
   books,
   purchasedBookIds,
+  currentUser,
   onSelectBook,
   onNavigateHome,
   onUnlockDemoBook,
+  onSyncPurchases,
 }) => {
+  const [activeSubTab, setActiveSubTab] = useState<'library' | 'invoices'>('library');
   const [offlineMap, setOfflineMap] = useState<Record<string, DownloadState>>({});
   const [filterMode, setFilterMode] = useState<'all' | 'offline_only'>('all');
   const [activeReader, setActiveReader] = useState<{
@@ -56,6 +74,9 @@ export const PurchasedView: React.FC<PurchasedViewProps> = ({
     mode: 'full' | 'offline';
   } | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isSyncingCloud, setIsSyncingCloud] = useState(false);
+  const [invoices, setInvoices] = useState<PurchaseRecord[]>([]);
+  const [isLoadingInvoices, setIsLoadingInvoices] = useState(false);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -85,6 +106,48 @@ export const PurchasedView: React.FC<PurchasedViewProps> = ({
     refreshOfflineStatus();
   }, [refreshOfflineStatus]);
 
+  // Fetch Firestore purchase invoices & receipts
+  const fetchInvoices = useCallback(async () => {
+    setIsLoadingInvoices(true);
+    try {
+      const userEmail = currentUser?.email || undefined;
+      const userId = currentUser?.uid || undefined;
+      const records = await getUserPurchaseHistory(userId, userEmail);
+      setInvoices(records);
+    } catch (e) {
+      console.warn('Failed to fetch purchase invoices:', e);
+    } finally {
+      setIsLoadingInvoices(false);
+    }
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (activeSubTab === 'invoices') {
+      fetchInvoices();
+    }
+  }, [activeSubTab, fetchInvoices]);
+
+  // Handle manual cloud sync
+  const handleCloudSync = async () => {
+    setIsSyncingCloud(true);
+    try {
+      if (onSyncPurchases) {
+        await onSyncPurchases();
+      } else {
+        await syncUserPurchases(currentUser?.uid, currentUser?.email || undefined);
+      }
+      await refreshOfflineStatus();
+      if (activeSubTab === 'invoices') {
+        await fetchInvoices();
+      }
+      showToast('Library synchronized with Firebase DB!');
+    } catch (e) {
+      showToast('Cloud sync completed with local cache.');
+    } finally {
+      setIsSyncingCloud(false);
+    }
+  };
+
   // Purchased books list
   const purchasedBooks = books.filter((b) => purchasedBookIds.includes(b.id));
 
@@ -104,7 +167,6 @@ export const PurchasedView: React.FC<PurchasedViewProps> = ({
       return;
     }
 
-    // Set downloading state
     setOfflineMap((prev) => ({
       ...prev,
       [book.id]: {
@@ -116,7 +178,6 @@ export const PurchasedView: React.FC<PurchasedViewProps> = ({
     }));
 
     try {
-      // Stream fetch either directly or through server proxy
       let response: Response;
       try {
         response = await fetch(targetUrl, { mode: 'cors' });
@@ -160,7 +221,6 @@ export const PurchasedView: React.FC<PurchasedViewProps> = ({
           }
         }
 
-        // Combine chunks into single ArrayBuffer
         const allChunks = new Uint8Array(receivedLength);
         let position = 0;
         for (const chunk of chunks) {
@@ -168,7 +228,6 @@ export const PurchasedView: React.FC<PurchasedViewProps> = ({
           position += chunk.length;
         }
 
-        // Save into IndexedDB for secure in-app offline reading
         await savePdfOffline(book.id, allChunks.buffer);
       } else {
         const arrayBuffer = await response.arrayBuffer();
@@ -198,302 +257,402 @@ export const PurchasedView: React.FC<PurchasedViewProps> = ({
           errorMsg: err?.message || 'Download failed',
         },
       }));
-      showToast('Download failed. Please check internet connection.');
+      showToast('Could not save PDF offline. Check network.');
     }
   };
 
-  // Delete Offline Copy
-  const handleDeleteOffline = async (bookId: string, title: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+  // Delete downloaded offline PDF
+  const handleDeleteOffline = async (bookId: string, title: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     try {
       await deleteOfflinePdf(bookId);
-      setOfflineMap((prev) => ({
-        ...prev,
-        [bookId]: {
-          status: 'idle',
-          progress: 0,
-          loadedMb: 0,
-          totalMb: 0,
-        },
-      }));
+      setOfflineMap((prev) => {
+        const copy = { ...prev };
+        delete copy[bookId];
+        return copy;
+      });
       showToast(`Removed offline copy of "${title.slice(0, 20)}..."`);
-    } catch (err) {
-      console.error('Failed to delete offline PDF:', err);
+    } catch {
+      showToast('Failed to remove offline copy.');
     }
   };
-
-  // Handle Quick Sample Unlock for testing if library is empty
-  const handleQuickUnlockSample = () => {
-    if (books.length === 0) return;
-    const firstBook = books[0];
-    savePurchasedBookIds([firstBook.id]);
-    if (onUnlockDemoBook) {
-      onUnlockDemoBook(firstBook.id);
-    }
-    showToast(`Unlocked "${firstBook.title.slice(0, 24)}..." to your library!`);
-  };
-
-  const totalOfflineDownloaded = Object.values(offlineMap).filter(
-    (s) => s.status === 'downloaded'
-  ).length;
 
   return (
-    <div className="w-full px-2 sm:px-6 py-2.5 sm:py-5 max-w-4xl mx-auto space-y-3 sm:space-y-6">
-      {/* 1. Header Section */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 border-b border-gray-100 pb-2.5 sm:pb-4">
+    <div className="w-full px-4 sm:px-6 py-5 max-w-5xl mx-auto space-y-6">
+      {/* 1. Header with Cloud Sync & Sub-tabs */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-lg sm:text-2xl font-black text-gray-950 tracking-tight">
-              Purchased E-Books
-            </h1>
-            <span className="bg-[#4029AB] text-white text-[11px] font-bold px-2.5 py-0.5 rounded-full">
-              {purchasedBooks.length}
+            <h1 className="text-xl sm:text-2xl font-black text-gray-950">Purchased Library</h1>
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#4029AB] text-white">
+              {purchasedBooks.length} Books
             </span>
           </div>
-          <p className="text-xs text-gray-500 mt-0.5 sm:mt-1">
-            Access your unlocked digital library online or download to device storage for offline study.
+          <p className="text-xs text-gray-500 mt-0.5">
+            Permanent access to your verified study materials &amp; PDF downloads.
           </p>
         </div>
 
-        {/* Offline summary badge */}
-        <div className="flex items-center gap-2 bg-gray-50 border border-gray-200/80 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold text-gray-700 shrink-0 self-start sm:self-auto">
-          <HardDrive className="w-4 h-4 text-[#4029AB]" />
-          <span>
-            <strong className="text-gray-950">{totalOfflineDownloaded}</strong> of{' '}
-            <strong className="text-gray-950">{purchasedBooks.length}</strong> Offline Ready
-          </span>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Sub-tab Navigation */}
+          <div className="flex bg-gray-100 p-1 rounded-xl border border-gray-200/80">
+            <button
+              onClick={() => setActiveSubTab('library')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                activeSubTab === 'library'
+                  ? 'bg-white text-[#4029AB] shadow-xs'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <BookOpen className="w-3.5 h-3.5" />
+              <span>My Books</span>
+            </button>
+            <button
+              onClick={() => setActiveSubTab('invoices')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                activeSubTab === 'invoices'
+                  ? 'bg-white text-[#4029AB] shadow-xs'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <Receipt className="w-3.5 h-3.5" />
+              <span>Receipts &amp; Records</span>
+            </button>
+          </div>
+
+          {/* Sync Button */}
+          <button
+            onClick={handleCloudSync}
+            disabled={isSyncingCloud}
+            className="px-3 py-2 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 disabled:opacity-60"
+            title="Synchronize purchased books from Firebase DB"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 text-[#4029AB] ${isSyncingCloud ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">Sync Cloud</span>
+          </button>
         </div>
       </div>
 
-      {/* 2. Filter Bar (if has purchased books) */}
-      {purchasedBooks.length > 0 && (
-        <div className="flex items-center justify-end gap-1.5">
-          <button
-            onClick={() => setFilterMode('all')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              filterMode === 'all'
-                ? 'bg-[#4029AB] text-white shadow-2xs'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            All ({purchasedBooks.length})
-          </button>
-          <button
-            onClick={() => setFilterMode('offline_only')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-              filterMode === 'offline_only'
-                ? 'bg-[#4029AB] text-white shadow-2xs'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            <HardDrive className="w-3.5 h-3.5" />
-            <span>Downloaded ({totalOfflineDownloaded})</span>
-          </button>
-        </div>
-      )}
-
-      {/* 3. Empty State (No purchased books yet) */}
-      {purchasedBooks.length === 0 ? (
-        <div className="py-14 px-6 text-center bg-gray-50/70 rounded-3xl border border-gray-200/80 max-w-lg mx-auto space-y-4 shadow-xs">
-          <div className="w-16 h-16 rounded-2xl bg-[#4029AB]/10 text-[#4029AB] flex items-center justify-center mx-auto">
-            <BookOpen className="w-8 h-8" />
-          </div>
-          <div>
-            <h3 className="text-base font-bold text-gray-950">No purchased books in your library</h3>
-            <p className="text-xs text-gray-500 mt-1 leading-relaxed max-w-sm mx-auto">
-              Books you buy from the store will appear here immediately with high-speed online vector reading and device offline storage.
-            </p>
+      {/* 2. TAB: INVOICES & PURCHASE RECORDS */}
+      {activeSubTab === 'invoices' && (
+        <div className="space-y-4">
+          <div className="p-4 bg-gray-50 rounded-2xl border border-gray-200 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-emerald-600" />
+              <span className="text-xs font-bold text-gray-900">
+                Verified Firebase DB Transaction Records
+              </span>
+            </div>
+            <span className="text-[11px] text-gray-500 font-mono">
+              {currentUser?.email || 'Active Reader'}
+            </span>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-2 pt-2">
-            <button
-              onClick={onNavigateHome}
-              className="w-full sm:w-auto px-5 py-2.5 bg-[#4029AB] hover:bg-[#34208e] text-white rounded-xl text-xs font-bold shadow-xs transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <ShoppingBag className="w-4 h-4" />
-              <span>Browse Catalog</span>
-            </button>
-
-            {books.length > 0 && (
-              <button
-                onClick={handleQuickUnlockSample}
-                className="w-full sm:w-auto px-4 py-2.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-800 rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-[#4029AB]" />
-                <span>Unlock Sample Book</span>
-              </button>
-            )}
-          </div>
-        </div>
-      ) : filteredPurchasedBooks.length === 0 ? (
-        /* Empty search results */
-        <div className="py-12 text-center bg-gray-50 rounded-2xl border border-gray-100 text-xs text-gray-500 space-y-2">
-          <p className="font-semibold text-gray-800">No books found matching your filter.</p>
-          <button
-            onClick={() => {
-              setFilterMode('all');
-            }}
-            className="text-[#4029AB] font-bold hover:underline cursor-pointer"
-          >
-            Reset Filters
-          </button>
-        </div>
-      ) : (
-        /* 4. Purchased Books List */
-        <div className="space-y-2 sm:space-y-3.5">
-          {filteredPurchasedBooks.map((book) => {
-            const dlState = offlineMap[book.id] || {
-              status: 'idle',
-              progress: 0,
-              loadedMb: 0,
-              totalMb: 0,
-            };
-            const isDownloaded = dlState.status === 'downloaded';
-            const isDownloading = dlState.status === 'downloading';
-
-            return (
-              <div
-                key={book.id}
-                id={`purchased-book-${book.id}`}
-                className="p-2.5 sm:p-4 rounded-xl sm:rounded-2xl border border-gray-200 bg-white hover:border-[#4029AB]/40 hover:shadow-md transition-all space-y-2.5 sm:space-y-3.5"
-              >
-                {/* Book Card Main Info */}
-                <div className="flex items-start gap-3 sm:gap-4">
-                  {/* Sharp 3:4 Cover Ratio */}
-                  <div
-                    onClick={() => onSelectBook(book)}
-                    className="relative w-14 sm:w-20 aspect-[3/4] rounded-none overflow-hidden shrink-0 bg-gray-100 border border-gray-200 shadow-2xs cursor-pointer group"
-                  >
-                    <Image
-                      src={book.cover || DEFAULT_BOOK_COVER}
-                      alt={book.title}
-                      fill
-                      unoptimized
-                      sizes="80px"
-                      className="object-cover rounded-none group-hover:scale-105 transition-transform"
-                      referrerPolicy="no-referrer"
-                    />
-                  </div>
-
-                  {/* Metadata */}
-                  <div className="flex-1 min-w-0 flex flex-col justify-start self-stretch">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#4029AB] bg-[#4029AB]/10 px-2 py-0.5 rounded">
-                        {book.category}
-                      </span>
-                      {isDownloaded && (
-                        <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
-                          <Check className="w-3 h-3 text-emerald-600" />
-                          Offline Ready
+          {isLoadingInvoices ? (
+            <div className="py-16 text-center space-y-3">
+              <RefreshCw className="w-6 h-6 text-[#4029AB] animate-spin mx-auto" />
+              <p className="text-xs font-semibold text-gray-500">
+                Retrieving your purchase history from Firebase...
+              </p>
+            </div>
+          ) : invoices.length === 0 ? (
+            <div className="py-14 text-center bg-gray-50 rounded-3xl border border-gray-200/80 space-y-3 p-6">
+              <Receipt className="w-10 h-10 text-gray-400 mx-auto" />
+              <h3 className="text-sm font-bold text-gray-900">No Online Invoices Found</h3>
+              <p className="text-xs text-gray-500 max-w-sm mx-auto">
+                Completed purchases made via Razorpay will be permanently archived here with their payment and order IDs.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {invoices.map((inv) => (
+                <div
+                  key={inv.paymentId}
+                  className="p-4 sm:p-5 rounded-2xl border border-gray-200 bg-white hover:border-[#4029AB]/30 transition-all shadow-2xs space-y-3"
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-3">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                          <Check className="w-3 h-3" />
+                          <span>{inv.status?.toUpperCase() || 'VERIFIED'}</span>
                         </span>
-                      )}
+                        <span className="text-xs font-mono font-bold text-gray-900">
+                          {inv.paymentId}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-[11px] text-gray-500">
+                        <Clock className="w-3 h-3 text-gray-400" />
+                        <span>{new Date(inv.purchasedAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</span>
+                        <span>•</span>
+                        <span>Order: {inv.orderId}</span>
+                      </div>
                     </div>
 
-                    <h3
-                      onClick={() => onSelectBook(book)}
-                      className="font-bold text-xs sm:text-base text-gray-950 leading-snug mt-1 cursor-pointer hover:text-[#4029AB] transition-colors"
-                    >
-                      {book.title}
-                    </h3>
-                  </div>
-                </div>
-
-                {/* Download Progress Bar & Status (Shown when downloading or error) */}
-                {isDownloading && (
-                  <div className="p-3 bg-purple-50/70 border border-[#4029AB]/20 rounded-xl space-y-2">
-                    <div className="flex justify-between items-center text-xs font-semibold text-[#4029AB]">
-                      <span className="flex items-center gap-1.5">
-                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                        <span>Downloading to device storage...</span>
+                    <div className="text-right">
+                      <span className="text-base font-black text-gray-950 font-mono">
+                        ₹{inv.amount}
                       </span>
-                      <span>{dlState.progress}%</span>
-                    </div>
-
-                    {/* Progress Track */}
-                    <div className="w-full h-2 bg-purple-200/60 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-[#4029AB] rounded-full transition-all duration-300 ease-out"
-                        style={{ width: `${dlState.progress}%` }}
-                      />
-                    </div>
-
-                    <div className="flex justify-between text-[10px] text-gray-500">
-                      <span>Secure in-app storage</span>
-                      <span>
-                        {dlState.loadedMb} MB / {dlState.totalMb || 12} MB
-                      </span>
+                      <p className="text-[10px] text-gray-400">Razorpay Gateway</p>
                     </div>
                   </div>
-                )}
 
-                {/* Action Buttons: 'Read Online' and 'Offline' */}
-                <div className="flex items-center gap-2.5 pt-1 border-t border-gray-100 flex-wrap">
-                  {/* 1. Read Online Button */}
-                  <button
-                    id={`btn-read-online-${book.id}`}
-                    onClick={() => setActiveReader({ book, mode: 'full' })}
-                    className="flex-1 min-w-[130px] py-2 px-3.5 rounded-xl border border-[#4029AB] text-[#4029AB] hover:bg-[#4029AB]/10 active:scale-98 transition-all text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
-                    title="Read PDF online instantly"
-                  >
-                    <Wifi className="w-3.5 h-3.5" />
-                    <span>Read Online</span>
-                  </button>
-
-                  {/* 2. Offline Action Button */}
-                  {isDownloaded ? (
-                    <div className="flex-1 min-w-[130px] flex items-center gap-1.5">
-                      <button
-                        id={`btn-read-offline-${book.id}`}
-                        onClick={() => setActiveReader({ book, mode: 'offline' })}
-                        className="flex-1 py-2 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white active:scale-98 transition-all text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
-                        title="Read PDF from device offline storage"
-                      >
-                        <WifiOff className="w-3.5 h-3.5" />
-                        <span>Read Offline</span>
-                      </button>
-
-                      {/* Remove Offline Copy Button */}
-                      <button
-                        onClick={(e) => handleDeleteOffline(book.id, book.title, e)}
-                        className="p-2 rounded-xl text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
-                        title="Delete offline file to free storage"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                  {/* Books in this invoice */}
+                  <div className="space-y-2">
+                    <span className="text-[11px] font-bold text-gray-600 uppercase tracking-wider">
+                      Purchased Items ({inv.books?.length || 0})
+                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {inv.books?.map((b) => {
+                        const matchedBook = books.find((orig) => orig.id === b.id);
+                        return (
+                          <div
+                            key={b.id}
+                            className="p-2.5 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-between gap-2"
+                          >
+                            <span className="text-xs font-bold text-gray-800 truncate">
+                              {b.title}
+                            </span>
+                            {matchedBook && (
+                              <button
+                                onClick={() => setActiveReader({ book: matchedBook, mode: 'full' })}
+                                className="px-2.5 py-1 rounded-lg bg-[#4029AB] text-white text-[10px] font-bold shrink-0 hover:bg-[#34208e] cursor-pointer"
+                              >
+                                Read PDF
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
-                  ) : (
-                    <button
-                      id={`btn-download-offline-${book.id}`}
-                      disabled={isDownloading}
-                      onClick={(e) => handleDownloadOffline(book, e)}
-                      className={`flex-1 min-w-[130px] py-2 px-3.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-98 ${
-                        isDownloading
-                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                          : 'bg-[#4029AB] hover:bg-[#34208e] text-white'
-                      }`}
-                      title="Download PDF to device for offline reading"
-                    >
-                      {isDownloading ? (
-                        <>
-                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                          <span>Downloading ({dlState.progress}%)</span>
-                        </>
-                      ) : (
-                        <>
-                          <Download className="w-3.5 h-3.5" />
-                          <span>Offline</span>
-                        </>
-                      )}
-                    </button>
-                  )}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              ))}
+            </div>
+          )}
         </div>
       )}
 
-      {/* 5. Real-time In-App PDF Reader Modal */}
+      {/* 3. TAB: ACTIVE LIBRARY (GRID OF E-BOOKS) */}
+      {activeSubTab === 'library' && (
+        <>
+          {/* Quick Filter Bar */}
+          {purchasedBooks.length > 0 && (
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => setFilterMode('all')}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    filterMode === 'all'
+                      ? 'bg-[#4029AB] text-white shadow-2xs'
+                      : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                  }`}
+                >
+                  All Purchased ({purchasedBooks.length})
+                </button>
+                <button
+                  onClick={() => setFilterMode('offline_only')}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                    filterMode === 'offline_only'
+                      ? 'bg-emerald-600 text-white shadow-2xs'
+                      : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                  }`}
+                >
+                  <WifiOff className="w-3 h-3" />
+                  <span>Downloaded Offline</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Empty State */}
+          {purchasedBooks.length === 0 ? (
+            <div className="py-16 text-center bg-gray-50 rounded-3xl border border-gray-200/80 space-y-4 p-6">
+              <div className="w-16 h-16 rounded-full bg-purple-100/60 text-[#4029AB] flex items-center justify-center mx-auto">
+                <BookOpen className="w-8 h-8" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-gray-900">Your Library is Empty</h3>
+                <p className="text-xs text-gray-500 max-w-sm mx-auto">
+                  Browse our catalog of study guides and competitive exam preparation e-books. All purchases include offline access.
+                </p>
+              </div>
+              <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
+                <button
+                  id="empty-library-browse-btn"
+                  onClick={onNavigateHome}
+                  className="px-5 py-2.5 bg-[#4029AB] text-white rounded-xl text-xs font-bold shadow-xs hover:bg-[#34208e] cursor-pointer inline-flex items-center gap-1.5 active:scale-95 transition-all"
+                >
+                  <ShoppingBag className="w-3.5 h-3.5" />
+                  <span>Explore E-Books</span>
+                </button>
+
+                {onUnlockDemoBook && (
+                  <button
+                    onClick={() => onUnlockDemoBook('1')}
+                    className="px-4 py-2.5 bg-white border border-gray-300 text-gray-800 rounded-xl text-xs font-bold hover:bg-gray-50 cursor-pointer inline-flex items-center gap-1.5 active:scale-95 transition-all"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-[#4029AB]" />
+                    <span>Try Sample Demo E-Book</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : (
+            /* Books Grid */
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {filteredPurchasedBooks.map((book) => {
+                const dlState = offlineMap[book.id] || { status: 'idle', progress: 0, loadedMb: 0, totalMb: 0 };
+                const isDownloaded = dlState.status === 'downloaded';
+                const isDownloading = dlState.status === 'downloading';
+
+                return (
+                  <div
+                    key={book.id}
+                    className="p-4 rounded-2xl border border-gray-200/90 bg-white hover:border-[#4029AB]/40 transition-all flex flex-col justify-between gap-3 shadow-2xs group"
+                  >
+                    {/* Top Info Section */}
+                    <div
+                      className="flex gap-3.5 cursor-pointer"
+                      onClick={() => onSelectBook(book)}
+                    >
+                      {/* Cover */}
+                      <div className="relative w-18 sm:w-20 aspect-[3/4] shrink-0 rounded-none overflow-hidden bg-gray-100 border border-gray-200 shadow-2xs">
+                        <Image
+                          src={book.cover || DEFAULT_BOOK_COVER}
+                          alt={book.title}
+                          fill
+                          unoptimized
+                          sizes="80px"
+                          className="object-cover rounded-none group-hover:scale-103 transition-transform duration-300"
+                          referrerPolicy="no-referrer"
+                        />
+                      </div>
+
+                      {/* Details */}
+                      <div className="flex-1 min-w-0 flex flex-col justify-between">
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[9px] font-black text-[#4029AB] uppercase tracking-wider bg-[#4029AB]/10 px-1.5 py-0.5 rounded">
+                              {book.category || 'EXAM'}
+                            </span>
+                            {isDownloaded && (
+                              <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                                <Check className="w-2.5 h-2.5" />
+                                <span>Saved Offline</span>
+                              </span>
+                            )}
+                          </div>
+
+                          <h3 className="text-sm font-bold text-gray-950 mt-1 line-clamp-2 leading-snug group-hover:text-[#4029AB] transition-colors">
+                            {book.title}
+                          </h3>
+                        </div>
+
+                        <div className="flex items-center gap-2 text-[11px] text-gray-500 mt-2">
+                          <span>{book.pages || 320} Pages</span>
+                          <span>•</span>
+                          <span>{book.language || 'English'}</span>
+                          <span>•</span>
+                          <span>{book.file_size || '12.5 MB'}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Progress Bar */}
+                    {isDownloading && (
+                      <div className="p-3 bg-purple-50/70 border border-[#4029AB]/20 rounded-xl space-y-2">
+                        <div className="flex justify-between items-center text-xs font-semibold text-[#4029AB]">
+                          <span className="flex items-center gap-1.5">
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                            <span>Downloading to device storage...</span>
+                          </span>
+                          <span>{dlState.progress}%</span>
+                        </div>
+
+                        <div className="w-full h-2 bg-purple-200/60 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-[#4029AB] rounded-full transition-all duration-300 ease-out"
+                            style={{ width: `${dlState.progress}%` }}
+                          />
+                        </div>
+
+                        <div className="flex justify-between text-[10px] text-gray-500">
+                          <span>Secure in-app storage</span>
+                          <span>
+                            {dlState.loadedMb} MB / {dlState.totalMb || 12} MB
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Action Buttons */}
+                    <div className="flex items-center gap-2.5 pt-1 border-t border-gray-100 flex-wrap">
+                      <button
+                        id={`btn-read-online-${book.id}`}
+                        onClick={() => setActiveReader({ book, mode: 'full' })}
+                        className="flex-1 min-w-[130px] py-2 px-3.5 rounded-xl border border-[#4029AB] text-[#4029AB] hover:bg-[#4029AB]/10 active:scale-98 transition-all text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                        title="Read PDF online instantly"
+                      >
+                        <Wifi className="w-3.5 h-3.5" />
+                        <span>Read Online</span>
+                      </button>
+
+                      {isDownloaded ? (
+                        <div className="flex-1 min-w-[130px] flex items-center gap-1.5">
+                          <button
+                            id={`btn-read-offline-${book.id}`}
+                            onClick={() => setActiveReader({ book, mode: 'offline' })}
+                            className="flex-1 py-2 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white active:scale-98 transition-all text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                            title="Read PDF from device offline storage"
+                          >
+                            <WifiOff className="w-3.5 h-3.5" />
+                            <span>Read Offline</span>
+                          </button>
+
+                          <button
+                            onClick={(e) => handleDeleteOffline(book.id, book.title, e)}
+                            className="p-2 rounded-xl text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                            title="Delete offline file to free storage"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          id={`btn-download-offline-${book.id}`}
+                          disabled={isDownloading}
+                          onClick={(e) => handleDownloadOffline(book, e)}
+                          className={`flex-1 min-w-[130px] py-2 px-3.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-98 ${
+                            isDownloading
+                              ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                              : 'bg-[#4029AB] hover:bg-[#34208e] text-white'
+                          }`}
+                          title="Download PDF to device for offline reading"
+                        >
+                          {isDownloading ? (
+                            <>
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                              <span>Downloading ({dlState.progress}%)</span>
+                            </>
+                          ) : (
+                            <>
+                              <Download className="w-3.5 h-3.5" />
+                              <span>Save Offline</span>
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* 4. Real-time In-App PDF Reader Modal */}
       {activeReader && (
         <PDFReaderModal
           book={activeReader.book}

@@ -264,7 +264,70 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       </div>
 
 
-      {/* 4. Share BooksCircle App Section */}
+      {/* 2. My Digital Library & Cloud Records Overview Card */}
+      <div className="p-5 sm:p-6 rounded-3xl bg-white border border-gray-200 space-y-4 shadow-2xs">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-purple-100 text-[#4029AB] flex items-center justify-center">
+              <BookOpen className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="text-sm sm:text-base font-bold text-gray-950">
+                Digital Library &amp; Cloud Records
+              </h3>
+              <p className="text-xs text-gray-500">
+                Synchronized with Firebase Firestore database
+              </p>
+            </div>
+          </div>
+          <span className="px-2.5 py-1 bg-purple-50 border border-purple-200 text-[#4029AB] text-xs font-bold rounded-full">
+            {purchasedCount} Ebooks
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 pt-1">
+          <div className="p-3 bg-gray-50 rounded-2xl border border-gray-100 space-y-1">
+            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+              Unlocked Books
+            </span>
+            <div className="text-lg font-black text-gray-900 font-mono">
+              {purchasedCount}
+            </div>
+          </div>
+
+          <div className="p-3 bg-gray-50 rounded-2xl border border-gray-100 space-y-1">
+            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+              Offline Storage
+            </span>
+            <div className="text-lg font-black text-gray-900 font-mono">
+              {formattedStorage} MB
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 pt-1">
+          <button
+            onClick={onNavigateToPurchased}
+            className="flex-1 py-2.5 px-4 bg-[#4029AB] hover:bg-[#34208e] text-white text-xs font-bold rounded-xl shadow-xs transition-all active:scale-98 cursor-pointer flex items-center justify-center gap-2"
+          >
+            <BookOpen className="w-3.5 h-3.5" />
+            <span>Open Purchased Library &amp; Invoices</span>
+          </button>
+
+          {offlineStats.count > 0 && (
+            <button
+              onClick={handleClearCache}
+              className="py-2.5 px-3 bg-gray-100 hover:bg-red-50 hover:text-red-600 text-gray-700 text-xs font-semibold rounded-xl transition-all cursor-pointer flex items-center gap-1.5"
+              title="Clear downloaded offline PDF files from device"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Clear Cache</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* 3. Share BooksCircle App Section */}
       <div className="p-5 sm:p-6 rounded-3xl border border-gray-200 bg-white space-y-4 shadow-2xs">
         <div className="flex items-center justify-between">
           <div>
