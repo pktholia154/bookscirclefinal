@@ -30,7 +30,7 @@ import { PDFReaderModal } from '@/components/PDFReaderModal';
 import { CartDrawer } from '@/components/CartDrawer';
 import { UserProfile } from '@/components/Header';
 import { processRazorpayPayment, loadRazorpayScript } from '@/lib/services/razorpay';
-import { recordUserPurchaseInFirestore, syncUserPurchases } from '@/lib/services/purchases';
+import { recordUserPurchaseInFirestore, syncUserPurchases, subscribeToUserPurchases } from '@/lib/services/purchases';
 import { syncUserProfileToFirestore } from '@/lib/services/users';
 import { getPurchasedBookIdsFromLocal, savePurchasedBookIds } from '@/lib/offline-storage';
 import { addToCartAction, getCartFromLocal, subscribeToCartChanges } from '@/lib/services/cart';
@@ -44,6 +44,41 @@ interface BookPageClientProps {
   book: Book;
   relatedBooks?: Book[];
 }
+
+const savePendingCheckoutSession = (items: CartItem[]) => {
+  try {
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem(
+        'bookscircle_pending_checkout',
+        JSON.stringify({
+          items,
+          timestamp: Date.now(),
+        })
+      );
+    }
+  } catch {}
+};
+
+const getPendingCheckoutItems = (): CartItem[] | null => {
+  try {
+    if (typeof window === 'undefined') return null;
+    const raw = sessionStorage.getItem('bookscircle_pending_checkout');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      const now = Date.now();
+      if (
+        parsed &&
+        Array.isArray(parsed.items) &&
+        parsed.items.length > 0 &&
+        now - (parsed.timestamp || 0) < 15 * 60 * 1000
+      ) {
+        sessionStorage.removeItem('bookscircle_pending_checkout');
+        return parsed.items as CartItem[];
+      }
+    }
+  } catch {}
+  return null;
+};
 
 export const BookPageClient: React.FC<BookPageClientProps> = ({
   book,
@@ -117,13 +152,46 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
     };
   }, []);
 
+  // Real-time continuous listener for Firebase DB purchase updates
+  useEffect(() => {
+    if (!currentUser) return;
+    const unsubPurchases = subscribeToUserPurchases(
+      currentUser.uid,
+      currentUser.email || undefined,
+      (syncedIds) => {
+        setPurchasedBookIds(syncedIds);
+      }
+    );
+    return () => {
+      unsubPurchases();
+    };
+  }, [currentUser]);
+
   const imgSrc = imgLoadFailed ? DEFAULT_BOOK_COVER : (book.cover || DEFAULT_BOOK_COVER);
   const isPurchased = purchasedBookIds.includes(book.id);
   const isInCart = cart.some((i) => i.book.id === book.id);
 
-  const showToast = (msg: string) => {
+  const showToast = (msg: string | null, duration = 2500) => {
+    if (!msg) {
+      setToastMessage(null);
+      return;
+    }
     setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 2500);
+    setTimeout(() => {
+      setToastMessage((curr) => (curr === msg ? null : curr));
+    }, duration);
+  };
+
+  const autoResumePendingCheckout = (user: UserProfile) => {
+    const pendingItems = getPendingCheckoutItems();
+    if (pendingItems) {
+      showToast('Sign in complete! Opening payment gateway...', 2500);
+      setTimeout(() => {
+        executeRazorpayCheckout(pendingItems, user);
+      }, 350);
+      return true;
+    }
+    return false;
   };
 
   const handleShare = async () => {
@@ -169,7 +237,7 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
     const userId = activeUser?.uid || 'guest_user';
     const totalAmount = itemsToBuy.reduce((sum, item) => sum + item.book.buy_price * item.quantity, 0);
 
-    showToast('Opening Razorpay Secure Gateway...');
+    showToast('Opening Razorpay Secure Gateway...', 2500);
     try {
       await processRazorpayPayment({
         amountInRupees: totalAmount,
@@ -180,38 +248,42 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
         userEmail,
         onSuccess: async (paymentData) => {
           const newPurchasedIds = itemsToBuy.map((item) => item.book.id);
-          try {
-            const allPurchased = await recordUserPurchaseInFirestore(
-              userId,
-              userEmail,
-              itemsToBuy,
-              {
-                orderId: paymentData.order_id,
-                paymentId: paymentData.payment_id,
-                amount: paymentData.amountInRupees,
-              }
-            );
-            setPurchasedBookIds(allPurchased);
-          } catch {
-            savePurchasedBookIds(newPurchasedIds);
-            setPurchasedBookIds((prev) => Array.from(new Set([...prev, ...newPurchasedIds])));
-          }
+          // Instant local state update
+          savePurchasedBookIds(newPurchasedIds);
+          setPurchasedBookIds((prev) => Array.from(new Set([...prev, ...newPurchasedIds])));
+
+          // Firestore write in background
+          recordUserPurchaseInFirestore(
+            userId,
+            userEmail,
+            itemsToBuy,
+            {
+              orderId: paymentData.order_id,
+              paymentId: paymentData.payment_id,
+              amount: paymentData.amountInRupees,
+            }
+          ).then((allPurchased) => {
+            if (allPurchased && allPurchased.length > 0) {
+              setPurchasedBookIds(allPurchased);
+            }
+          }).catch(() => {});
+
           setCart((prev) => prev.filter((item) => !newPurchasedIds.includes(item.book.id)));
-          showToast(`Purchase successful! Opening your library...`);
+          showToast(`Purchase successful! Opening your library...`, 3000);
           setTimeout(() => {
             router.push('/?tab=purchased');
-          }, 600);
+          }, 400);
         },
-        onError: (err) => showToast(err || 'Payment was cancelled.'),
+        onError: (err) => showToast(err || 'Payment was cancelled.', 3500),
       });
     } catch {
-      showToast('Unable to open payment gateway.');
+      showToast('Unable to open payment gateway.', 3500);
     }
   };
 
   const triggerDirectGoogleSignIn = async (callback?: (user: UserProfile) => void) => {
     try {
-      showToast('Initiating Google sign in...');
+      showToast('Initiating Google sign in...', 2500);
       const res = await signInWithGoogle();
       if (res.user) {
         const profile: UserProfile = {
@@ -224,7 +296,7 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
         if (typeof window !== 'undefined') {
           localStorage.setItem('bookscircle_user_session', JSON.stringify(profile));
         }
-        showToast(`Signed in as ${profile.displayName || profile.email}`);
+        showToast(`Signed in as ${profile.displayName || profile.email}`, 3000);
         syncUserProfileToFirestore({
           uid: profile.uid,
           email: profile.email,
@@ -240,17 +312,19 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
           // Sync note
         }
 
-        if (callback) {
+        const resumed = autoResumePendingCheckout(profile);
+
+        if (!resumed && callback) {
           callback(profile);
         }
       } else if (res.fallbackNeeded) {
-        showToast('Firebase Google Sign-In domain check in progress.');
+        showToast('Firebase Google Sign-In domain check in progress.', 3500);
       } else if (res.cancelled) {
-        showToast('Google sign in was cancelled.');
+        showToast('Google sign in was cancelled.', 2500);
       }
     } catch (err: any) {
       if (!err?.message?.includes('popup-closed-by-user')) {
-        showToast('Google sign in error: ' + (err?.message || 'Failed'));
+        showToast('Google sign in error: ' + (err?.message || 'Failed'), 3500);
       }
     }
   };
@@ -263,6 +337,10 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
     }
     const buyItem: CartItem = { book, quantity: 1 };
     if (!currentUser || !currentUser.email) {
+      savePendingCheckoutSession([buyItem]);
+      setPendingActionAfterLogin(() => (user: UserProfile) => {
+        executeRazorpayCheckout([buyItem], user);
+      });
       triggerDirectGoogleSignIn((loggedInUser: UserProfile) => {
         executeRazorpayCheckout([buyItem], loggedInUser);
       });

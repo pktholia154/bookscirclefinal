@@ -12,7 +12,7 @@ import {
   serverTimestamp,
   onSnapshot,
 } from 'firebase/firestore';
-import { db, defaultDb } from '../firebase';
+import { db, defaultDb, auth } from '../firebase';
 import {
   getPurchasedBookIdsFromLocal,
   savePurchasedBookIds,
@@ -110,6 +110,15 @@ export async function recordUserPurchaseInFirestore(
     pdfStoragePath: item.book.pdfStoragePath,
   }));
 
+  const effectiveUserId =
+    userId && userId !== 'guest_user'
+      ? userId
+      : auth?.currentUser?.uid || 'guest_user';
+  const effectiveUserEmail =
+    userEmail && userEmail !== 'user@bookscircle.org'
+      ? userEmail
+      : auth?.currentUser?.email || userEmail || 'user@bookscircle.org';
+
   const purchaseRecord: PurchaseRecord = {
     orderId: paymentInfo.orderId || `ord_${Date.now()}`,
     paymentId: paymentInfo.paymentId || `pay_${Date.now()}`,
@@ -117,8 +126,8 @@ export async function recordUserPurchaseInFirestore(
     currency: 'INR',
     status: paymentInfo.status || 'verified',
     purchasedAt: now,
-    userId: userId || 'guest_user',
-    userEmail: userEmail || 'user@bookscircle.org',
+    userId: effectiveUserId,
+    userEmail: effectiveUserEmail,
     userName: paymentInfo.userName || 'Reader',
     books: purchaseItemDetails,
     bookIds,
@@ -168,14 +177,14 @@ export async function recordUserPurchaseInFirestore(
   for (const firestoreInstance of instances) {
     if (!firestoreInstance) continue;
     try {
-      // User Profile and Entitlements in /users/{userId} AND subcollection /users/{userId}/purchases/{paymentId}
-      if (userId && userId !== 'guest_user') {
-        const userProfileDocRef = doc(firestoreInstance, 'users', userId);
+      // 1. /users/{userId} & subcollection /users/{userId}/purchases/{paymentId}
+      if (effectiveUserId && effectiveUserId !== 'guest_user') {
+        const userProfileDocRef = doc(firestoreInstance, 'users', effectiveUserId);
         await setDoc(
           userProfileDocRef,
           {
-            uid: userId,
-            email: userEmail,
+            uid: effectiveUserId,
+            email: effectiveUserEmail,
             purchasedBooks: arrayUnion(...bookIds),
             purchasesCount: increment(bookIds.length),
             totalSpent: increment(purchaseRecord.amount),
@@ -191,14 +200,77 @@ export async function recordUserPurchaseInFirestore(
         const userPurchaseSubDocRef = doc(
           firestoreInstance,
           'users',
-          userId,
+          effectiveUserId,
           'purchases',
           purchaseRecord.paymentId
         );
         await setDoc(userPurchaseSubDocRef, purchaseRecord, { merge: true });
+
+        // 2. Top-level /user_purchases/{userId}
+        const userPurchasesDocRef = doc(firestoreInstance, 'user_purchases', effectiveUserId);
+        await setDoc(
+          userPurchasesDocRef,
+          {
+            userId: effectiveUserId,
+            userEmail: effectiveUserEmail,
+            purchasedBooks: arrayUnion(...bookIds),
+            totalBooksCount: increment(bookIds.length),
+            totalSpent: increment(purchaseRecord.amount),
+            lastPurchasedAt: now,
+            lastOrderId: purchaseRecord.orderId,
+            lastPaymentId: purchaseRecord.paymentId,
+            lastUpdated: now,
+          },
+          { merge: true }
+        );
+
+        // 3. Top-level /user_purchases_by_email/{normalizedEmail}
+        if (effectiveUserEmail) {
+          const normEmail = normalizeEmailForDocId(effectiveUserEmail);
+          const emailPurchasesDocRef = doc(firestoreInstance, 'user_purchases_by_email', normEmail);
+          await setDoc(
+            emailPurchasesDocRef,
+            {
+              userEmail: effectiveUserEmail,
+              userId: effectiveUserId,
+              purchasedBooks: arrayUnion(...bookIds),
+              totalBooksCount: increment(bookIds.length),
+              totalSpent: increment(purchaseRecord.amount),
+              lastPurchasedAt: now,
+              lastOrderId: purchaseRecord.orderId,
+              lastPaymentId: purchaseRecord.paymentId,
+              lastUpdated: now,
+            },
+            { merge: true }
+          );
+        }
       }
 
-      // Update book analytics & purchase counters: /book_analytics/{bookId}
+      // 4. Top-level /purchases/{paymentId}
+      const topPurchaseDocRef = doc(firestoreInstance, 'purchases', purchaseRecord.paymentId);
+      await setDoc(topPurchaseDocRef, purchaseRecord, { merge: true });
+
+      // 5. Top-level /orders/{orderId}
+      const topOrderDocRef = doc(firestoreInstance, 'orders', purchaseRecord.orderId);
+      await setDoc(
+        topOrderDocRef,
+        {
+          orderId: purchaseRecord.orderId,
+          paymentId: purchaseRecord.paymentId,
+          amount: purchaseRecord.amount,
+          currency: purchaseRecord.currency,
+          status: purchaseRecord.status,
+          purchasedAt: now,
+          userId: effectiveUserId,
+          userEmail: effectiveUserEmail,
+          books: purchaseItemDetails,
+          bookIds,
+          updatedAt: now,
+        },
+        { merge: true }
+      );
+
+      // 6. Update book analytics: /book_analytics/{bookId}
       for (const item of cartItems) {
         try {
           const analyticsDocRef = doc(firestoreInstance, 'book_analytics', item.book.id);
@@ -238,12 +310,14 @@ export async function recordUserPurchaseInFirestore(
   }
 
   const allPurchased = Array.from(new Set([...getPurchasedBookIdsFromLocal(), ...bookIds]));
+  await savePurchasedBookIds(allPurchased);
   return allPurchased;
 }
 
 /**
- * 2. Fetch and merge purchased book IDs for a user from Firestore & local storage.
- * Performs lookup on /users/{userId} doc and /users/{userId}/purchases subcollection.
+ * 2. Fetch purchased book IDs for a user directly from Firebase DB collections.
+ * Performs lookup across /users/{userId}, /users/{userId}/purchases, /user_purchases/{userId},
+ * and /user_purchases_by_email/{normalizedEmail}.
  */
 export async function syncUserPurchases(userId?: string, userEmail?: string): Promise<string[]> {
   const localPurchased = getPurchasedBookIdsFromLocal();
@@ -253,7 +327,7 @@ export async function syncUserPurchases(userId?: string, userEmail?: string): Pr
   syncPendingPurchasesToFirestore().catch(() => {});
 
   if (userId && userId !== 'guest_user') {
-    const instances = [db, defaultDb];
+    const instances = [db, defaultDb].filter(Boolean);
     for (const firestoreInstance of instances) {
       if (!firestoreInstance) continue;
       try {
@@ -277,8 +351,33 @@ export async function syncUserPurchases(userId?: string, userEmail?: string): Pr
               remoteBookIds.push(...pData.bookIds);
             }
           });
-        } catch (subErr) {
-          // Subcollection query error note
+        } catch (subErr) {}
+
+        // C. Check /user_purchases/{userId}
+        try {
+          const upRef = doc(firestoreInstance, 'user_purchases', userId);
+          const upSnap = await getDoc(upRef);
+          if (upSnap.exists()) {
+            const upData = upSnap.data();
+            if (Array.isArray(upData?.purchasedBooks)) {
+              remoteBookIds.push(...upData.purchasedBooks);
+            }
+          }
+        } catch (upErr) {}
+
+        // D. Check /user_purchases_by_email/{normalizedEmail}
+        if (userEmail) {
+          try {
+            const normEmail = normalizeEmailForDocId(userEmail);
+            const emailDocRef = doc(firestoreInstance, 'user_purchases_by_email', normEmail);
+            const emailSnap = await getDoc(emailDocRef);
+            if (emailSnap.exists()) {
+              const eData = emailSnap.data();
+              if (Array.isArray(eData?.purchasedBooks)) {
+                remoteBookIds.push(...eData.purchasedBooks);
+              }
+            }
+          } catch (eErr) {}
         }
 
         if (remoteBookIds.length > 0) break;
@@ -288,19 +387,16 @@ export async function syncUserPurchases(userId?: string, userEmail?: string): Pr
     }
   }
 
-  const combined = Array.from(new Set([...localPurchased, ...remoteBookIds]));
+  const uniqueRemoteIds = Array.from(new Set(remoteBookIds));
 
-  // If remote returned book IDs not yet in local storage, save them locally
-  if (combined.length > localPurchased.length) {
-    await savePurchasedBookIds(combined);
+  // If user is authenticated, purchase list comes directly from Firebase collections
+  if (userId && userId !== 'guest_user') {
+    await savePurchasedBookIds(uniqueRemoteIds);
+    return uniqueRemoteIds;
   }
 
-  // If local had books but user is signed in and remote was missing them, backfill to user's cloud account
-  if (userId && userId !== 'guest_user' && localPurchased.length > 0 && remoteBookIds.length < combined.length) {
-    backfillLocalPurchasesToCloud(userId, userEmail || 'user@bookscircle.org', combined).catch(() => {});
-  }
-
-  return combined;
+  // Fallback for guest users without an account: return local storage
+  return Array.from(new Set(localPurchased));
 }
 
 /**
@@ -499,13 +595,12 @@ export function subscribeToUserPurchases(
   const unsubscribers: (() => void)[] = [];
 
   const handleNewBookIds = async (newIds: string[]) => {
-    if (!newIds || !Array.isArray(newIds) || newIds.length === 0) return;
-    const local = getPurchasedBookIdsFromLocal();
-    const merged = Array.from(new Set([...local, ...newIds]));
-    if (merged.length > local.length) {
-      await savePurchasedBookIds(merged);
+    if (!newIds || !Array.isArray(newIds)) return;
+    const unique = Array.from(new Set(newIds));
+    if (unique.length > 0) {
+      await savePurchasedBookIds(unique);
+      onPurchasesUpdated(unique);
     }
-    onPurchasesUpdated(merged);
   };
 
   const instances = [db, defaultDb].filter(Boolean);
@@ -513,9 +608,9 @@ export function subscribeToUserPurchases(
   instances.forEach((firestoreInstance) => {
     if (!firestoreInstance) return;
 
-    // 1. Real-time listener for users/{userId} doc
     if (userId && userId !== 'guest_user') {
       try {
+        // 1. Real-time listener for /users/{userId}
         const userProfileDocRef = doc(firestoreInstance, 'users', userId);
         const unsubProfile = onSnapshot(
           userProfileDocRef,
@@ -554,6 +649,41 @@ export function subscribeToUserPurchases(
           }
         );
         unsubscribers.push(unsubSubCol);
+
+        // 3. Real-time listener for /user_purchases/{userId}
+        const userPurchasesDocRef = doc(firestoreInstance, 'user_purchases', userId);
+        const unsubUserPurchases = onSnapshot(
+          userPurchasesDocRef,
+          (snap) => {
+            if (snap.exists()) {
+              const data = snap.data();
+              if (Array.isArray(data?.purchasedBooks)) {
+                handleNewBookIds(data.purchasedBooks);
+              }
+            }
+          },
+          () => {}
+        );
+        unsubscribers.push(unsubUserPurchases);
+
+        // 4. Real-time listener for /user_purchases_by_email/{normalizedEmail}
+        if (userEmail) {
+          const normEmail = normalizeEmailForDocId(userEmail);
+          const emailDocRef = doc(firestoreInstance, 'user_purchases_by_email', normEmail);
+          const unsubEmail = onSnapshot(
+            emailDocRef,
+            (snap) => {
+              if (snap.exists()) {
+                const data = snap.data();
+                if (Array.isArray(data?.purchasedBooks)) {
+                  handleNewBookIds(data.purchasedBooks);
+                }
+              }
+            },
+            () => {}
+          );
+          unsubscribers.push(unsubEmail);
+        }
       } catch (e) {
         console.warn('Realtime listener attach error:', e);
       }

@@ -93,6 +93,20 @@ const CartItemRow: React.FC<{
   );
 };
 
+const savePendingCheckoutToSession = (items: CartItem[]) => {
+  try {
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem(
+        'bookscircle_pending_checkout',
+        JSON.stringify({
+          items,
+          timestamp: Date.now(),
+        })
+      );
+    }
+  } catch {}
+};
+
 export const CartDrawer: React.FC<CartDrawerProps> = ({
   isOpen,
   onClose,
@@ -128,6 +142,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 
     // Strict authentication check before initiating checkout
     if (!activeUser || !activeUser.email) {
+      savePendingCheckoutToSession(items);
       if (onRequireLogin) {
         onRequireLogin((loggedInUser: UserProfile) => {
           handleCheckout(loggedInUser);

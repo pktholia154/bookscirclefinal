@@ -37,6 +37,41 @@ import { usePWAInstall } from '@/hooks/use-pwa-install';
 import { Check, ShoppingBag, RefreshCw, Lock, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
+const savePendingCheckoutSession = (items: CartItem[]) => {
+  try {
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem(
+        'bookscircle_pending_checkout',
+        JSON.stringify({
+          items,
+          timestamp: Date.now(),
+        })
+      );
+    }
+  } catch {}
+};
+
+const getPendingCheckoutItems = (): CartItem[] | null => {
+  try {
+    if (typeof window === 'undefined') return null;
+    const raw = sessionStorage.getItem('bookscircle_pending_checkout');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      const now = Date.now();
+      if (
+        parsed &&
+        Array.isArray(parsed.items) &&
+        parsed.items.length > 0 &&
+        now - (parsed.timestamp || 0) < 15 * 60 * 1000
+      ) {
+        sessionStorage.removeItem('bookscircle_pending_checkout');
+        return parsed.items as CartItem[];
+      }
+    }
+  } catch {}
+  return null;
+};
+
 export default function HomePage() {
   const [books, setBooks] = useState<Book[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -135,6 +170,141 @@ export default function HomePage() {
     }
   }, [purchasedBookIds]);
 
+  // Toast message helper with automatic clearing timer
+  const showToast = useCallback((msg: string | null, duration = 3000) => {
+    if (!msg) {
+      setToastMessage(null);
+      return;
+    }
+    setToastMessage(msg);
+    setTimeout(() => {
+      setToastMessage((curr) => (curr === msg ? null : curr));
+    }, duration);
+  }, []);
+
+  const handleSuccessfulCheckout = useCallback(
+    async (
+      purchasedItems: CartItem[],
+      paymentData?: { order_id?: string; payment_id?: string; amountInRupees?: number },
+      userOverride?: UserProfile | null
+    ) => {
+      const newPurchasedIds = purchasedItems.map((item) => item.book.id);
+      const activeUser = userOverride || currentUser;
+      const effectiveUserId = activeUser?.uid || auth?.currentUser?.uid || 'guest_user';
+      const effectiveUserEmail = activeUser?.email || auth?.currentUser?.email || 'user@bookscircle.org';
+
+      // 1. Instant local state update & persistence
+      savePurchasedBookIds(newPurchasedIds);
+      setPurchasedBookIds((prev) => Array.from(new Set([...prev, ...newPurchasedIds])));
+
+      // 2. Perform Firestore cloud purchase record asynchronously in background without blocking UI
+      recordUserPurchaseInFirestore(
+        effectiveUserId,
+        effectiveUserEmail,
+        purchasedItems,
+        {
+          orderId: paymentData?.order_id || `ord_${Date.now()}`,
+          paymentId: paymentData?.payment_id || `pay_${Date.now()}`,
+          amount: paymentData?.amountInRupees || 0,
+        }
+      )
+        .then((allPurchased) => {
+          if (allPurchased && allPurchased.length > 0) {
+            setPurchasedBookIds(allPurchased);
+          }
+        })
+        .catch((e) => {
+          console.warn('Purchase cloud record note:', e);
+        });
+
+      // Clean up purchased items from cart
+      newPurchasedIds.forEach((id) => removeFromCartAction(id));
+      setCart((prev) => prev.filter((item) => !newPurchasedIds.includes(item.book.id)));
+
+      showToast(`Purchase successful! ${purchasedItems.length} eBook(s) unlocked in your library.`, 3500);
+
+      // 3. Immediate redirect & tab switch to purchased library view
+      startTransition(() => {
+        setSelectedBook(null);
+        setActiveTab('purchased');
+        setIsCartOpen(false);
+        if (typeof window !== 'undefined') {
+          try {
+            const url = new URL(window.location.href);
+            url.searchParams.set('tab', 'purchased');
+            window.history.pushState({}, '', url.toString());
+          } catch {}
+        }
+      });
+    },
+    [currentUser, showToast]
+  );
+
+  // Central Razorpay checkout executor that supports instant auto-resume
+  const executeRazorpayCheckout = useCallback(
+    async (
+      itemsToBuy: CartItem[],
+      userOverride?: UserProfile | null
+    ) => {
+      if (itemsToBuy.length === 0) return;
+
+      const activeUser = userOverride || currentUser;
+      const userEmail = activeUser?.email || '';
+      const userName = activeUser?.displayName || 'Reader';
+      const userId = activeUser?.uid || 'guest_user';
+
+      const summary = calculateCartSummary(itemsToBuy);
+      const totalAmount = summary.subtotal;
+      const bookIds = itemsToBuy.map((i) => i.book.id);
+      const bookTitles = itemsToBuy.map((i) => i.book.title);
+
+      setIsCartTabCheckingOut(true);
+      showToast('Opening Razorpay Secure Gateway...', 2500);
+
+      try {
+        await processRazorpayPayment({
+          amountInRupees: totalAmount,
+          bookIds,
+          bookTitles,
+          userId,
+          userName,
+          userEmail,
+          onSuccess: (paymentData) => {
+            setIsCartTabCheckingOut(false);
+            handleSuccessfulCheckout(itemsToBuy, paymentData, activeUser);
+          },
+          onError: (err) => {
+            setIsCartTabCheckingOut(false);
+            showToast(err || 'Payment was declined or cancelled.', 3500);
+          },
+          onDismiss: () => {
+            setIsCartTabCheckingOut(false);
+          },
+        });
+      } catch (e: any) {
+        setIsCartTabCheckingOut(false);
+        showToast(e?.message || 'Unable to load payment gateway.', 3500);
+      }
+    },
+    [currentUser, handleSuccessfulCheckout, showToast]
+  );
+
+  // Auto-resume pending purchase pipeline after sign in without requiring user to click buy again
+  const autoResumePendingCheckout = useCallback(
+    (user: UserProfile) => {
+      const pendingItems = getPendingCheckoutItems();
+      if (pendingItems) {
+        showToast('Sign in complete! Opening payment gateway...', 2500);
+        setTimeout(() => {
+          executeRazorpayCheckout(pendingItems, user);
+        }, 350);
+        return true;
+      }
+      return false;
+    },
+    [executeRazorpayCheckout, showToast]
+  );
+
   // Listen to Firebase Auth state for real Google Sign-In & cloud purchase sync
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -165,11 +335,14 @@ export default function HomePage() {
         } catch (e) {
           console.warn('Initial cloud purchase sync note:', e);
         }
+
+        // Auto-resume pending purchase if visitor clicked buy before signing in
+        autoResumePendingCheckout(profile);
       }
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [autoResumePendingCheckout]);
 
   // Real-time continuous Firebase Firestore subscription for multi-device instant auto-sync
   useEffect(() => {
@@ -265,7 +438,7 @@ export default function HomePage() {
   // Direct Google Sign-In trigger (No modal popup dialog)
   const triggerDirectGoogleSignIn = async (callback?: (user: UserProfile) => void) => {
     try {
-      setToastMessage('Initiating Google sign in...');
+      showToast('Initiating Google sign in...', 2500);
       const res = await signInWithGoogle();
       if (res.user) {
         const profile: UserProfile = {
@@ -279,16 +452,13 @@ export default function HomePage() {
           callback(profile);
         }
       } else if (res.fallbackNeeded) {
-        setToastMessage('Firebase Google Sign-In domain check in progress. Please retry.');
-        setTimeout(() => setToastMessage(null), 3500);
+        showToast('Firebase Google Sign-In domain check in progress. Please retry.', 3500);
       } else if (res.cancelled) {
-        setToastMessage('Google sign in was cancelled.');
-        setTimeout(() => setToastMessage(null), 2500);
+        showToast('Google sign in was cancelled.', 2500);
       }
     } catch (err: any) {
       if (!err?.message?.includes('popup-closed-by-user')) {
-        setToastMessage('Google sign in error: ' + (err?.message || 'Failed'));
-        setTimeout(() => setToastMessage(null), 3500);
+        showToast('Google sign in error: ' + (err?.message || 'Failed'), 3500);
       }
     }
   };
@@ -310,8 +480,7 @@ export default function HomePage() {
     if (typeof window !== 'undefined') {
       localStorage.setItem('bookscircle_user_session', JSON.stringify(profile));
     }
-    setToastMessage(`Signed in as ${profile.displayName || profile.email}`);
-    setTimeout(() => setToastMessage(null), 3000);
+    showToast(`Signed in as ${profile.displayName || profile.email}`, 3000);
 
     // Ensure user profile document exists in Firestore /users/{uid}
     syncUserProfileToFirestore({
@@ -330,8 +499,11 @@ export default function HomePage() {
       console.warn('User purchase cloud sync note:', e);
     }
 
-    // Automatically resume pending action if present
-    if (pendingActionAfterLogin) {
+    // Auto-resume pending checkout if stored in session
+    const resumed = autoResumePendingCheckout(profile);
+
+    // Automatically resume pending callback action if present and not already resumed
+    if (!resumed && pendingActionAfterLogin) {
       const action = pendingActionAfterLogin;
       setPendingActionAfterLogin(null);
       setTimeout(() => {
@@ -351,8 +523,7 @@ export default function HomePage() {
       localStorage.removeItem('bookscircle_user_session');
     }
     setCurrentUser(null);
-    setToastMessage('Signed out successfully.');
-    setTimeout(() => setToastMessage(null), 2500);
+    showToast('Signed out successfully.', 2500);
   };
 
   // Centralized Cart Operations via cart.ts
@@ -360,8 +531,7 @@ export default function HomePage() {
     if (e) e.stopPropagation();
 
     if (purchasedBookIds.includes(book.id)) {
-      setToastMessage(`You already own "${book.title.slice(0, 22)}...". Check your Library.`);
-      setTimeout(() => setToastMessage(null), 2500);
+      showToast(`You already own "${book.title.slice(0, 22)}...". Check your Library.`, 2500);
       return;
     }
 
@@ -369,11 +539,10 @@ export default function HomePage() {
     setCart(updatedCart);
 
     if (isNewItem) {
-      setToastMessage(`Added "${book.title.slice(0, 22)}..." to Cart`);
+      showToast(`Added "${book.title.slice(0, 22)}..." to Cart`, 2500);
     } else {
-      setToastMessage(`"${book.title.slice(0, 22)}..." is already in your Cart`);
+      showToast(`"${book.title.slice(0, 22)}..." is already in your Cart`, 2500);
     }
-    setTimeout(() => setToastMessage(null), 2500);
   };
 
   const handleRemoveFromCart = (bookId: string) => {
@@ -386,100 +555,10 @@ export default function HomePage() {
     setCart(updated);
   };
 
-  const handleSuccessfulCheckout = async (
-    purchasedItems: CartItem[],
-    paymentData?: { order_id?: string; payment_id?: string; amountInRupees?: number }
-  ) => {
-    const newPurchasedIds = purchasedItems.map((item) => item.book.id);
-
-    try {
-      const allPurchased = await recordUserPurchaseInFirestore(
-        currentUser?.uid || 'guest_user',
-        currentUser?.email || 'user@bookscircle.org',
-        purchasedItems,
-        {
-          orderId: paymentData?.order_id || `ord_${Date.now()}`,
-          paymentId: paymentData?.payment_id || `pay_${Date.now()}`,
-          amount: paymentData?.amountInRupees || 0,
-        }
-      );
-      setPurchasedBookIds(allPurchased);
-    } catch (e) {
-      savePurchasedBookIds(newPurchasedIds);
-      setPurchasedBookIds((prev) => Array.from(new Set([...prev, ...newPurchasedIds])));
-    }
-
-    // Clean up purchased items from cart
-    newPurchasedIds.forEach((id) => removeFromCartAction(id));
-    setCart((prev) => prev.filter((item) => !newPurchasedIds.includes(item.book.id)));
-
-    setToastMessage(`Purchase successful! ${purchasedItems.length} eBook(s) unlocked in your library.`);
-    startTransition(() => {
-      setSelectedBook(null);
-      setActiveTab('purchased');
-      setIsCartOpen(false);
-      if (typeof window !== 'undefined') {
-        try {
-          const url = new URL(window.location.href);
-          url.searchParams.set('tab', 'purchased');
-          window.history.pushState({}, '', url.toString());
-        } catch {}
-      }
-    });
-  };
-
-  // Central Razorpay checkout executor that supports instant auto-resume
-  const executeRazorpayCheckout = async (
-    itemsToBuy: CartItem[],
-    userOverride?: UserProfile | null
-  ) => {
-    if (itemsToBuy.length === 0) return;
-
-    const activeUser = userOverride || currentUser;
-    const userEmail = activeUser?.email || '';
-    const userName = activeUser?.displayName || 'Reader';
-    const userId = activeUser?.uid || 'guest_user';
-
-    const summary = calculateCartSummary(itemsToBuy);
-    const totalAmount = summary.subtotal;
-    const bookIds = itemsToBuy.map((i) => i.book.id);
-    const bookTitles = itemsToBuy.map((i) => i.book.title);
-
-    setIsCartTabCheckingOut(true);
-    setToastMessage('Opening Razorpay Secure Gateway...');
-
-    try {
-      await processRazorpayPayment({
-        amountInRupees: totalAmount,
-        bookIds,
-        bookTitles,
-        userId,
-        userName,
-        userEmail,
-        onSuccess: (paymentData) => {
-          setIsCartTabCheckingOut(false);
-          handleSuccessfulCheckout(itemsToBuy, paymentData);
-        },
-        onError: (err) => {
-          setIsCartTabCheckingOut(false);
-          setToastMessage(err || 'Payment was declined or cancelled.');
-          setTimeout(() => setToastMessage(null), 3500);
-        },
-        onDismiss: () => {
-          setIsCartTabCheckingOut(false);
-        },
-      });
-    } catch (e: any) {
-      setIsCartTabCheckingOut(false);
-      setToastMessage(e?.message || 'Unable to load payment gateway.');
-      setTimeout(() => setToastMessage(null), 3500);
-    }
-  };
-
   // Direct Buy Now handler - initiates direct checkout without adding to user's cart
   const handleBuyNow = (book: Book) => {
     if (purchasedBookIds.includes(book.id)) {
-      setToastMessage(`You already own "${book.title.slice(0, 20)}...". Opening Library.`);
+      showToast(`You already own "${book.title.slice(0, 20)}...". Opening Library.`, 3000);
       startTransition(() => {
         setSelectedBook(null);
         setActiveTab('purchased');
@@ -490,6 +569,11 @@ export default function HomePage() {
     const buyItem: CartItem = { book, quantity: 1 };
 
     if (!currentUser || !currentUser.email) {
+      // Save pending checkout in session storage AND state callback to guarantee seamless auto-resume
+      savePendingCheckoutSession([buyItem]);
+      setPendingActionAfterLogin(() => (loggedInUser: UserProfile) => {
+        executeRazorpayCheckout([buyItem], loggedInUser);
+      });
       handleRequireLogin((loggedInUser: UserProfile) => {
         executeRazorpayCheckout([buyItem], loggedInUser);
       });

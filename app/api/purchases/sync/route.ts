@@ -67,18 +67,41 @@ export async function POST(req: NextRequest) {
       const dbBaseUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/${dbName}/documents`;
 
       try {
-        // Write to /users/{userId} and subcollection /users/{userId}/purchases/{paymentId}
+        // 1. Update /users/{userId} and subcollection /users/{userId}/purchases/{paymentId}
         if (userId && userId !== 'guest_user') {
           const userDocUrl = `${dbBaseUrl}/users/${encodeURIComponent(userId)}?key=${FIREBASE_API_KEY}`;
-          await fetch(userDocUrl, {
+          
+          let existingPurchased: string[] = [];
+          try {
+            const getRes = await fetch(userDocUrl);
+            if (getRes.ok) {
+              const getJson = await getRes.json();
+              const fields = getJson?.fields || {};
+              if (fields.purchasedBooks?.arrayValue?.values) {
+                existingPurchased = fields.purchasedBooks.arrayValue.values
+                  .map((v: any) => v.stringValue)
+                  .filter(Boolean);
+              }
+            }
+          } catch (e) {
+            // Ignore fetch error, start with empty
+          }
+
+          const combinedBooks = Array.from(new Set([...existingPurchased, ...(purchaseRecord.bookIds || [])]));
+
+          const updateFields = ['uid', 'email', 'purchasedBooks', 'purchasesCount', 'lastPurchasedAt', 'lastOrderId', 'lastPaymentId', 'updatedAt'];
+          const maskParams = updateFields.map((f) => `updateMask.fieldPaths=${encodeURIComponent(f)}`).join('&');
+          const patchUrl = `${userDocUrl}&${maskParams}`;
+
+          await fetch(patchUrl, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               fields: toFirestoreFields({
                 uid: userId,
                 email: userEmail || '',
-                purchasedBooks: purchaseRecord.bookIds,
-                purchasesCount: purchaseRecord.booksCount,
+                purchasedBooks: combinedBooks,
+                purchasesCount: combinedBooks.length,
                 lastPurchasedAt: now,
                 lastOrderId: orderId,
                 lastPaymentId: paymentId,
@@ -87,7 +110,7 @@ export async function POST(req: NextRequest) {
             }),
           });
 
-          // Subcollection record under user
+          // 2. Subcollection record /users/{userId}/purchases/{paymentId}
           const subPurchaseUrl = `${dbBaseUrl}/users/${encodeURIComponent(userId)}/purchases/${encodeURIComponent(
             paymentId
           )}?key=${FIREBASE_API_KEY}`;
@@ -96,6 +119,95 @@ export async function POST(req: NextRequest) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ fields: toFirestoreFields(purchaseRecord) }),
           });
+
+          // 3. Top-level /user_purchases/{userId}
+          const userPurchasesUrl = `${dbBaseUrl}/user_purchases/${encodeURIComponent(userId)}?key=${FIREBASE_API_KEY}`;
+          await fetch(userPurchasesUrl, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              fields: toFirestoreFields({
+                userId,
+                userEmail: userEmail || '',
+                purchasedBooks: combinedBooks,
+                totalBooksCount: combinedBooks.length,
+                totalSpent: purchaseRecord.amount,
+                lastPurchasedAt: now,
+                lastOrderId: orderId,
+                lastPaymentId: paymentId,
+                lastUpdated: now,
+              }),
+            }),
+          });
+
+          // 4. Top-level /user_purchases_by_email/{emailKey}
+          if (userEmail) {
+            const normalizedEmailKey = userEmail.trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
+            const emailPurchasesUrl = `${dbBaseUrl}/user_purchases_by_email/${encodeURIComponent(normalizedEmailKey)}?key=${FIREBASE_API_KEY}`;
+            await fetch(emailPurchasesUrl, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                fields: toFirestoreFields({
+                  userEmail,
+                  userId,
+                  purchasedBooks: combinedBooks,
+                  totalBooksCount: combinedBooks.length,
+                  totalSpent: purchaseRecord.amount,
+                  lastPurchasedAt: now,
+                  lastOrderId: orderId,
+                  lastPaymentId: paymentId,
+                  lastUpdated: now,
+                }),
+              }),
+            });
+          }
+        }
+
+        // 5. Top-level /purchases/{paymentId}
+        const topPurchaseUrl = `${dbBaseUrl}/purchases/${encodeURIComponent(paymentId)}?key=${FIREBASE_API_KEY}`;
+        await fetch(topPurchaseUrl, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fields: toFirestoreFields(purchaseRecord) }),
+        });
+
+        // 6. Top-level /orders/{orderId}
+        const topOrderUrl = `${dbBaseUrl}/orders/${encodeURIComponent(orderId)}?key=${FIREBASE_API_KEY}`;
+        await fetch(topOrderUrl, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fields: toFirestoreFields({
+              orderId,
+              paymentId,
+              amount,
+              currency: currency || 'INR',
+              status: status || 'verified',
+              purchasedAt: now,
+              userId: userId || 'guest_user',
+              userEmail: userEmail || '',
+              bookIds: purchaseRecord.bookIds,
+              updatedAt: now,
+            }),
+          }),
+        });
+
+        // 7. /book_analytics/{bookId}
+        if (Array.isArray(bookIds)) {
+          for (const bId of bookIds) {
+            const analyticsUrl = `${dbBaseUrl}/book_analytics/${encodeURIComponent(bId)}?key=${FIREBASE_API_KEY}`;
+            await fetch(analyticsUrl, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                fields: toFirestoreFields({
+                  bookId: bId,
+                  lastPurchasedAt: now,
+                }),
+              }),
+            });
+          }
         }
 
         results[dbName] = { ok: true };

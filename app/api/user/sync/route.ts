@@ -49,20 +49,36 @@ export async function POST(req: NextRequest) {
     }
 
     const now = new Date().toISOString();
-    const userDocData = {
+    const explicitPurchased = Array.isArray(purchasedBooks) ? purchasedBooks : null;
+
+    // Base user profile fields for login/session sync
+    const userDocData: Record<string, any> = {
       uid,
       email: email || '',
       displayName: displayName || (email ? email.split('@')[0] : 'Reader'),
       photoURL: photoURL || '',
       providerId: providerId || 'google.com',
       role: role || 'user',
-      purchasedBooks: Array.isArray(purchasedBooks) ? purchasedBooks : [],
-      purchasesCount: Array.isArray(purchasedBooks) ? purchasedBooks.length : 0,
-      totalSpent: typeof totalSpent === 'number' ? totalSpent : 0,
       lastLoginAt: now,
       updatedAt: now,
       createdAt: body.createdAt || now,
     };
+
+    const updateFields = ['uid', 'email', 'displayName', 'photoURL', 'providerId', 'role', 'lastLoginAt', 'updatedAt', 'createdAt'];
+
+    if (explicitPurchased && explicitPurchased.length > 0) {
+      userDocData.purchasedBooks = explicitPurchased;
+      userDocData.purchasesCount = explicitPurchased.length;
+      updateFields.push('purchasedBooks', 'purchasesCount');
+    }
+
+    if (typeof totalSpent === 'number' && totalSpent > 0) {
+      userDocData.totalSpent = totalSpent;
+      updateFields.push('totalSpent');
+    }
+
+    // Build REST updateMask parameters so PATCH only updates specified profile fields
+    const maskParams = updateFields.map((f) => `updateMask.fieldPaths=${encodeURIComponent(f)}`).join('&');
 
     const databases = ['bookscircle', '(default)'];
     const results: Record<string, any> = {};
@@ -70,7 +86,7 @@ export async function POST(req: NextRequest) {
     for (const dbName of databases) {
       const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/${dbName}/documents/users/${encodeURIComponent(
         uid
-      )}?key=${FIREBASE_API_KEY}`;
+      )}?key=${FIREBASE_API_KEY}&${maskParams}`;
 
       try {
         const firestoreFields = toFirestoreFields(userDocData);

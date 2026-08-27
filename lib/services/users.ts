@@ -58,16 +58,13 @@ export async function syncUserProfileToFirestore(
     user.displayName ||
     (fallbackEmail ? fallbackEmail.split('@')[0] : 'Reader');
 
-  const profilePayload: FirestoreUserProfile = {
+  const profilePayload: Record<string, any> = {
     uid: user.uid,
     email: user.email || null,
     displayName: fallbackDisplayName,
     photoURL: user.photoURL || null,
     providerId: user.providerId || 'google.com',
     role: 'user',
-    purchasedBooks: explicitPurchased,
-    purchasesCount: explicitPurchased.length,
-    totalSpent: additionalData?.totalSpent || 0,
     createdAt: now,
     lastLoginAt: now,
     updatedAt: now,
@@ -77,6 +74,12 @@ export async function syncUserProfileToFirestore(
       domain: typeof window !== 'undefined' ? window.location.hostname : 'bookscircle.org',
     },
   };
+
+  if (explicitPurchased.length > 0) {
+    profilePayload.purchasedBooks = explicitPurchased;
+    profilePayload.purchasesCount = explicitPurchased.length;
+    profilePayload.totalSpent = additionalData?.totalSpent || 0;
+  }
 
   // 1. Dispatch to server-side Firestore synchronization endpoint (bypasses client firewall / CORS / auth limits)
   try {
@@ -118,7 +121,7 @@ export async function syncUserProfileToFirestore(
     }
   }
 
-  return profilePayload;
+  return profilePayload as unknown as FirestoreUserProfile;
 }
 
 /**
