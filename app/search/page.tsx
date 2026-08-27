@@ -18,14 +18,6 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { RefreshCw, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
-const RAZORPAY_TEST_USER: UserProfile = {
-  uid: 'razorpay_test_auditor_uid',
-  email: 'reviewer.razorpay@bookscircle.org',
-  displayName: 'Razorpay Test Reviewer',
-  photoURL: null,
-  isTestAccount: true,
-};
-
 function SearchPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -56,12 +48,12 @@ function SearchPageContent() {
     }
   });
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
-    if (typeof window === 'undefined') return RAZORPAY_TEST_USER;
+    if (typeof window === 'undefined') return null;
     try {
-      const savedUser = localStorage.getItem('bookscircle_test_user');
+      const savedUser = localStorage.getItem('bookscircle_auth_user');
       if (savedUser) return JSON.parse(savedUser);
     } catch {}
-    return RAZORPAY_TEST_USER;
+    return null;
   });
   const [isGoogleModalOpen, setIsGoogleModalOpen] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -99,7 +91,6 @@ function SearchPageContent() {
           email: user.email,
           displayName: user.displayName || 'Google User',
           photoURL: user.photoURL,
-          isTestAccount: false,
         };
         setCurrentUser(profile);
         try {
@@ -131,7 +122,7 @@ function SearchPageContent() {
   const executeRazorpayCheckout = async (itemsToBuy: CartItem[], userOverride?: UserProfile | null) => {
     if (itemsToBuy.length === 0) return;
     const activeUser = userOverride || currentUser;
-    const userEmail = activeUser?.email || 'reviewer.razorpay@bookscircle.org';
+    const userEmail = activeUser?.email || '';
     const userName = activeUser?.displayName || 'Reader';
     const totalAmount = itemsToBuy.reduce((sum, item) => sum + item.book.buy_price * item.quantity, 0);
 

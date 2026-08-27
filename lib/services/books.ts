@@ -10,6 +10,7 @@ import { DEFAULT_BOOK_COVER } from '../data';
 import {
   resolveBookCoverUrl,
   resolveBookSampleUrl,
+  resolveBookPdfUrl,
   resolveFullBookStoragePath,
 } from './storage';
 
@@ -59,14 +60,14 @@ export async function getBooksFromFirestore(): Promise<Book[]> {
           const seoslug = String(data.seoslug ?? data.slug ?? bookId).trim();
           const categorySlug = String(data.categorySlug ?? data.category_slug ?? '').trim();
 
-          const rawCover = data.imageUrl || data.cover || data.cover_image || data.image || data.thumbnail || data.image_url || '';
+          const rawCover = data.imageUrl || data.cover || data.cover_image || data.image || data.thumbnail || data.image_url || data.coverImage || data.coverUrl || '';
           const resolvedCover = resolveBookCoverUrl(rawCover, bookId);
 
-          const rawSample = data.sampleUrl || data.sampleurl || data.sample_file || data.sample_pdf || data.sample_url || '';
+          const rawSample = data.sampleUrl || data.sampleurl || data.sample_file || data.sample_pdf || data.sample_url || data.sampleFile || data.preview_url || data.sample || '';
           const resolvedSample = resolveBookSampleUrl(rawSample, bookId);
 
-          const rawPdfStoragePath = data.pdfStoragePath || data.pdf_storage_path || data.pdfurl || data.pdf_file || data.pdf_url || '';
-          const resolvedFullStoragePath = resolveFullBookStoragePath(rawPdfStoragePath, bookId);
+          const rawPdfStoragePath = data.pdf_file || data.pdfFile || data.pdfurl || data.pdf_url || data.pdfUrl || data.pdfStoragePath || data.pdf_storage_path || data.full_pdf_url || data.file_url || data.fileUrl || data.download_url || data.downloadUrl || data.book_file || data.full_file || data.url || data.pdf || '';
+          const resolvedFullPdfUrl = resolveBookPdfUrl(rawPdfStoragePath, bookId);
 
           books.push({
             id: bookId,
@@ -83,8 +84,10 @@ export async function getBooksFromFirestore(): Promise<Book[]> {
             isActive: data.isActive !== undefined ? Boolean(data.isActive) : true,
             buy_price: buyPrice,
             list_price: listPrice,
-            pdf_file: resolvedFullStoragePath,
-            pdfStoragePath: resolvedFullStoragePath,
+            pdf_file: resolvedFullPdfUrl,
+            pdfUrl: resolvedFullPdfUrl,
+            pdf_url: resolvedFullPdfUrl,
+            pdfStoragePath: resolvedFullPdfUrl,
             hasFullPdf: data.hasFullPdf !== undefined ? Boolean(data.hasFullPdf) : true,
             cover: resolvedCover,
             imageUrl: resolvedCover,

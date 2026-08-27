@@ -11,6 +11,7 @@ export interface RazorpayCheckoutOptions {
   amountInRupees: number;
   bookIds?: string[];
   bookTitles?: string[];
+  userId?: string;
   userName?: string;
   userEmail?: string;
   userPhone?: string;
@@ -91,9 +92,10 @@ export async function processRazorpayPayment(options: RazorpayCheckoutOptions): 
     amountInRupees,
     bookIds = [],
     bookTitles = [],
-    userName = 'Pardeep Kumar',
-    userEmail = 'pardeep1984@gmail.com',
-    userPhone = '9876543210',
+    userId = 'guest_user',
+    userName = '',
+    userEmail = '',
+    userPhone = '',
     onSuccess,
     onError,
     onDismiss,
@@ -163,6 +165,12 @@ export async function processRazorpayPayment(options: RazorpayCheckoutOptions): 
               razorpay_order_id: response.razorpay_order_id,
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_signature: response.razorpay_signature,
+              userId,
+              userEmail,
+              userName,
+              bookIds,
+              bookTitles,
+              amount: amountInRupees,
             }),
           });
 

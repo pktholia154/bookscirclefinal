@@ -1,25 +1,16 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Image from 'next/image';
 import {
   BookOpen,
   Download,
   Check,
-  HardDrive,
   Trash2,
   RefreshCw,
   ShoppingBag,
-  Sparkles,
   WifiOff,
   Wifi,
-  Receipt,
-  FileText,
-  ShieldCheck,
-  Clock,
-  ChevronRight,
-  CreditCard,
-  Layers,
 } from 'lucide-react';
 import { Book } from '@/lib/types';
 import { DEFAULT_BOOK_COVER } from '@/lib/data';
@@ -30,12 +21,11 @@ import {
   getAllOfflineBookIds,
   isPdfOfflineAvailable,
   savePurchasedBookIds,
+  getAllOfflineBooks,
+  getOfflineStorageStats,
+  requestPersistentStorage,
 } from '@/lib/offline-storage';
-import {
-  getUserPurchaseHistory,
-  syncUserPurchases,
-  PurchaseRecord,
-} from '@/lib/services/purchases';
+import { resolveBookPdfUrl, resolveBookSampleUrl } from '@/lib/services/storage';
 import { PDFReaderModal } from '@/components/PDFReaderModal';
 import { UserProfile } from '@/components/Header';
 
@@ -45,7 +35,6 @@ interface PurchasedViewProps {
   currentUser?: UserProfile | null;
   onSelectBook: (book: Book) => void;
   onNavigateHome: () => void;
-  onUnlockDemoBook?: (bookId: string) => void;
   onSyncPurchases?: () => Promise<void>;
 }
 
@@ -63,27 +52,27 @@ export const PurchasedView: React.FC<PurchasedViewProps> = ({
   currentUser,
   onSelectBook,
   onNavigateHome,
-  onUnlockDemoBook,
-  onSyncPurchases,
 }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'library' | 'invoices'>('library');
   const [offlineMap, setOfflineMap] = useState<Record<string, DownloadState>>({});
+  const [offlineCachedBooks, setOfflineCachedBooks] = useState<Book[]>([]);
   const [filterMode, setFilterMode] = useState<'all' | 'offline_only'>('all');
   const [activeReader, setActiveReader] = useState<{
     book: Book;
     mode: 'full' | 'offline';
   } | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [isSyncingCloud, setIsSyncingCloud] = useState(false);
-  const [invoices, setInvoices] = useState<PurchaseRecord[]>([]);
-  const [isLoadingInvoices, setIsLoadingInvoices] = useState(false);
+  const [storageStats, setStorageStats] = useState<{ count: number; totalBytes: number; isPersisted: boolean }>({
+    count: 0,
+    totalBytes: 0,
+    isPersisted: false,
+  });
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 2500);
   };
 
-  // Sync offline status from IndexedDB
+  // Sync offline status from IndexedDB and CacheStorage
   const refreshOfflineStatus = useCallback(async () => {
     try {
       const offlineIds = await getAllOfflineBookIds();
@@ -97,59 +86,48 @@ export const PurchasedView: React.FC<PurchasedViewProps> = ({
         };
       });
       setOfflineMap((prev) => ({ ...prev, ...newMap }));
+
+      const cached = await getAllOfflineBooks();
+      if (cached && cached.length > 0) {
+        setOfflineCachedBooks(cached);
+      }
+
+      const stats = await getOfflineStorageStats();
+      setStorageStats(stats);
     } catch (e) {
       console.warn('Failed to load offline keys:', e);
     }
   }, []);
 
+  // Automatically initialize offline status and silently request persistent storage on mount
   useEffect(() => {
     refreshOfflineStatus();
+
+    // Silently request persistent storage so user never needs to manually click any lock buttons
+    requestPersistentStorage()
+      .then((granted) => {
+        if (granted) {
+          setStorageStats((prev) => ({ ...prev, isPersisted: true }));
+        }
+      })
+      .catch(() => {});
   }, [refreshOfflineStatus]);
 
-  // Fetch Firestore purchase invoices & receipts
-  const fetchInvoices = useCallback(async () => {
-    setIsLoadingInvoices(true);
-    try {
-      const userEmail = currentUser?.email || undefined;
-      const userId = currentUser?.uid || undefined;
-      const records = await getUserPurchaseHistory(userId, userEmail);
-      setInvoices(records);
-    } catch (e) {
-      console.warn('Failed to fetch purchase invoices:', e);
-    } finally {
-      setIsLoadingInvoices(false);
-    }
-  }, [currentUser]);
+  // Map of all known books (remote Firestore + local offline metadata)
+  const allKnownBooksMap = useMemo(() => {
+    const map = new Map<string, Book>();
+    offlineCachedBooks.forEach((b) => map.set(b.id, b));
+    books.forEach((b) => map.set(b.id, b));
+    return map;
+  }, [books, offlineCachedBooks]);
 
-  useEffect(() => {
-    if (activeSubTab === 'invoices') {
-      fetchInvoices();
-    }
-  }, [activeSubTab, fetchInvoices]);
-
-  // Handle manual cloud sync
-  const handleCloudSync = async () => {
-    setIsSyncingCloud(true);
-    try {
-      if (onSyncPurchases) {
-        await onSyncPurchases();
-      } else {
-        await syncUserPurchases(currentUser?.uid, currentUser?.email || undefined);
-      }
-      await refreshOfflineStatus();
-      if (activeSubTab === 'invoices') {
-        await fetchInvoices();
-      }
-      showToast('Library synchronized with Firebase DB!');
-    } catch (e) {
-      showToast('Cloud sync completed with local cache.');
-    } finally {
-      setIsSyncingCloud(false);
-    }
-  };
-
-  // Purchased books list
-  const purchasedBooks = books.filter((b) => purchasedBookIds.includes(b.id));
+  // Purchased books list (including offline cached items)
+  const purchasedBooks = useMemo(() => {
+    const combinedIds = Array.from(new Set([...purchasedBookIds, ...Object.keys(offlineMap)]));
+    return combinedIds
+      .map((id) => allKnownBooksMap.get(id))
+      .filter((b): b is Book => Boolean(b));
+  }, [purchasedBookIds, offlineMap, allKnownBooksMap]);
 
   // Filtered by offline mode filter only
   const filteredPurchasedBooks = purchasedBooks.filter((book) => {
@@ -161,7 +139,9 @@ export const PurchasedView: React.FC<PurchasedViewProps> = ({
   const handleDownloadOffline = async (book: Book, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
 
-    const targetUrl = book.pdf_file || book.sample_file;
+    const targetUrl =
+      resolveBookPdfUrl(book.pdf_file || book.pdfUrl || book.pdfStoragePath, book.id) ||
+      resolveBookSampleUrl(book.sample_file || book.sampleUrl, book.id);
     if (!targetUrl) {
       showToast('No PDF source URL available for this book.');
       return;
@@ -228,10 +208,10 @@ export const PurchasedView: React.FC<PurchasedViewProps> = ({
           position += chunk.length;
         }
 
-        await savePdfOffline(book.id, allChunks.buffer);
+        await savePdfOffline(book.id, allChunks.buffer, book);
       } else {
         const arrayBuffer = await response.arrayBuffer();
-        await savePdfOffline(book.id, arrayBuffer);
+        await savePdfOffline(book.id, arrayBuffer, book);
       }
 
       setOfflineMap((prev) => ({
@@ -244,6 +224,7 @@ export const PurchasedView: React.FC<PurchasedViewProps> = ({
         },
       }));
 
+      await refreshOfflineStatus();
       showToast(`"${book.title.slice(0, 22)}..." saved for offline reading!`);
     } catch (err: any) {
       console.error('Download offline error:', err);
@@ -271,6 +252,7 @@ export const PurchasedView: React.FC<PurchasedViewProps> = ({
         delete copy[bookId];
         return copy;
       });
+      await refreshOfflineStatus();
       showToast(`Removed offline copy of "${title.slice(0, 20)}..."`);
     } catch {
       showToast('Failed to remove offline copy.');
@@ -279,191 +261,65 @@ export const PurchasedView: React.FC<PurchasedViewProps> = ({
 
   return (
     <div className="w-full px-4 sm:px-6 py-5 max-w-5xl mx-auto space-y-6">
-      {/* 1. Header with Cloud Sync & Sub-tabs */}
+      {/* 1. Header (Auto-synced from Firebase DB) */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4">
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-xl sm:text-2xl font-black text-gray-950">Purchased Library</h1>
             <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#4029AB] text-white">
-              {purchasedBooks.length} Books
+              {purchasedBooks.length} {purchasedBooks.length === 1 ? 'Book' : 'Books'}
             </span>
           </div>
           <p className="text-xs text-gray-500 mt-0.5">
-            Permanent access to your verified study materials &amp; PDF downloads.
+            Auto-synced across your devices &amp; study platforms with offline access.
           </p>
-        </div>
-
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Sub-tab Navigation */}
-          <div className="flex bg-gray-100 p-1 rounded-xl border border-gray-200/80">
-            <button
-              onClick={() => setActiveSubTab('library')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                activeSubTab === 'library'
-                  ? 'bg-white text-[#4029AB] shadow-xs'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              <BookOpen className="w-3.5 h-3.5" />
-              <span>My Books</span>
-            </button>
-            <button
-              onClick={() => setActiveSubTab('invoices')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                activeSubTab === 'invoices'
-                  ? 'bg-white text-[#4029AB] shadow-xs'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              <Receipt className="w-3.5 h-3.5" />
-              <span>Receipts &amp; Records</span>
-            </button>
-          </div>
-
-          {/* Sync Button */}
-          <button
-            onClick={handleCloudSync}
-            disabled={isSyncingCloud}
-            className="px-3 py-2 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 disabled:opacity-60"
-            title="Synchronize purchased books from Firebase DB"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 text-[#4029AB] ${isSyncingCloud ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">Sync Cloud</span>
-          </button>
         </div>
       </div>
 
-      {/* 2. TAB: INVOICES & PURCHASE RECORDS */}
-      {activeSubTab === 'invoices' && (
-        <div className="space-y-4">
-          <div className="p-4 bg-gray-50 rounded-2xl border border-gray-200 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-emerald-600" />
-              <span className="text-xs font-bold text-gray-900">
-                Verified Firebase DB Transaction Records
-              </span>
+      {/* 2. Active Library & Offline Controls */}
+      <div className="space-y-4">
+        {/* Quick Filter & Storage Info Bar */}
+        {purchasedBooks.length > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-2.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <button
+                onClick={() => setFilterMode('all')}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  filterMode === 'all'
+                    ? 'bg-[#4029AB] text-white shadow-2xs'
+                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                }`}
+              >
+                All Purchased ({purchasedBooks.length})
+              </button>
+              <button
+                onClick={() => setFilterMode('offline_only')}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                  filterMode === 'offline_only'
+                    ? 'bg-emerald-600 text-white shadow-2xs'
+                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                }`}
+              >
+                <WifiOff className="w-3 h-3" />
+                <span>Downloaded ({storageStats.count})</span>
+              </button>
             </div>
-            <span className="text-[11px] text-gray-500 font-mono">
-              {currentUser?.email || 'Active Reader'}
-            </span>
+
+            {/* Storage Info */}
+            <div className="flex items-center gap-2 text-xs">
+              {storageStats.count > 0 && (
+                <span className="text-[11px] font-medium text-gray-500 hidden sm:inline">
+                  {(storageStats.totalBytes / (1024 * 1024)).toFixed(1)} MB stored
+                </span>
+              )}
+              {storageStats.isPersisted && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
+                  <span>Offline Storage Protected</span>
+                </span>
+              )}
+            </div>
           </div>
-
-          {isLoadingInvoices ? (
-            <div className="py-16 text-center space-y-3">
-              <RefreshCw className="w-6 h-6 text-[#4029AB] animate-spin mx-auto" />
-              <p className="text-xs font-semibold text-gray-500">
-                Retrieving your purchase history from Firebase...
-              </p>
-            </div>
-          ) : invoices.length === 0 ? (
-            <div className="py-14 text-center bg-gray-50 rounded-3xl border border-gray-200/80 space-y-3 p-6">
-              <Receipt className="w-10 h-10 text-gray-400 mx-auto" />
-              <h3 className="text-sm font-bold text-gray-900">No Online Invoices Found</h3>
-              <p className="text-xs text-gray-500 max-w-sm mx-auto">
-                Completed purchases made via Razorpay will be permanently archived here with their payment and order IDs.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {invoices.map((inv) => (
-                <div
-                  key={inv.paymentId}
-                  className="p-4 sm:p-5 rounded-2xl border border-gray-200 bg-white hover:border-[#4029AB]/30 transition-all shadow-2xs space-y-3"
-                >
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-3">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
-                          <Check className="w-3 h-3" />
-                          <span>{inv.status?.toUpperCase() || 'VERIFIED'}</span>
-                        </span>
-                        <span className="text-xs font-mono font-bold text-gray-900">
-                          {inv.paymentId}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 text-[11px] text-gray-500">
-                        <Clock className="w-3 h-3 text-gray-400" />
-                        <span>{new Date(inv.purchasedAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</span>
-                        <span>•</span>
-                        <span>Order: {inv.orderId}</span>
-                      </div>
-                    </div>
-
-                    <div className="text-right">
-                      <span className="text-base font-black text-gray-950 font-mono">
-                        ₹{inv.amount}
-                      </span>
-                      <p className="text-[10px] text-gray-400">Razorpay Gateway</p>
-                    </div>
-                  </div>
-
-                  {/* Books in this invoice */}
-                  <div className="space-y-2">
-                    <span className="text-[11px] font-bold text-gray-600 uppercase tracking-wider">
-                      Purchased Items ({inv.books?.length || 0})
-                    </span>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {inv.books?.map((b) => {
-                        const matchedBook = books.find((orig) => orig.id === b.id);
-                        return (
-                          <div
-                            key={b.id}
-                            className="p-2.5 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-between gap-2"
-                          >
-                            <span className="text-xs font-bold text-gray-800 truncate">
-                              {b.title}
-                            </span>
-                            {matchedBook && (
-                              <button
-                                onClick={() => setActiveReader({ book: matchedBook, mode: 'full' })}
-                                className="px-2.5 py-1 rounded-lg bg-[#4029AB] text-white text-[10px] font-bold shrink-0 hover:bg-[#34208e] cursor-pointer"
-                              >
-                                Read PDF
-                              </button>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* 3. TAB: ACTIVE LIBRARY (GRID OF E-BOOKS) */}
-      {activeSubTab === 'library' && (
-        <>
-          {/* Quick Filter Bar */}
-          {purchasedBooks.length > 0 && (
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-1.5">
-                <button
-                  onClick={() => setFilterMode('all')}
-                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    filterMode === 'all'
-                      ? 'bg-[#4029AB] text-white shadow-2xs'
-                      : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-                  }`}
-                >
-                  All Purchased ({purchasedBooks.length})
-                </button>
-                <button
-                  onClick={() => setFilterMode('offline_only')}
-                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
-                    filterMode === 'offline_only'
-                      ? 'bg-emerald-600 text-white shadow-2xs'
-                      : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-                  }`}
-                >
-                  <WifiOff className="w-3 h-3" />
-                  <span>Downloaded Offline</span>
-                </button>
-              </div>
-            </div>
-          )}
+        )}
 
           {/* Empty State */}
           {purchasedBooks.length === 0 ? (
@@ -474,7 +330,7 @@ export const PurchasedView: React.FC<PurchasedViewProps> = ({
               <div className="space-y-1">
                 <h3 className="text-base font-bold text-gray-900">Your Library is Empty</h3>
                 <p className="text-xs text-gray-500 max-w-sm mx-auto">
-                  Browse our catalog of study guides and competitive exam preparation e-books. All purchases include offline access.
+                  Browse our catalog of study guides and competitive exam preparation e-books. All purchases auto-sync across your devices with offline access.
                 </p>
               </div>
               <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
@@ -486,16 +342,6 @@ export const PurchasedView: React.FC<PurchasedViewProps> = ({
                   <ShoppingBag className="w-3.5 h-3.5" />
                   <span>Explore E-Books</span>
                 </button>
-
-                {onUnlockDemoBook && (
-                  <button
-                    onClick={() => onUnlockDemoBook('1')}
-                    className="px-4 py-2.5 bg-white border border-gray-300 text-gray-800 rounded-xl text-xs font-bold hover:bg-gray-50 cursor-pointer inline-flex items-center gap-1.5 active:scale-95 transition-all"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-[#4029AB]" />
-                    <span>Try Sample Demo E-Book</span>
-                  </button>
-                )}
               </div>
             </div>
           ) : (
@@ -649,10 +495,9 @@ export const PurchasedView: React.FC<PurchasedViewProps> = ({
               })}
             </div>
           )}
-        </>
-      )}
+        </div>
 
-      {/* 4. Real-time In-App PDF Reader Modal */}
+      {/* 3. Real-time In-App PDF Reader Modal */}
       {activeReader && (
         <PDFReaderModal
           book={activeReader.book}

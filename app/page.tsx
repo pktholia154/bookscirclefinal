@@ -20,21 +20,22 @@ import { Book, Category, CartItem } from '@/lib/types';
 import { DEFAULT_BOOK_COVER } from '@/lib/data';
 import { getBooksFromFirestore, getCategoriesFromFirestore } from '@/lib/services/books';
 import { getPurchasedBookIdsFromLocal, savePurchasedBookIds } from '@/lib/offline-storage';
-import { recordUserPurchaseInFirestore, syncUserPurchases } from '@/lib/services/purchases';
-import { processRazorpayPayment } from '@/lib/services/razorpay';
-import { auth, signInWithGoogle, signOutUser } from '@/lib/firebase';
+import { recordUserPurchaseInFirestore, syncUserPurchases, subscribeToUserPurchases } from '@/lib/services/purchases';
+import { processRazorpayPayment, loadRazorpayScript } from '@/lib/services/razorpay';
+import {
+  getCartItemsFromLocal,
+  addToCartAction,
+  removeFromCartAction,
+  clearCartAction,
+  syncCartWithPurchases,
+  calculateCartSummary,
+  subscribeToCartChanges,
+} from '@/lib/services/cart';
+import { auth, signOutUser } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { usePWAInstall } from '@/hooks/use-pwa-install';
-import { Check, ShoppingBag, RefreshCw, Lock } from 'lucide-react';
+import { Check, ShoppingBag, RefreshCw, Lock, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-
-const RAZORPAY_TEST_USER: UserProfile = {
-  uid: 'razorpay_test_auditor_uid',
-  email: 'reviewer.razorpay@bookscircle.org',
-  displayName: 'Razorpay Test Reviewer',
-  photoURL: null,
-  isTestAccount: true,
-};
 
 export default function HomePage() {
   const [books, setBooks] = useState<Book[]>([]);
@@ -52,7 +53,7 @@ export default function HomePage() {
   const [pendingActionAfterLogin, setPendingActionAfterLogin] = useState<((user: UserProfile) => void) | null>(null);
 
   const [isClientLoaded, setIsClientLoaded] = useState<boolean>(false);
-  const [currentUser, setCurrentUser] = useState<UserProfile | null>(RAZORPAY_TEST_USER);
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [purchasedBookIds, setPurchasedBookIds] = useState<string[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
@@ -69,11 +70,11 @@ export default function HomePage() {
     closeIOSPrompt,
   } = usePWAInstall();
 
-  // Load client persisted data after initial mount to prevent SSR hydration mismatches
+  // Load client persisted data after initial mount
   useEffect(() => {
     const timer = setTimeout(() => {
       try {
-        const savedUser = localStorage.getItem('bookscircle_test_user');
+        const savedUser = localStorage.getItem('bookscircle_auth_user');
         if (savedUser) {
           setCurrentUser(JSON.parse(savedUser));
         }
@@ -91,15 +92,22 @@ export default function HomePage() {
       }
 
       try {
-        const savedCart = localStorage.getItem('bookscircle_cart');
-        if (savedCart) {
-          const parsed = JSON.parse(savedCart);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setCart(parsed);
+        const loadedCart = getCartItemsFromLocal();
+        setCart(loadedCart);
+      } catch (e) {
+        console.warn('Cart load note:', e);
+      }
+
+      try {
+        if (typeof window !== 'undefined') {
+          const urlParams = new URLSearchParams(window.location.search);
+          const tabParam = urlParams.get('tab');
+          if (tabParam && ['home', 'categories', 'purchased', 'cart', 'profile', 'search'].includes(tabParam)) {
+            setActiveTab(tabParam as TabKey);
           }
         }
       } catch (e) {
-        console.warn('Cart load note:', e);
+        console.warn('URL tab load note:', e);
       }
 
       setIsClientLoaded(true);
@@ -107,6 +115,25 @@ export default function HomePage() {
 
     return () => clearTimeout(timer);
   }, []);
+
+  // Listen to cross-tab / cross-component cart synchronization events
+  useEffect(() => {
+    const unsubscribe = subscribeToCartChanges((updatedCart) => {
+      setCart(updatedCart);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Synchronize cart with purchased IDs to prevent buying already owned books
+  useEffect(() => {
+    if (purchasedBookIds.length > 0) {
+      const timer = setTimeout(() => {
+        const filtered = syncCartWithPurchases(getCartItemsFromLocal(), purchasedBookIds);
+        setCart(filtered);
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [purchasedBookIds]);
 
   // Listen to Firebase Auth state for real Google Sign-In & cloud purchase sync
   useEffect(() => {
@@ -117,7 +144,6 @@ export default function HomePage() {
           email: user.email,
           displayName: user.displayName || user.email?.split('@')[0] || 'Google User',
           photoURL: user.photoURL,
-          isTestAccount: false,
         };
         setCurrentUser(profile);
         if (typeof window !== 'undefined') {
@@ -135,15 +161,42 @@ export default function HomePage() {
     return () => unsubscribe();
   }, []);
 
-  // Save cart to localStorage only after initial client hydration is complete
+  // Real-time continuous Firebase Firestore subscription for multi-device instant auto-sync
   useEffect(() => {
-    if (!isClientLoaded || typeof window === 'undefined') return;
-    try {
-      localStorage.setItem('bookscircle_cart', JSON.stringify(cart));
-    } catch (e) {
-      console.warn('LocalStorage cart save failed:', e);
-    }
-  }, [cart, isClientLoaded]);
+    if (!currentUser) return;
+
+    const unsubscribe = subscribeToUserPurchases(
+      currentUser.uid,
+      currentUser.email || undefined,
+      (syncedBookIds) => {
+        setPurchasedBookIds(syncedBookIds);
+      }
+    );
+
+    // Automatic background synchronization on tab focus, device wake, or network reconnection
+    const handleAutoSync = async () => {
+      try {
+        const synced = await syncUserPurchases(currentUser.uid, currentUser.email || undefined);
+        setPurchasedBookIds(synced);
+      } catch (err) {
+        // Non-blocking auto sync
+      }
+    };
+
+    window.addEventListener('focus', handleAutoSync);
+    window.addEventListener('online', handleAutoSync);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        handleAutoSync();
+      }
+    });
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener('focus', handleAutoSync);
+      window.removeEventListener('online', handleAutoSync);
+    };
+  }, [currentUser]);
 
   // Fetch live books & categories from Firestore
   const loadData = useCallback(async (showLoadingSpinner = false) => {
@@ -267,52 +320,35 @@ export default function HomePage() {
     setTimeout(() => setToastMessage(null), 2500);
   };
 
-  // Switch to Razorpay Test Account
-  const handleSetTestAccount = async () => {
-    setCurrentUser(RAZORPAY_TEST_USER);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('bookscircle_test_user', JSON.stringify(RAZORPAY_TEST_USER));
-    }
-    try {
-      const merged = await syncUserPurchases(RAZORPAY_TEST_USER.uid, RAZORPAY_TEST_USER.email || undefined);
-      setPurchasedBookIds(merged);
-    } catch {}
-    setToastMessage('Switched to Razorpay Test Reviewer account.');
-    setTimeout(() => setToastMessage(null), 2500);
-  };
-
-  // Cart operations
+  // Centralized Cart Operations via cart.ts
   const handleAddToCart = (book: Book, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    setCart((prevCart) => {
-      const existing = prevCart.find((item) => item.book.id === book.id);
-      if (existing) {
-        return prevCart.map((item) =>
-          item.book.id === book.id ? { ...item, quantity: item.quantity + 1 } : item
-        );
-      }
-      return [...prevCart, { book, quantity: 1 }];
-    });
-    setToastMessage(`Added "${book.title.slice(0, 20)}..." to Cart`);
-    setTimeout(() => setToastMessage(null), 2500);
-  };
 
-  const handleUpdateQuantity = (bookId: string, quantity: number) => {
-    if (quantity <= 0) {
-      handleRemoveFromCart(bookId);
+    if (purchasedBookIds.includes(book.id)) {
+      setToastMessage(`You already own "${book.title.slice(0, 22)}...". Check your Library.`);
+      setTimeout(() => setToastMessage(null), 2500);
       return;
     }
-    setCart((prev) =>
-      prev.map((item) => (item.book.id === bookId ? { ...item, quantity } : item))
-    );
+
+    const { updatedCart, isNewItem } = addToCartAction(book);
+    setCart(updatedCart);
+
+    if (isNewItem) {
+      setToastMessage(`Added "${book.title.slice(0, 22)}..." to Cart`);
+    } else {
+      setToastMessage(`"${book.title.slice(0, 22)}..." is already in your Cart`);
+    }
+    setTimeout(() => setToastMessage(null), 2500);
   };
 
   const handleRemoveFromCart = (bookId: string) => {
-    setCart((prev) => prev.filter((item) => item.book.id !== bookId));
+    const updated = removeFromCartAction(bookId);
+    setCart(updated);
   };
 
   const handleClearCart = () => {
-    setCart([]);
+    const updated = clearCartAction();
+    setCart(updated);
   };
 
   const handleSuccessfulCheckout = async (
@@ -338,17 +374,26 @@ export default function HomePage() {
       setPurchasedBookIds((prev) => Array.from(new Set([...prev, ...newPurchasedIds])));
     }
 
-    // Clean up purchased items from active cart
+    // Clean up purchased items from cart
+    newPurchasedIds.forEach((id) => removeFromCartAction(id));
     setCart((prev) => prev.filter((item) => !newPurchasedIds.includes(item.book.id)));
+
     setToastMessage(`Purchase successful! ${purchasedItems.length} eBook(s) unlocked in your library.`);
     startTransition(() => {
+      setSelectedBook(null);
       setActiveTab('purchased');
       setIsCartOpen(false);
-      setSelectedBook(null);
+      if (typeof window !== 'undefined') {
+        try {
+          const url = new URL(window.location.href);
+          url.searchParams.set('tab', 'purchased');
+          window.history.pushState({}, '', url.toString());
+        } catch {}
+      }
     });
   };
 
-  // Central Razorpay checkout executor that supports instant auto-resume with authenticated user override
+  // Central Razorpay checkout executor that supports instant auto-resume
   const executeRazorpayCheckout = async (
     itemsToBuy: CartItem[],
     userOverride?: UserProfile | null
@@ -356,16 +401,16 @@ export default function HomePage() {
     if (itemsToBuy.length === 0) return;
 
     const activeUser = userOverride || currentUser;
-    const userEmail = activeUser?.email || 'reviewer.razorpay@bookscircle.org';
+    const userEmail = activeUser?.email || '';
     const userName = activeUser?.displayName || 'Reader';
+    const userId = activeUser?.uid || 'guest_user';
 
-    const totalAmount = itemsToBuy.reduce(
-      (sum, item) => sum + (item.book.buy_price || 0) * item.quantity,
-      0
-    );
+    const summary = calculateCartSummary(itemsToBuy);
+    const totalAmount = summary.subtotal;
     const bookIds = itemsToBuy.map((i) => i.book.id);
     const bookTitles = itemsToBuy.map((i) => i.book.title);
 
+    setIsCartTabCheckingOut(true);
     setToastMessage('Opening Razorpay Secure Gateway...');
 
     try {
@@ -373,26 +418,30 @@ export default function HomePage() {
         amountInRupees: totalAmount,
         bookIds,
         bookTitles,
+        userId,
         userName,
         userEmail,
         onSuccess: (paymentData) => {
+          setIsCartTabCheckingOut(false);
           handleSuccessfulCheckout(itemsToBuy, paymentData);
         },
         onError: (err) => {
+          setIsCartTabCheckingOut(false);
           setToastMessage(err || 'Payment was declined or cancelled.');
           setTimeout(() => setToastMessage(null), 3500);
         },
         onDismiss: () => {
-          // Payment dismissed cleanly
+          setIsCartTabCheckingOut(false);
         },
       });
     } catch (e: any) {
+      setIsCartTabCheckingOut(false);
       setToastMessage(e?.message || 'Unable to load payment gateway.');
       setTimeout(() => setToastMessage(null), 3500);
     }
   };
 
-  // Direct Buy Now handler with automatic login trigger and instant resume
+  // Direct Buy Now handler with deduplication and instant auto-resume
   const handleBuyNow = (book: Book) => {
     if (purchasedBookIds.includes(book.id)) {
       setToastMessage(`You already own "${book.title.slice(0, 20)}...". Opening Library.`);
@@ -404,7 +453,10 @@ export default function HomePage() {
     }
 
     const buyItem: CartItem = { book, quantity: 1 };
-    handleAddToCart(book);
+    
+    // Ensure item is also added/synced to cart state
+    const { updatedCart } = addToCartAction(book);
+    setCart(updatedCart);
 
     if (!currentUser || !currentUser.email) {
       handleRequireLogin((loggedInUser: UserProfile) => {
@@ -415,15 +467,9 @@ export default function HomePage() {
     }
   };
 
-  // Demo unlock book for testing
-  const handleUnlockDemoBook = async (bookId: string) => {
-    savePurchasedBookIds([bookId]);
-    setPurchasedBookIds((prev) => Array.from(new Set([...prev, bookId])));
-  };
-
   // Compute cart counts & set for fast lookup
   const totalCartCount = useMemo(() => {
-    return cart.reduce((acc, item) => acc + item.quantity, 0);
+    return cart.length;
   }, [cart]);
 
   const cartBookIds = useMemo(() => {
@@ -483,12 +529,25 @@ export default function HomePage() {
       if (tab === 'cart') {
         setIsCartOpen(true);
       }
+      if (typeof window !== 'undefined') {
+        try {
+          const url = new URL(window.location.href);
+          if (tab === 'home') {
+            url.searchParams.delete('tab');
+          } else {
+            url.searchParams.set('tab', tab);
+          }
+          window.history.pushState({}, '', url.toString());
+        } catch {}
+      }
       window.scrollTo({ top: 0, behavior: 'smooth' });
     });
   };
 
-  const activeEmail = currentUser?.email || 'reviewer.razorpay@bookscircle.org';
-  const activeName = currentUser?.displayName || 'Razorpay Test Reviewer';
+  const activeEmail = currentUser?.email || '';
+  const activeName = currentUser?.displayName || 'Reader';
+
+  const cartSummary = calculateCartSummary(cart);
 
   return (
     <div className="min-h-screen bg-white text-gray-900 pb-24 selection:bg-[#4029AB] selection:text-white">
@@ -568,7 +627,9 @@ export default function HomePage() {
                       books={filteredBooks}
                       onSelectBook={(book) => setSelectedBook(book)}
                       onAddToCart={handleAddToCart}
+                      onBuyNow={handleBuyNow}
                       cartBookIds={cartBookIds}
+                      purchasedBookIds={purchasedBookIds}
                     />
                   </div>
                 ) : selectedCategory !== 'all' ? (
@@ -579,7 +640,9 @@ export default function HomePage() {
                       books={filteredBooks}
                       onSelectBook={(book) => setSelectedBook(book)}
                       onAddToCart={handleAddToCart}
+                      onBuyNow={handleBuyNow}
                       cartBookIds={cartBookIds}
+                      purchasedBookIds={purchasedBookIds}
                     />
                   </div>
                 ) : (
@@ -592,7 +655,9 @@ export default function HomePage() {
                       books={featuredTrendingBooks.length > 0 ? featuredTrendingBooks : books.slice(0, 6)}
                       onSelectBook={(book) => setSelectedBook(book)}
                       onAddToCart={handleAddToCart}
+                      onBuyNow={handleBuyNow}
                       cartBookIds={cartBookIds}
+                      purchasedBookIds={purchasedBookIds}
                     />
 
                     {/* Standard List View: Complete Catalog */}
@@ -601,7 +666,9 @@ export default function HomePage() {
                       books={books}
                       onSelectBook={(book) => setSelectedBook(book)}
                       onAddToCart={handleAddToCart}
+                      onBuyNow={handleBuyNow}
                       cartBookIds={cartBookIds}
+                      purchasedBookIds={purchasedBookIds}
                     />
 
                     {/* Category Spotlight 1 */}
@@ -611,7 +678,9 @@ export default function HomePage() {
                         books={category1Books}
                         onSelectBook={(book) => setSelectedBook(book)}
                         onAddToCart={handleAddToCart}
+                        onBuyNow={handleBuyNow}
                         cartBookIds={cartBookIds}
+                        purchasedBookIds={purchasedBookIds}
                       />
                     )}
 
@@ -622,7 +691,9 @@ export default function HomePage() {
                         books={category2Books}
                         onSelectBook={(book) => setSelectedBook(book)}
                         onAddToCart={handleAddToCart}
+                        onBuyNow={handleBuyNow}
                         cartBookIds={cartBookIds}
+                        purchasedBookIds={purchasedBookIds}
                       />
                     )}
                   </>
@@ -640,7 +711,9 @@ export default function HomePage() {
                 books={books}
                 onSelectBook={(book) => setSelectedBook(book)}
                 onAddToCart={handleAddToCart}
+                onBuyNow={handleBuyNow}
                 cartBookIds={cartBookIds}
+                purchasedBookIds={purchasedBookIds}
               />
             )}
 
@@ -654,9 +727,19 @@ export default function HomePage() {
                       Review selected e-books before secure digital checkout.
                     </p>
                   </div>
-                  <span className="bg-[#4029AB] text-white text-xs font-bold px-3 py-1 rounded-full">
-                    {totalCartCount} items
-                  </span>
+                  <div className="flex items-center gap-2">
+                    {cart.length > 0 && (
+                      <button
+                        onClick={handleClearCart}
+                        className="text-xs font-semibold text-gray-400 hover:text-red-500 transition-colors px-2 py-1 cursor-pointer"
+                      >
+                        Clear All
+                      </button>
+                    )}
+                    <span className="bg-[#4029AB] text-white text-xs font-bold px-3 py-1 rounded-full">
+                      {totalCartCount} {totalCartCount === 1 ? 'item' : 'items'}
+                    </span>
+                  </div>
                 </div>
 
                 {cart.length === 0 ? (
@@ -679,7 +762,7 @@ export default function HomePage() {
                 ) : (
                   <div className="space-y-4">
                     <div className="space-y-3">
-                      {cart.map(({ book, quantity }) => (
+                      {cart.map(({ book }) => (
                         <div
                           key={book.id}
                           className="p-4 rounded-2xl border border-gray-200 bg-white flex items-center gap-3.5"
@@ -696,29 +779,26 @@ export default function HomePage() {
                             />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <span className="text-[9px] font-bold text-[#4029AB] bg-[#4029AB]/10 px-1.5 py-0.2 rounded uppercase">
+                            <span className="text-[9px] font-bold text-[#4029AB] bg-[#4029AB]/10 px-1.5 py-0.5 rounded uppercase">
                               {book.category}
                             </span>
                             <h4 className="font-bold text-xs sm:text-sm text-gray-950 truncate mt-1">
                               {book.title}
                             </h4>
-                            <p className="text-xs font-black text-gray-900 mt-1">₹{book.buy_price}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-sm font-black text-gray-950">₹{book.buy_price}</span>
+                              {book.list_price && book.list_price > book.buy_price && (
+                                <span className="text-xs text-gray-400 line-through">₹{book.list_price}</span>
+                              )}
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => handleUpdateQuantity(book.id, quantity - 1)}
-                              className="w-7 h-7 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center justify-center font-bold text-sm cursor-pointer"
-                            >
-                              -
-                            </button>
-                            <span className="text-xs font-bold w-4 text-center">{quantity}</span>
-                            <button
-                              onClick={() => handleUpdateQuantity(book.id, quantity + 1)}
-                              className="w-7 h-7 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center justify-center font-bold text-sm cursor-pointer"
-                            >
-                              +
-                            </button>
-                          </div>
+                          <button
+                            onClick={() => handleRemoveFromCart(book.id)}
+                            className="p-2 rounded-xl text-gray-400 hover:text-red-500 hover:bg-red-50 active:scale-90 transition-all cursor-pointer"
+                            title="Remove from Cart"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
                       ))}
                     </div>
@@ -726,26 +806,32 @@ export default function HomePage() {
                     {/* Checkout Summary Box */}
                     <div className="p-5 rounded-3xl bg-gray-50 border border-gray-200/80 space-y-3">
                       <div className="flex justify-between text-xs text-gray-600">
-                        <span>Subtotal</span>
+                        <span>Subtotal ({cart.length} {cart.length === 1 ? 'eBook' : 'eBooks'})</span>
                         <span className="font-bold text-gray-900">
-                          ₹
-                          {cart.reduce((sum, item) => sum + (item.book.buy_price || 0) * item.quantity, 0)}
+                          ₹{cartSummary.subtotal}
                         </span>
                       </div>
+                      {cartSummary.savings > 0 && (
+                        <div className="flex justify-between text-xs text-emerald-600">
+                          <span>Total Savings ({cartSummary.savingsPercent}% OFF)</span>
+                          <span className="font-semibold">-₹{cartSummary.savings}</span>
+                        </div>
+                      )}
                       <div className="flex justify-between text-xs text-gray-600">
                         <span>Instant Digital Delivery</span>
                         <span className="font-bold text-emerald-600">Free</span>
                       </div>
                       <div className="border-t border-gray-200 pt-3 flex justify-between text-sm font-black text-gray-950">
                         <span>Total Amount</span>
-                        <span>
-                          ₹
-                          {cart.reduce((sum, item) => sum + (item.book.buy_price || 0) * item.quantity, 0)}
+                        <span className="text-base text-[#4029AB]">
+                          ₹{cartSummary.subtotal}
                         </span>
                       </div>
 
                       <button
                         disabled={isCartTabCheckingOut}
+                        onMouseEnter={() => loadRazorpayScript()}
+                        onTouchStart={() => loadRazorpayScript()}
                         onClick={async () => {
                           if (cart.length === 0) return;
                           if (!currentUser || !currentUser.email) {
@@ -767,12 +853,12 @@ export default function HomePage() {
                         ) : !currentUser || !currentUser.email ? (
                           <>
                             <Lock className="w-4 h-4" />
-                            <span>Sign in &amp; Pay ₹{cart.reduce((sum, item) => sum + (item.book.buy_price || 0) * item.quantity, 0)}</span>
+                            <span>Sign in &amp; Pay ₹{cartSummary.subtotal}</span>
                           </>
                         ) : (
                           <>
                             <Lock className="w-4 h-4" />
-                            <span>Pay ₹{cart.reduce((sum, item) => sum + (item.book.buy_price || 0) * item.quantity, 0)} with Razorpay</span>
+                            <span>Pay ₹{cartSummary.subtotal} with Razorpay</span>
                           </>
                         )}
                       </button>
@@ -795,14 +881,6 @@ export default function HomePage() {
                 currentUser={currentUser}
                 onSelectBook={(book) => setSelectedBook(book)}
                 onNavigateHome={() => handleTabChange('home')}
-                onUnlockDemoBook={handleUnlockDemoBook}
-                onSyncPurchases={async () => {
-                  const merged = await syncUserPurchases(
-                    currentUser?.uid,
-                    currentUser?.email || undefined
-                  );
-                  setPurchasedBookIds(merged);
-                }}
               />
             )}
 
@@ -825,7 +903,6 @@ export default function HomePage() {
         isOpen={isCartOpen}
         onClose={() => setIsCartOpen(false)}
         items={cart}
-        onUpdateQuantity={handleUpdateQuantity}
         onRemoveItem={handleRemoveFromCart}
         onClearCart={handleClearCart}
         onSuccessfulCheckout={handleSuccessfulCheckout}

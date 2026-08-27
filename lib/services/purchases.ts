@@ -10,6 +10,7 @@ import {
   getDocs,
   increment,
   serverTimestamp,
+  onSnapshot,
 } from 'firebase/firestore';
 import { db, defaultDb } from '../firebase';
 import {
@@ -564,4 +565,119 @@ async function backfillLocalPurchasesToCloud(
       console.warn('Backfill local purchases note:', e);
     }
   }
+}
+
+/**
+ * 6. Real-time continuous listener for user purchases in Firestore across all devices and sessions.
+ * Automatically synchronizes whenever a purchase occurs on any device, phone, tablet, or web browser
+ * without requiring the user to click any sync buttons.
+ */
+export function subscribeToUserPurchases(
+  userId: string | undefined,
+  userEmail: string | undefined,
+  onPurchasesUpdated: (bookIds: string[]) => void
+): () => void {
+  const unsubscribers: (() => void)[] = [];
+
+  const handleNewBookIds = async (newIds: string[]) => {
+    if (!newIds || !Array.isArray(newIds) || newIds.length === 0) return;
+    const local = getPurchasedBookIdsFromLocal();
+    const merged = Array.from(new Set([...local, ...newIds]));
+    if (merged.length > local.length) {
+      await savePurchasedBookIds(merged);
+    }
+    onPurchasesUpdated(merged);
+  };
+
+  const instances = [db, defaultDb].filter(Boolean);
+
+  instances.forEach((firestoreInstance) => {
+    if (!firestoreInstance) return;
+
+    // 1. Real-time listener for user_purchases/{userId}
+    if (userId && userId !== 'guest_user') {
+      try {
+        const userDocRef = doc(firestoreInstance, 'user_purchases', userId);
+        const unsub = onSnapshot(
+          userDocRef,
+          (snap) => {
+            if (snap.exists()) {
+              const data = snap.data();
+              if (Array.isArray(data?.bookIds)) {
+                handleNewBookIds(data.bookIds);
+              }
+            }
+          },
+          (err) => {
+            console.warn('Realtime user_purchases sync note:', err?.message || err);
+          }
+        );
+        unsubscribers.push(unsub);
+      } catch (e) {
+        console.warn('Realtime listener attach error:', e);
+      }
+    }
+
+    // 2. Real-time listener for user_purchases_by_email/{emailKey}
+    if (userEmail && userEmail !== 'user@bookscircle.org') {
+      try {
+        const emailKey = normalizeEmailForDocId(userEmail);
+        const emailDocRef = doc(firestoreInstance, 'user_purchases_by_email', emailKey);
+        const unsub = onSnapshot(
+          emailDocRef,
+          (snap) => {
+            if (snap.exists()) {
+              const data = snap.data();
+              if (Array.isArray(data?.bookIds)) {
+                handleNewBookIds(data.bookIds);
+              }
+            }
+          },
+          (err) => {
+            console.warn('Realtime email purchases sync note:', err?.message || err);
+          }
+        );
+        unsubscribers.push(unsub);
+      } catch (e) {
+        console.warn('Realtime email listener attach error:', e);
+      }
+    }
+
+    // 3. Real-time listener for /purchases matching user email or user ID
+    if (userEmail && userEmail !== 'user@bookscircle.org') {
+      try {
+        const purchasesCol = collection(firestoreInstance, 'purchases');
+        const q = query(purchasesCol, where('userEmail', '==', userEmail));
+        const unsub = onSnapshot(
+          q,
+          (snap) => {
+            const ids: string[] = [];
+            snap.forEach((d) => {
+              const pData = d.data();
+              if (Array.isArray(pData?.bookIds)) {
+                ids.push(...pData.bookIds);
+              }
+            });
+            if (ids.length > 0) {
+              handleNewBookIds(ids);
+            }
+          },
+          (err) => {
+            console.warn('Realtime purchases query sync note:', err?.message || err);
+          }
+        );
+        unsubscribers.push(unsub);
+      } catch (e) {
+        // Non-blocking query subscription
+      }
+    }
+  });
+
+  return () => {
+    unsubscribers.forEach((fn) => {
+      try {
+        fn();
+      } catch {}
+    });
+  };
 }

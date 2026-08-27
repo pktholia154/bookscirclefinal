@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Image from 'next/image';
-import { ShoppingCart, Star } from 'lucide-react';
+import { ShoppingCart, Star, Check } from 'lucide-react';
 import { Book } from '@/lib/types';
 import { DEFAULT_BOOK_COVER } from '@/lib/data';
 
@@ -11,6 +11,7 @@ interface BookCardProps {
   onSelect: (book: Book) => void;
   onAddToCart: (book: Book, e: React.MouseEvent) => void;
   isInCart?: boolean;
+  isPurchased?: boolean;
 }
 
 export const BookCard: React.FC<BookCardProps> = ({
@@ -18,6 +19,7 @@ export const BookCard: React.FC<BookCardProps> = ({
   onSelect,
   onAddToCart,
   isInCart = false,
+  isPurchased = false,
 }) => {
   const [imgSrc, setImgSrc] = useState(book.cover || DEFAULT_BOOK_COVER);
 
@@ -35,7 +37,7 @@ export const BookCard: React.FC<BookCardProps> = ({
       onClick={() => onSelect(book)}
       className="peekaboo-item group shrink-0 cursor-pointer select-none flex flex-col w-[calc((100vw-57px)/3.5)] min-w-[82px] max-w-[102px] sm:w-[135px] sm:min-w-[135px] sm:max-w-[135px] md:w-[160px] md:min-w-[160px] md:max-w-[160px] lg:w-[175px] lg:min-w-[175px] lg:max-w-[175px] transition-transform active:scale-[0.98]"
     >
-      {/* Cover Image with Cart Icon Overlay (Price removed from top-right corner) */}
+      {/* Cover Image with Cart / Owned Icon Overlay */}
       <div className="relative aspect-[3/4] w-full rounded-none overflow-hidden bg-gray-100 shadow-xs border border-gray-200">
         <Image
           src={imgSrc}
@@ -48,19 +50,34 @@ export const BookCard: React.FC<BookCardProps> = ({
           onError={() => setImgSrc(DEFAULT_BOOK_COVER)}
         />
 
-        {/* Circular Cart Button Overlay at Bottom-Right of Cover */}
-        <button
-          id={`card-add-cart-${book.id}`}
-          onClick={(e) => onAddToCart(book, e)}
-          className={`absolute bottom-1 right-1 sm:bottom-1.5 sm:right-1.5 w-5.5 h-5.5 sm:w-7 sm:h-7 rounded-full flex items-center justify-center shadow-md transition-all duration-200 active:scale-90 ${
-            isInCart
-              ? 'bg-[#4029AB] text-white'
-              : 'bg-white/95 text-gray-900 hover:bg-[#4029AB] hover:text-white'
-          }`}
-          aria-label={`Add ${book.title} to cart`}
-        >
-          <ShoppingCart className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 stroke-[2.2]" />
-        </button>
+        {/* Circular Cart or Owned Button Overlay at Bottom-Right of Cover */}
+        {isPurchased ? (
+          <div
+            id={`card-owned-badge-${book.id}`}
+            className="absolute bottom-1 right-1 sm:bottom-1.5 sm:right-1.5 w-5.5 h-5.5 sm:w-6.5 sm:h-6.5 rounded-full flex items-center justify-center shadow-md bg-emerald-600 text-white"
+            title="You own this eBook"
+          >
+            <Check className="w-3 h-3 sm:w-3.5 sm:h-3.5 stroke-[2.5]" />
+          </div>
+        ) : (
+          <button
+            id={`card-add-cart-${book.id}`}
+            onClick={(e) => onAddToCart(book, e)}
+            className={`absolute bottom-1 right-1 sm:bottom-1.5 sm:right-1.5 w-5.5 h-5.5 sm:w-7 sm:h-7 rounded-full flex items-center justify-center shadow-md transition-all duration-200 active:scale-90 cursor-pointer ${
+              isInCart
+                ? 'bg-[#4029AB] text-white ring-2 ring-white'
+                : 'bg-white/95 text-gray-900 hover:bg-[#4029AB] hover:text-white'
+            }`}
+            aria-label={isInCart ? `Remove ${book.title} from cart` : `Add ${book.title} to cart`}
+            title={isInCart ? 'In Cart (Click to toggle)' : 'Add to Cart'}
+          >
+            {isInCart ? (
+              <Check className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 stroke-[2.5]" />
+            ) : (
+              <ShoppingCart className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 stroke-[2.2]" />
+            )}
+          </button>
+        )}
       </div>
 
       {/* Dominating Pricing & Discount Tag */}

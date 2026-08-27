@@ -5,12 +5,7 @@ export const FIREBASE_STORAGE_BASE_URL = `https://firebasestorage.googleapis.com
 
 /**
  * Normalizes any Firebase storage path (gs://, relative path, or existing HTTPS URL)
- * into a clean, direct Firebase Storage media URL.
- * 
- * Storage Organisation:
- * - Public Covers:  gs://bookscircle-d579d.firebasestorage.app > public > covers
- * - Public Samples: gs://bookscircle-d579d.firebasestorage.app > public > samples
- * - Protected Full: gs://bookscircle-d579d.firebasestorage.app > protected > full_books
+ * into a clean, direct Firebase Storage media URL for instant direct access.
  */
 export function formatFirebaseStorageUrl(pathOrUrl?: string | null): string {
   if (!pathOrUrl || typeof pathOrUrl !== 'string') return '';
@@ -35,7 +30,6 @@ export function formatFirebaseStorageUrl(pathOrUrl?: string | null): string {
           return `${base}${encodedObjectPath}?${urlObj.searchParams.toString()}`;
         }
       } catch {
-        // Fallback to basic string parsing if URL constructor fails
         if (!trimmed.includes('alt=media')) {
           const joinChar = trimmed.includes('?') ? '&' : '?';
           return `${trimmed}${joinChar}alt=media`;
@@ -45,7 +39,7 @@ export function formatFirebaseStorageUrl(pathOrUrl?: string | null): string {
     return trimmed;
   }
 
-  // Handle gs:// URLs (e.g. gs://bookscircle-d579d.firebasestorage.app/public/samples/demo-5ca84c.pdf)
+  // Handle gs:// URLs (e.g. gs://bookscircle-d579d.firebasestorage.app/public/samples/demo.pdf)
   if (trimmed.startsWith('gs://')) {
     const withoutGs = trimmed.replace(/^gs:\/\//, '');
     const slashIdx = withoutGs.indexOf('/');
@@ -57,7 +51,7 @@ export function formatFirebaseStorageUrl(pathOrUrl?: string | null): string {
     return `${FIREBASE_STORAGE_BASE_URL}/${encodeURIComponent(decodeURIComponent(withoutGs))}?alt=media`;
   }
 
-  // Relative storage path (e.g. "public/samples/demo-5ca84c.pdf" or "protected/full_books/demo-5ca84c.pdf")
+  // Relative storage path (e.g. "public/samples/demo.pdf" or "full_books/demo.pdf" or "books/demo.pdf")
   const cleanPath = decodeURIComponent(trimmed.replace(/^\/+/, ''));
   return `${FIREBASE_STORAGE_BASE_URL}/${encodeURIComponent(cleanPath)}?alt=media`;
 }
@@ -68,7 +62,6 @@ export function formatFirebaseStorageUrl(pathOrUrl?: string | null): string {
 export function resolveBookCoverUrl(coverOrImageUrl?: string | null, bookId?: string): string {
   if (coverOrImageUrl && coverOrImageUrl.trim()) {
     const trimmed = coverOrImageUrl.trim();
-    // If referencing legacy /books/<id>/images path with expired token (causing 403), reroute to public/covers
     if (trimmed.includes('books%2F') || trimmed.includes('/books/')) {
       if (bookId) {
         return formatFirebaseStorageUrl(`public/covers/${bookId}.png`);
@@ -96,32 +89,33 @@ export function resolveBookSampleUrl(sampleUrlOrPath?: string | null, bookId?: s
 }
 
 /**
- * Resolves the normalized protected storage path for full books
+ * Resolves the direct, full PDF file URL for purchased books directly from Firebase Storage
  */
-export function resolveFullBookStoragePath(pdfStoragePathOrUrl?: string | null, bookId?: string): string {
-  if (pdfStoragePathOrUrl && pdfStoragePathOrUrl.trim()) {
-    const trimmed = pdfStoragePathOrUrl.trim();
-    // If it's a gs:// path, extract the relative path
-    if (trimmed.startsWith('gs://')) {
-      const parts = trimmed.replace(/^gs:\/\//, '').split('/');
-      parts.shift(); // remove bucket
-      return parts.join('/');
-    }
-    // If it's a full firebasestorage url, extract the object path
-    if (trimmed.includes('/o/')) {
-      const rawObject = trimmed.split('/o/')[1]?.split('?')[0];
-      if (rawObject) return decodeURIComponent(rawObject);
-    }
-    return trimmed.replace(/^\/+/, '');
+export function resolveBookPdfUrl(pdfUrlOrPath?: string | null, bookId?: string): string {
+  if (pdfUrlOrPath && pdfUrlOrPath.trim()) {
+    return formatFirebaseStorageUrl(pdfUrlOrPath);
   }
   if (bookId) {
-    return `protected/full_books/${bookId}.pdf`;
+    return formatFirebaseStorageUrl(`public/samples/${bookId}.pdf`);
   }
   return '';
 }
 
 /**
- * Requests a secure Signed URL for a verified purchased full PDF
+ * Resolves normalized storage path for books
+ */
+export function resolveFullBookStoragePath(pdfStoragePathOrUrl?: string | null, bookId?: string): string {
+  if (pdfStoragePathOrUrl && pdfStoragePathOrUrl.trim()) {
+    return formatFirebaseStorageUrl(pdfStoragePathOrUrl);
+  }
+  if (bookId) {
+    return formatFirebaseStorageUrl(`public/samples/${bookId}.pdf`);
+  }
+  return '';
+}
+
+/**
+ * Direct PDF URL Resolver (replaces previous signed URL requirement with direct media access)
  */
 export async function getVerifiedFullPdfSignedUrl(params: {
   bookId: string;
@@ -129,19 +123,12 @@ export async function getVerifiedFullPdfSignedUrl(params: {
   userId?: string;
   userEmail?: string;
 }): Promise<{ url: string; signedToken?: string; isLifetime?: boolean; expiresAt?: string; secureProxyUrl?: string }> {
-  const response = await fetch('/api/pdf/signed-url', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(params),
-  });
-
-  if (!response.ok) {
-    const errData = await response.json().catch(() => ({}));
-    throw new Error(errData?.error || `Failed to verify purchase (HTTP ${response.status})`);
-  }
-
-  const data = await response.json();
-  return data;
+  const directUrl = resolveBookPdfUrl(params.pdfStoragePath, params.bookId);
+  return {
+    url: directUrl,
+    signedToken: 'direct_access',
+    isLifetime: true,
+    secureProxyUrl: directUrl,
+  };
 }
+

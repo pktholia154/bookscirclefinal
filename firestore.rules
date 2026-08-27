@@ -1,18 +1,59 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // BooksCircle collections: allow read access to everyone, allow write access for admin/auth or prototyping
+    // Books collection - public read access for catalog browsing, write for admin/sync
     match /books/{bookId} {
       allow read: if true;
       allow write: if true;
     }
+    
+    // Categories collection - public read access for category navigation
     match /categories/{categoryId} {
       allow read: if true;
       allow write: if true;
     }
+    
+    // Transaction purchase records by payment ID (e.g., pay_XXXXX)
+    match /purchases/{purchaseId} {
+      allow read: if true;
+      allow write: if true;
+    }
+    
+    // Order records by order ID (e.g., order_XXXXX)
+    match /orders/{orderId} {
+      allow read: if true;
+      allow write: if true;
+    }
+    
+    // User purchase summaries indexed by User UID
+    match /user_purchases/{userId} {
+      allow read: if true;
+      allow write: if true;
+    }
+    
+    // User purchase summaries indexed by sanitized email
+    match /user_purchases_by_email/{emailKey} {
+      allow read: if true;
+      allow write: if true;
+    }
+    
+    // Aggregate analytics & purchase counts per book
+    match /book_analytics/{bookId} {
+      allow read: if true;
+      allow write: if true;
+    }
+    
+    // User profile documents
+    match /users/{userId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Default catch-all for any other collections
     match /{document=**} {
       allow read: if true;
       allow write: if true;
     }
   }
 }
+

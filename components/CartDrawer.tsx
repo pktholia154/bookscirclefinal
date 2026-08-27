@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { X, Trash2, Plus, Minus, ArrowRight, CheckCircle2, Shield, Lock, AlertCircle, RefreshCw } from 'lucide-react';
+import { X, Trash2, ArrowRight, CheckCircle2, Shield, Lock, AlertCircle, RefreshCw, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { CartItem } from '@/lib/types';
 import { DEFAULT_BOOK_COVER } from '@/lib/data';
-import { processRazorpayPayment } from '@/lib/services/razorpay';
+import { processRazorpayPayment, loadRazorpayScript } from '@/lib/services/razorpay';
+import { calculateCartSummary } from '@/lib/services/cart';
 
 import { UserProfile } from '@/components/Header';
 
@@ -14,7 +15,7 @@ interface CartDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   items: CartItem[];
-  onUpdateQuantity: (bookId: string, quantity: number) => void;
+  onUpdateQuantity?: (bookId: string, quantity: number) => void;
   onRemoveItem: (bookId: string) => void;
   onClearCart: () => void;
   onSuccessfulCheckout?: (purchasedBooks: CartItem[], paymentData: { order_id: string; payment_id: string; amountInRupees: number }) => void;
@@ -26,15 +27,19 @@ interface CartDrawerProps {
 
 const CartItemRow: React.FC<{
   item: CartItem;
-  onUpdateQuantity: (bookId: string, quantity: number) => void;
   onRemoveItem: (bookId: string) => void;
-}> = ({ item, onUpdateQuantity, onRemoveItem }) => {
+}> = ({ item, onRemoveItem }) => {
   const [imgSrc, setImgSrc] = useState(item.book.cover || DEFAULT_BOOK_COVER);
 
+  const discountPercent =
+    item.book.list_price && item.book.list_price > item.book.buy_price
+      ? Math.round(((item.book.list_price - item.book.buy_price) / item.book.list_price) * 100)
+      : null;
+
   return (
-    <div className="py-3.5 flex gap-3 items-center">
+    <div className="py-3.5 flex gap-3 items-center group">
       {/* Thumbnail: 3:4 ratio, sharp corners */}
-      <div className="relative w-14 aspect-[3/4] rounded-none overflow-hidden shrink-0 bg-gray-100 border border-gray-200">
+      <div className="relative w-14 aspect-[3/4] rounded-none overflow-hidden shrink-0 bg-gray-100 border border-gray-200 shadow-2xs">
         <Image
           src={imgSrc}
           alt={item.book.title}
@@ -49,14 +54,15 @@ const CartItemRow: React.FC<{
 
       {/* Details */}
       <div className="flex-1 min-w-0">
-        <h4 className="text-xs sm:text-sm font-bold text-gray-950 line-clamp-1 leading-snug">
+        <span className="text-[9px] font-bold uppercase tracking-wider text-[#4029AB] bg-[#4029AB]/10 px-1.5 py-0.5 rounded">
+          {item.book.category || 'eBook'}
+        </span>
+        <h4 className="text-xs sm:text-sm font-bold text-gray-950 line-clamp-1 leading-snug mt-1" title={item.book.title}>
           {item.book.title}
         </h4>
-        <p className="text-[11px] font-semibold text-gray-500 uppercase mt-0.5">
-          {item.book.category} • PDF
-        </p>
+        
         <div className="flex items-center gap-2 mt-1">
-          <span className="text-sm font-bold text-gray-900">
+          <span className="text-sm font-black text-gray-950">
             ₹{item.book.buy_price}
           </span>
           {item.book.list_price && item.book.list_price > item.book.buy_price && (
@@ -64,35 +70,25 @@ const CartItemRow: React.FC<{
               ₹{item.book.list_price}
             </span>
           )}
+          {discountPercent && (
+            <span className="text-[10px] font-bold text-emerald-600">
+              {discountPercent}% OFF
+            </span>
+          )}
         </div>
       </div>
 
-      {/* Quantity controls */}
-      <div className="flex items-center gap-1.5 bg-gray-100 px-2 py-1 rounded-lg">
+      {/* Digital License Info & Remove button */}
+      <div className="flex items-center gap-1.5 shrink-0">
         <button
-          onClick={() => onUpdateQuantity(item.book.id, item.quantity - 1)}
-          className="w-5 h-5 flex items-center justify-center text-gray-600 hover:text-gray-900 active:scale-90"
+          onClick={() => onRemoveItem(item.book.id)}
+          className="p-2 rounded-xl text-gray-400 hover:text-red-500 hover:bg-red-50 active:scale-90 transition-all cursor-pointer"
+          title="Remove from Cart"
+          aria-label={`Remove ${item.book.title} from cart`}
         >
-          <Minus className="w-3 h-3" />
-        </button>
-        <span className="text-xs font-bold text-gray-900 min-w-[14px] text-center">
-          {item.quantity}
-        </span>
-        <button
-          onClick={() => onUpdateQuantity(item.book.id, item.quantity + 1)}
-          className="w-5 h-5 flex items-center justify-center text-gray-600 hover:text-gray-900 active:scale-90"
-        >
-          <Plus className="w-3 h-3" />
+          <Trash2 className="w-4 h-4" />
         </button>
       </div>
-
-      {/* Remove button */}
-      <button
-        onClick={() => onRemoveItem(item.book.id)}
-        className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 active:scale-90 transition-all"
-      >
-        <Trash2 className="w-4 h-4" />
-      </button>
     </div>
   );
 };
@@ -101,7 +97,6 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   isOpen,
   onClose,
   items,
-  onUpdateQuantity,
   onRemoveItem,
   onClearCart,
   onSuccessfulCheckout,
@@ -115,15 +110,16 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   const [lastPaymentId, setLastPaymentId] = useState<string | null>(null);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
-  const subtotal = items.reduce((acc, item) => acc + item.book.buy_price * item.quantity, 0);
-  const totalListPrice = items.reduce(
-    (acc, item) => acc + (item.book.list_price || item.book.buy_price) * item.quantity,
-    0
-  );
-  const savings = Math.max(0, totalListPrice - subtotal);
+  // Preload Razorpay script when cart is open
+  useEffect(() => {
+    if (isOpen) {
+      loadRazorpayScript().catch(() => {});
+    }
+  }, [isOpen]);
 
-  const activeEmail = currentUser?.email || userEmail || '';
-  const activeName = currentUser?.displayName || userName || 'Reader';
+  const summary = calculateCartSummary(items);
+  const subtotal = summary.subtotal;
+  const savings = summary.savings;
 
   const handleCheckout = async (userOverride?: UserProfile) => {
     if (items.length === 0) return;
@@ -140,7 +136,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
       return;
     }
 
-    const currentActiveEmail = activeUser?.email || userEmail || 'reviewer.razorpay@bookscircle.org';
+    const currentActiveEmail = activeUser?.email || userEmail || '';
     const currentActiveName = activeUser?.displayName || userName || 'Reader';
 
     setIsCheckingOut(true);
@@ -155,6 +151,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
         amountInRupees: subtotal,
         bookIds,
         bookTitles,
+        userId: activeUser?.uid,
         userName: currentActiveName,
         userEmail: currentActiveEmail,
         onSuccess: (paymentData) => {
@@ -168,7 +165,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
             setOrderSuccess(false);
             onClearCart();
             onClose();
-          }, 2500);
+          }, 800);
         },
         onError: (err) => {
           setIsCheckingOut(false);
@@ -212,15 +209,25 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
             <div className="flex items-center gap-2">
               <h2 className="text-lg font-bold text-gray-950">Your Cart</h2>
               <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-[#4029AB]/10 text-[#4029AB]">
-                {items.reduce((acc, i) => acc + i.quantity, 0)} Items
+                {items.length} {items.length === 1 ? 'eBook' : 'eBooks'}
               </span>
             </div>
-            <button
-              onClick={onClose}
-              className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:text-gray-900 active:scale-95 transition-all"
-            >
-              <X className="w-4 h-4" />
-            </button>
+            <div className="flex items-center gap-2">
+              {items.length > 0 && (
+                <button
+                  onClick={onClearCart}
+                  className="text-xs font-semibold text-gray-400 hover:text-red-500 transition-colors px-2 py-1 cursor-pointer"
+                >
+                  Clear All
+                </button>
+              )}
+              <button
+                onClick={onClose}
+                className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:text-gray-900 active:scale-95 transition-all cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
           </div>
 
           {/* Cart Content */}
@@ -261,7 +268,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
               </p>
               <button
                 onClick={onClose}
-                className="px-5 py-2 rounded-full bg-[#4029AB] text-white text-xs font-bold active:scale-95 transition-all"
+                className="px-5 py-2 rounded-full bg-[#4029AB] text-white text-xs font-bold active:scale-95 transition-all cursor-pointer"
               >
                 Browse Books
               </button>
@@ -274,7 +281,6 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                   <CartItemRow
                     key={item.book.id}
                     item={item}
-                    onUpdateQuantity={onUpdateQuantity}
                     onRemoveItem={onRemoveItem}
                   />
                 ))}
@@ -294,22 +300,22 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 
                 <div className="space-y-1.5 text-xs text-gray-600">
                   <div className="flex justify-between">
-                    <span>Subtotal</span>
+                    <span>Subtotal ({items.length} {items.length === 1 ? 'item' : 'items'})</span>
                     <span className="font-semibold text-gray-900">₹{subtotal}</span>
                   </div>
                   {savings > 0 && (
                     <div className="flex justify-between text-emerald-600">
-                      <span>Total Savings</span>
+                      <span>Total Savings ({summary.savingsPercent}% OFF)</span>
                       <span className="font-semibold">-₹{savings}</span>
                     </div>
                   )}
                   <div className="flex justify-between">
                     <span>Delivery</span>
-                    <span className="font-semibold text-emerald-600">Instant PDF Download (Free)</span>
+                    <span className="font-semibold text-emerald-600">Instant Digital Delivery (Free)</span>
                   </div>
                   <div className="flex justify-between text-sm font-bold text-gray-950 pt-2 border-t border-gray-200">
                     <span>Total Amount</span>
-                    <span className="text-base text-[#4029AB]">₹{subtotal}</span>
+                    <span className="text-base font-black text-[#4029AB]">₹{subtotal}</span>
                   </div>
                 </div>
 
@@ -369,7 +375,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 
                 <p className="text-[10px] text-gray-400 text-center flex items-center justify-center gap-1.5">
                   <Lock className="w-3 h-3 text-emerald-600" />
-                  <span>Secured by Razorpay • UPI, Cards & NetBanking</span>
+                  <span>Secured by Razorpay • UPI, Cards &amp; NetBanking</span>
                 </p>
               </div>
             </>

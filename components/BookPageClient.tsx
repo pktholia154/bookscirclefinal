@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo, useTransition } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
   Share2,
@@ -47,6 +48,7 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
   book,
   relatedBooks = [],
 }) => {
+  const router = useRouter();
   const [imgLoadFailed, setImgLoadFailed] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [activePdfReaderMode, setActivePdfReaderMode] = useState<'sample' | 'full' | null>(null);
@@ -70,7 +72,7 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
   useEffect(() => {
     const timer = setTimeout(() => {
       try {
-        const savedUser = localStorage.getItem('bookscircle_test_user');
+        const savedUser = localStorage.getItem('bookscircle_auth_user');
         if (savedUser) setCurrentUser(JSON.parse(savedUser));
       } catch {}
 
@@ -95,7 +97,6 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
           email: user.email,
           displayName: user.displayName || user.email?.split('@')[0] || 'Google User',
           photoURL: user.photoURL,
-          isTestAccount: false,
         };
         setCurrentUser(profile);
         try {
@@ -157,8 +158,9 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
   const executeRazorpayCheckout = async (itemsToBuy: CartItem[], userOverride?: UserProfile | null) => {
     if (itemsToBuy.length === 0) return;
     const activeUser = userOverride || currentUser;
-    const userEmail = activeUser?.email || 'reviewer.razorpay@bookscircle.org';
+    const userEmail = activeUser?.email || '';
     const userName = activeUser?.displayName || 'Reader';
+    const userId = activeUser?.uid || 'guest_user';
     const totalAmount = itemsToBuy.reduce((sum, item) => sum + item.book.buy_price * item.quantity, 0);
 
     showToast('Opening Razorpay Secure Gateway...');
@@ -167,13 +169,14 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
         amountInRupees: totalAmount,
         bookIds: itemsToBuy.map((i) => i.book.id),
         bookTitles: itemsToBuy.map((i) => i.book.title),
+        userId,
         userName,
         userEmail,
         onSuccess: async (paymentData) => {
           const newPurchasedIds = itemsToBuy.map((item) => item.book.id);
           try {
             const allPurchased = await recordUserPurchaseInFirestore(
-              activeUser?.uid || 'guest_user',
+              userId,
               userEmail,
               itemsToBuy,
               {
@@ -188,8 +191,10 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
             setPurchasedBookIds((prev) => Array.from(new Set([...prev, ...newPurchasedIds])));
           }
           setCart((prev) => prev.filter((item) => !newPurchasedIds.includes(item.book.id)));
-          showToast(`Purchase successful! PDF unlocked.`);
-          setActivePdfReaderMode('full');
+          showToast(`Purchase successful! Opening your library...`);
+          setTimeout(() => {
+            router.push('/?tab=purchased');
+          }, 600);
         },
         onError: (err) => showToast(err || 'Payment was cancelled.'),
       });
@@ -778,6 +783,7 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
           const newIds = items.map((i) => i.book.id);
           setPurchasedBookIds((prev) => [...prev, ...newIds]);
           setIsCartOpen(false);
+          router.push('/?tab=purchased');
         }}
       />
 

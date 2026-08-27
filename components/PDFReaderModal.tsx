@@ -22,11 +22,10 @@ import {
 } from 'lucide-react';
 import { createEngine, PdfEngine, PdfDocument } from 'clawpdf/browser';
 import { Book } from '@/lib/types';
-import { getPdfOffline } from '@/lib/offline-storage';
+import { getPdfOffline, savePdfOffline } from '@/lib/offline-storage';
 import {
   resolveBookSampleUrl,
-  resolveFullBookStoragePath,
-  getVerifiedFullPdfSignedUrl,
+  resolveBookPdfUrl,
   formatFirebaseStorageUrl,
 } from '@/lib/services/storage';
 
@@ -334,37 +333,74 @@ export const PDFReaderModal: React.FC<PDFReaderModalProps> = ({
       setErrorMessage(null);
 
       try {
-        let arrayBuffer: ArrayBuffer;
+        let arrayBuffer: ArrayBuffer | null = null;
 
         if (activeMode === 'offline') {
+          // 1. Try local dual-tier offline storage (IndexedDB + CacheStorage)
           const offlineData = await getPdfOffline(book.id);
-          if (!offlineData) {
-            throw new Error('Offline PDF file not found in device storage. Please download it while connected to internet.');
+          if (offlineData && offlineData.byteLength > 0) {
+            arrayBuffer = offlineData;
+          } else {
+            // Auto-recovery fallback: If device is currently online, fetch and save to offline storage
+            const directPdfUrl = resolveBookPdfUrl(
+              book.pdf_file || book.pdfUrl || book.pdfStoragePath,
+              book.id
+            );
+            if (directPdfUrl) {
+              try {
+                let res = await fetch(directPdfUrl, { mode: 'cors' });
+                if (!res.ok) {
+                  const proxyUrl = `/api/pdf?url=${encodeURIComponent(directPdfUrl)}&bookId=${encodeURIComponent(book.id || '')}`;
+                  res = await fetch(proxyUrl);
+                }
+                if (res.ok) {
+                  arrayBuffer = await res.arrayBuffer();
+                  // Re-populate offline storage for future offline launches
+                  await savePdfOffline(book.id, arrayBuffer, book);
+                }
+              } catch {}
+            }
+            if (!arrayBuffer) {
+              throw new Error('Offline PDF file not found in device storage. Please connect to internet to load or download.');
+            }
           }
-          arrayBuffer = offlineData;
         } else if (activeMode === 'full') {
-          // 1. Full PDF (Paid Users Only): Generate verified lifetime Signed URL
-          const signedResult = await getVerifiedFullPdfSignedUrl({
-            bookId: book.id,
-            pdfStoragePath: book.pdfStoragePath || book.pdf_file,
-          });
+          // Check if already available in offline cache for instant loading
+          const cachedOffline = await getPdfOffline(book.id);
+          if (cachedOffline && cachedOffline.byteLength > 0) {
+            arrayBuffer = cachedOffline;
+          } else {
+            // Full PDF: Direct access URL
+            const directPdfUrl = resolveBookPdfUrl(
+              book.pdf_file || book.pdfUrl || book.pdfStoragePath,
+              book.id
+            );
 
-          if (!active) return;
-          setVerifiedSignedUrl(signedResult.url);
+            if (!active) return;
+            setVerifiedSignedUrl(directPdfUrl);
 
-          const fullFetchUrl = signedResult.secureProxyUrl || signedResult.url;
-          try {
-            const response = await fetch(fullFetchUrl, { mode: 'cors' });
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            arrayBuffer = await response.arrayBuffer();
-          } catch {
-            const fallbackProxyUrl = `/api/pdf?url=${encodeURIComponent(signedResult.url)}&bookId=${encodeURIComponent(book.id || '')}`;
-            const proxyRes = await fetch(fallbackProxyUrl);
-            if (!proxyRes.ok) throw new Error(`Proxy fetch error ${proxyRes.status}`);
-            arrayBuffer = await proxyRes.arrayBuffer();
+            try {
+              if (directPdfUrl) {
+                const response = await fetch(directPdfUrl, { mode: 'cors' });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                arrayBuffer = await response.arrayBuffer();
+              } else {
+                throw new Error('No direct PDF url available');
+              }
+            } catch {
+              const fallbackProxyUrl = `/api/pdf?url=${encodeURIComponent(directPdfUrl)}&bookId=${encodeURIComponent(book.id || '')}`;
+              const proxyRes = await fetch(fallbackProxyUrl);
+              if (!proxyRes.ok) throw new Error(`Proxy fetch error ${proxyRes.status}`);
+              arrayBuffer = await proxyRes.arrayBuffer();
+            }
+
+            // Cache in background for offline durability
+            if (arrayBuffer && isPurchased) {
+              savePdfOffline(book.id, arrayBuffer, book).catch(() => {});
+            }
           }
         } else {
-          // 2. Sample PDF (All Visitors): Public samples folder
+          // Sample PDF (All Visitors): Public samples folder
           const sampleUrl = resolveBookSampleUrl(book.sample_file || book.sampleUrl, book.id);
           const proxyUrl = `/api/pdf?url=${encodeURIComponent(sampleUrl || `public/samples/${book.id}.pdf`)}&bookId=${encodeURIComponent(book.id || '')}`;
 
@@ -383,7 +419,7 @@ export const PDFReaderModal: React.FC<PDFReaderModalProps> = ({
           }
         }
 
-        if (!active) return;
+        if (!active || !arrayBuffer) return;
 
         rawPdfBufferRef.current = arrayBuffer;
 
@@ -609,11 +645,15 @@ export const PDFReaderModal: React.FC<PDFReaderModalProps> = ({
     try {
       let buffer = rawPdfBufferRef.current;
       if (!buffer) {
-        const signed = await getVerifiedFullPdfSignedUrl({
-          bookId: book.id,
-          pdfStoragePath: book.pdfStoragePath || book.pdf_file,
-        });
-        const res = await fetch(signed.secureProxyUrl || signed.url);
+        const directPdfUrl = resolveBookPdfUrl(
+          book.pdf_file || book.pdfUrl || book.pdfStoragePath,
+          book.id
+        );
+        let res = await fetch(directPdfUrl, { mode: 'cors' }).catch(() => null);
+        if (!res || !res.ok) {
+          res = await fetch(`/api/pdf?url=${encodeURIComponent(directPdfUrl)}&bookId=${encodeURIComponent(book.id || '')}`);
+        }
+        if (!res.ok) throw new Error('Could not download PDF stream');
         buffer = await res.arrayBuffer();
       }
 

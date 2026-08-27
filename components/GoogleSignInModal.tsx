@@ -63,7 +63,6 @@ export const GoogleSignInModal: React.FC<LoginModalProps> = ({
           email: res.user.email,
           displayName: res.user.displayName || 'Google User',
           photoURL: res.user.photoURL,
-          isTestAccount: false,
         };
         onSelectUser(profile);
         onClose();
@@ -97,26 +96,22 @@ export const GoogleSignInModal: React.FC<LoginModalProps> = ({
 
     try {
       const user = await signInWithEmail(cleanEmail, cleanPassword);
-      const isReviewer = cleanEmail.includes('razorpay') || cleanEmail.includes('reviewer');
       const profile: UserProfile = {
         uid: user.uid,
         email: user.email,
-        displayName: user.displayName || (isReviewer ? 'Razorpay Test Reviewer' : cleanEmail.split('@')[0]),
+        displayName: user.displayName || cleanEmail.split('@')[0],
         photoURL: user.photoURL,
-        isTestAccount: isReviewer,
       };
       onSelectUser(profile);
       onClose();
     } catch (err: any) {
       // Local graceful fallback if offline / rules restriction
       console.warn('Firebase Email Auth note, using instant session fallback:', err?.message || err);
-      const isReviewer = cleanEmail.includes('razorpay') || cleanEmail.includes('reviewer');
       const fallbackProfile: UserProfile = {
         uid: `user_${Date.now()}`,
         email: cleanEmail,
-        displayName: isReviewer ? 'Razorpay Test Reviewer' : cleanEmail.split('@')[0],
+        displayName: cleanEmail.split('@')[0],
         photoURL: null,
-        isTestAccount: isReviewer,
       };
       onSelectUser(fallbackProfile);
       onClose();

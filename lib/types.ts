@@ -23,6 +23,8 @@ export interface Book {
   buy_price: number;
   list_price: number;
   pdf_file: string;
+  pdfUrl?: string;
+  pdf_url?: string;
   pdfStoragePath?: string;
   hasFullPdf?: boolean;
   cover: string;

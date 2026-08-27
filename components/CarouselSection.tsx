@@ -9,8 +9,10 @@ interface CarouselSectionProps {
   title: string;
   books: Book[];
   onSelectBook: (book: Book) => void;
-  onAddToCart: (book: Book, e: React.MouseEvent) => void;
+  onAddToCart: (book: Book, e?: React.MouseEvent) => void;
+  onBuyNow?: (book: Book) => void;
   cartBookIds: Set<string>;
+  purchasedBookIds?: string[];
   sectionId: string;
   onViewAll?: () => void;
 }
@@ -20,7 +22,9 @@ export const CarouselSection: React.FC<CarouselSectionProps> = ({
   books,
   onSelectBook,
   onAddToCart,
+  onBuyNow,
   cartBookIds,
+  purchasedBookIds = [],
   sectionId,
   onViewAll,
 }) => {
@@ -83,6 +87,7 @@ export const CarouselSection: React.FC<CarouselSectionProps> = ({
             onSelect={onSelectBook}
             onAddToCart={onAddToCart}
             isInCart={cartBookIds.has(book.id)}
+            isPurchased={purchasedBookIds.includes(book.id)}
           />
         ))}
       </div>

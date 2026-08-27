@@ -4,9 +4,9 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import { Loader2, ArrowLeft, ZoomIn, ZoomOut, AlertCircle, Download, CheckCircle2, ShieldCheck, Lock, Sparkles, ShoppingBag } from 'lucide-react';
 import { fetchFirestoreBookBySlugOrId } from '@/lib/books-store';
-import { getPdfOffline, getPurchasedBookIdsFromLocal } from '@/lib/offline-storage';
+import { getPdfOffline, savePdfOffline, getPurchasedBookIdsFromLocal } from '@/lib/offline-storage';
 import { createEngine, PdfEngine, PdfDocument } from 'clawpdf/browser';
-import { resolveBookSampleUrl, getVerifiedFullPdfSignedUrl, resolveFullBookStoragePath } from '@/lib/services/storage';
+import { resolveBookSampleUrl, resolveBookPdfUrl } from '@/lib/services/storage';
 
 export default function PDFReader() {
   const params = useParams();
@@ -90,12 +90,11 @@ export default function PDFReader() {
               // Public Sample PDF for all visitors
               resolvedTargetUrl = resolveBookSampleUrl(fetchedBook.sample_file || fetchedBook.sampleUrl, fetchedBook.id);
             } else {
-              // Full PDF: Check purchase and get verified signed URL
-              const signed = await getVerifiedFullPdfSignedUrl({
-                bookId: fetchedBook.id,
-                pdfStoragePath: fetchedBook.pdfStoragePath || fetchedBook.pdf_file,
-              });
-              resolvedTargetUrl = signed.secureProxyUrl || signed.url;
+              // Full PDF: Direct access URL
+              resolvedTargetUrl = resolveBookPdfUrl(
+                fetchedBook.pdf_file || fetchedBook.pdfUrl || fetchedBook.pdfStoragePath,
+                fetchedBook.id
+              );
             }
           }
         } catch (e) {
@@ -359,19 +358,37 @@ export default function PDFReader() {
 
     async function initPdfEngine() {
       try {
-        let arrayBuffer: ArrayBuffer;
+        let arrayBuffer: ArrayBuffer | null = null;
 
         if (readType === 'offline') {
           const data = await getPdfOffline(decodedBookId);
-          if (!data) throw new Error('Offline PDF not found');
-          arrayBuffer = data;
+          if (data && data.byteLength > 0) {
+            arrayBuffer = data;
+          } else if (fileUrl && fileUrl !== 'offline') {
+            // Auto-recovery if user is online
+            const response = await fetch(fileUrl, { mode: 'cors' });
+            if (response.ok) {
+              arrayBuffer = await response.arrayBuffer();
+              savePdfOffline(decodedBookId, arrayBuffer, bookData).catch(() => {});
+            }
+          }
+          if (!arrayBuffer) throw new Error('Offline PDF not found in storage');
         } else {
-          const response = await fetch(fileUrl, { mode: 'cors' });
-          if (!response.ok) throw new Error('Network response not OK');
-          arrayBuffer = await response.arrayBuffer();
+          // Check local offline cache first for instant speed
+          const cachedData = await getPdfOffline(decodedBookId);
+          if (cachedData && cachedData.byteLength > 0) {
+            arrayBuffer = cachedData;
+          } else {
+            const response = await fetch(fileUrl, { mode: 'cors' });
+            if (!response.ok) throw new Error('Network response not OK');
+            arrayBuffer = await response.arrayBuffer();
+            if (isPurchased) {
+              savePdfOffline(decodedBookId, arrayBuffer, bookData).catch(() => {});
+            }
+          }
         }
 
-        if (!active) return;
+        if (!active || !arrayBuffer) return;
 
         rawBufferRef.current = arrayBuffer;
 
@@ -465,7 +482,7 @@ export default function PDFReader() {
       if (pdfDocRef.current) pdfDocRef.current[Symbol.dispose]();
       if (engineRef.current) engineRef.current.destroy();
     };
-  }, [fileUrl, isUrlResolved, noUrlError, setupPages, decodedBookId, readType]);
+  }, [fileUrl, isUrlResolved, noUrlError, setupPages, decodedBookId, readType, bookData, isPurchased]);
 
   const handleDownload = () => {
     if (!rawBufferRef.current) return;
