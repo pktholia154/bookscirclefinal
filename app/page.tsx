@@ -307,7 +307,7 @@ export default function HomePage() {
 
   // Listen to Firebase Auth state for real Google Sign-In & cloud purchase sync
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user && !user.isAnonymous) {
         const profile: UserProfile = {
           uid: user.uid,
@@ -320,7 +320,7 @@ export default function HomePage() {
           localStorage.removeItem('bookscircle_user_session');
         }
 
-        // Guarantee user profile document is initialized in Firestore /users/{uid}
+        // Non-blocking background sync of user profile document to Firestore /users/{uid}
         syncUserProfileToFirestore({
           uid: user.uid,
           email: user.email,
@@ -329,12 +329,14 @@ export default function HomePage() {
           providerId: user.providerData?.[0]?.providerId || 'google.com',
         }).catch((err) => console.warn('User profile sync on auth state change note:', err));
 
-        try {
-          const syncedIds = await syncUserPurchases(user.uid, user.email || undefined);
-          setPurchasedBookIds(syncedIds);
-        } catch (e) {
-          console.warn('Initial cloud purchase sync note:', e);
-        }
+        // Non-blocking sync of cloud purchases
+        syncUserPurchases(user.uid, user.email || undefined)
+          .then((syncedIds) => {
+            if (syncedIds && syncedIds.length > 0) {
+              setPurchasedBookIds(syncedIds);
+            }
+          })
+          .catch((e) => console.warn('Initial cloud purchase sync note:', e));
 
         // Auto-resume pending purchase if visitor clicked buy before signing in
         autoResumePendingCheckout(profile);
@@ -356,23 +358,24 @@ export default function HomePage() {
       }
     );
 
-    // Automatic background synchronization on tab focus, device wake, or network reconnection
-    const handleAutoSync = async () => {
-      try {
-        const synced = await syncUserPurchases(currentUser.uid, currentUser.email || undefined);
-        setPurchasedBookIds(synced);
-      } catch (err) {
-        // Non-blocking auto sync
-      }
+    let lastAutoSyncTime = 0;
+    // Throttled automatic background synchronization on tab focus, device wake, or network reconnection
+    const handleAutoSync = () => {
+      const now = Date.now();
+      if (now - lastAutoSyncTime < 15000) return; // at most once every 15s
+      lastAutoSyncTime = now;
+
+      syncUserPurchases(currentUser.uid, currentUser.email || undefined)
+        .then((synced) => {
+          if (synced && synced.length > 0) {
+            setPurchasedBookIds(synced);
+          }
+        })
+        .catch(() => {});
     };
 
     window.addEventListener('focus', handleAutoSync);
     window.addEventListener('online', handleAutoSync);
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') {
-        handleAutoSync();
-      }
-    });
 
     return () => {
       unsubscribe();
@@ -482,7 +485,7 @@ export default function HomePage() {
     }
     showToast(`Signed in as ${profile.displayName || profile.email}`, 3000);
 
-    // Ensure user profile document exists in Firestore /users/{uid}
+    // Non-blocking user profile document sync
     syncUserProfileToFirestore({
       uid: profile.uid,
       email: profile.email,
@@ -491,13 +494,14 @@ export default function HomePage() {
       providerId: 'google.com',
     }).catch((err) => console.warn('User profile sync in handleSelectUserProfile note:', err));
 
-    // Sync cloud purchases
-    try {
-      const mergedBookIds = await syncUserPurchases(profile.uid, profile.email || undefined);
-      setPurchasedBookIds(mergedBookIds);
-    } catch (e) {
-      console.warn('User purchase cloud sync note:', e);
-    }
+    // Non-blocking cloud purchase sync
+    syncUserPurchases(profile.uid, profile.email || undefined)
+      .then((mergedBookIds) => {
+        if (mergedBookIds && mergedBookIds.length > 0) {
+          setPurchasedBookIds(mergedBookIds);
+        }
+      })
+      .catch((e) => console.warn('User purchase cloud sync note:', e));
 
     // Auto-resume pending checkout if stored in session
     const resumed = autoResumePendingCheckout(profile);
@@ -508,7 +512,7 @@ export default function HomePage() {
       setPendingActionAfterLogin(null);
       setTimeout(() => {
         action(profile);
-      }, 300);
+      }, 150);
     }
   };
 

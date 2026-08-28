@@ -92,33 +92,28 @@ export async function syncUserProfileToFirestore(
     // Non-blocking server dispatch
   }
 
-  // 2. Direct client-side Firestore SDK writes across all database instances
-  const instances = [db, defaultDb].filter(Boolean);
-  for (const firestoreInstance of instances) {
-    if (!firestoreInstance) continue;
+  // 2. Direct client-side Firestore SDK write
+  try {
+    const userRef = doc(db, 'users', user.uid);
+    const updateData: Record<string, any> = {
+      uid: user.uid,
+      email: user.email || null,
+      displayName: fallbackDisplayName,
+      photoURL: user.photoURL || null,
+      providerId: user.providerId || 'google.com',
+      role: 'user',
+      lastLoginAt: now,
+      updatedAt: now,
+    };
 
-    try {
-      const userRef = doc(firestoreInstance, 'users', user.uid);
-      const updateData: Record<string, any> = {
-        uid: user.uid,
-        email: user.email || null,
-        displayName: fallbackDisplayName,
-        photoURL: user.photoURL || null,
-        providerId: user.providerId || 'google.com',
-        role: 'user',
-        lastLoginAt: now,
-        updatedAt: now,
-      };
-
-      if (explicitPurchased.length > 0) {
-        updateData.purchasedBooks = arrayUnion(...explicitPurchased);
-        updateData.purchasesCount = increment(explicitPurchased.length);
-      }
-
-      await setDoc(userRef, updateData, { merge: true });
-    } catch (err) {
-      console.warn('Firestore user client write attempt note:', err);
+    if (explicitPurchased.length > 0) {
+      updateData.purchasedBooks = arrayUnion(...explicitPurchased);
+      updateData.purchasesCount = increment(explicitPurchased.length);
     }
+
+    await setDoc(userRef, updateData, { merge: true });
+  } catch (err) {
+    console.warn('Firestore user client write attempt note:', err);
   }
 
   return profilePayload as unknown as FirestoreUserProfile;
@@ -132,18 +127,14 @@ export async function getUserProfileFromFirestore(
 ): Promise<FirestoreUserProfile | null> {
   if (!uid) return null;
 
-  const instances = [db, defaultDb].filter(Boolean);
-  for (const firestoreInstance of instances) {
-    if (!firestoreInstance) continue;
-    try {
-      const userRef = doc(firestoreInstance, 'users', uid);
-      const snap = await getDoc(userRef);
-      if (snap.exists()) {
-        return snap.data() as FirestoreUserProfile;
-      }
-    } catch (err) {
-      console.warn('Error fetching user profile from Firestore:', err);
+  try {
+    const userRef = doc(db, 'users', uid);
+    const snap = await getDoc(userRef);
+    if (snap.exists()) {
+      return snap.data() as FirestoreUserProfile;
     }
+  } catch (err) {
+    console.warn('Error fetching user profile from Firestore:', err);
   }
   return null;
 }

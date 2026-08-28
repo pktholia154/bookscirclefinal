@@ -170,49 +170,65 @@ export async function recordUserPurchaseInFirestore(
     // Non-blocking server dispatch
   }
 
-  // 2. Persist in Firestore user document and subcollection across database instances
+  // 2. Persist in Firestore user document and subcollection
   let recordedInCloud = false;
-  const instances = [db, defaultDb].filter(Boolean);
+  try {
+    // 1. /users/{userId} & subcollection /users/{userId}/purchases/{paymentId}
+    if (effectiveUserId && effectiveUserId !== 'guest_user') {
+      const userProfileDocRef = doc(db, 'users', effectiveUserId);
+      await setDoc(
+        userProfileDocRef,
+        {
+          uid: effectiveUserId,
+          email: effectiveUserEmail,
+          purchasedBooks: arrayUnion(...bookIds),
+          purchasesCount: increment(bookIds.length),
+          totalSpent: increment(purchaseRecord.amount),
+          lastPurchasedAt: now,
+          lastOrderId: purchaseRecord.orderId,
+          lastPaymentId: purchaseRecord.paymentId,
+          updatedAt: now,
+        },
+        { merge: true }
+      );
 
-  for (const firestoreInstance of instances) {
-    if (!firestoreInstance) continue;
-    try {
-      // 1. /users/{userId} & subcollection /users/{userId}/purchases/{paymentId}
-      if (effectiveUserId && effectiveUserId !== 'guest_user') {
-        const userProfileDocRef = doc(firestoreInstance, 'users', effectiveUserId);
+      // Subcollection record under user: /users/{userId}/purchases/{paymentId}
+      const userPurchaseSubDocRef = doc(
+        db,
+        'users',
+        effectiveUserId,
+        'purchases',
+        purchaseRecord.paymentId
+      );
+      await setDoc(userPurchaseSubDocRef, purchaseRecord, { merge: true });
+
+      // 2. Top-level /user_purchases/{userId}
+      const userPurchasesDocRef = doc(db, 'user_purchases', effectiveUserId);
+      await setDoc(
+        userPurchasesDocRef,
+        {
+          userId: effectiveUserId,
+          userEmail: effectiveUserEmail,
+          purchasedBooks: arrayUnion(...bookIds),
+          totalBooksCount: increment(bookIds.length),
+          totalSpent: increment(purchaseRecord.amount),
+          lastPurchasedAt: now,
+          lastOrderId: purchaseRecord.orderId,
+          lastPaymentId: purchaseRecord.paymentId,
+          lastUpdated: now,
+        },
+        { merge: true }
+      );
+
+      // 3. Top-level /user_purchases_by_email/{normalizedEmail}
+      if (effectiveUserEmail) {
+        const normEmail = normalizeEmailForDocId(effectiveUserEmail);
+        const emailPurchasesDocRef = doc(db, 'user_purchases_by_email', normEmail);
         await setDoc(
-          userProfileDocRef,
+          emailPurchasesDocRef,
           {
-            uid: effectiveUserId,
-            email: effectiveUserEmail,
-            purchasedBooks: arrayUnion(...bookIds),
-            purchasesCount: increment(bookIds.length),
-            totalSpent: increment(purchaseRecord.amount),
-            lastPurchasedAt: now,
-            lastOrderId: purchaseRecord.orderId,
-            lastPaymentId: purchaseRecord.paymentId,
-            updatedAt: now,
-          },
-          { merge: true }
-        );
-
-        // Subcollection record under user: /users/{userId}/purchases/{paymentId}
-        const userPurchaseSubDocRef = doc(
-          firestoreInstance,
-          'users',
-          effectiveUserId,
-          'purchases',
-          purchaseRecord.paymentId
-        );
-        await setDoc(userPurchaseSubDocRef, purchaseRecord, { merge: true });
-
-        // 2. Top-level /user_purchases/{userId}
-        const userPurchasesDocRef = doc(firestoreInstance, 'user_purchases', effectiveUserId);
-        await setDoc(
-          userPurchasesDocRef,
-          {
-            userId: effectiveUserId,
             userEmail: effectiveUserEmail,
+            userId: effectiveUserId,
             purchasedBooks: arrayUnion(...bookIds),
             totalBooksCount: increment(bookIds.length),
             totalSpent: increment(purchaseRecord.amount),
@@ -223,77 +239,56 @@ export async function recordUserPurchaseInFirestore(
           },
           { merge: true }
         );
-
-        // 3. Top-level /user_purchases_by_email/{normalizedEmail}
-        if (effectiveUserEmail) {
-          const normEmail = normalizeEmailForDocId(effectiveUserEmail);
-          const emailPurchasesDocRef = doc(firestoreInstance, 'user_purchases_by_email', normEmail);
-          await setDoc(
-            emailPurchasesDocRef,
-            {
-              userEmail: effectiveUserEmail,
-              userId: effectiveUserId,
-              purchasedBooks: arrayUnion(...bookIds),
-              totalBooksCount: increment(bookIds.length),
-              totalSpent: increment(purchaseRecord.amount),
-              lastPurchasedAt: now,
-              lastOrderId: purchaseRecord.orderId,
-              lastPaymentId: purchaseRecord.paymentId,
-              lastUpdated: now,
-            },
-            { merge: true }
-          );
-        }
       }
-
-      // 4. Top-level /purchases/{paymentId}
-      const topPurchaseDocRef = doc(firestoreInstance, 'purchases', purchaseRecord.paymentId);
-      await setDoc(topPurchaseDocRef, purchaseRecord, { merge: true });
-
-      // 5. Top-level /orders/{orderId}
-      const topOrderDocRef = doc(firestoreInstance, 'orders', purchaseRecord.orderId);
-      await setDoc(
-        topOrderDocRef,
-        {
-          orderId: purchaseRecord.orderId,
-          paymentId: purchaseRecord.paymentId,
-          amount: purchaseRecord.amount,
-          currency: purchaseRecord.currency,
-          status: purchaseRecord.status,
-          purchasedAt: now,
-          userId: effectiveUserId,
-          userEmail: effectiveUserEmail,
-          books: purchaseItemDetails,
-          bookIds,
-          updatedAt: now,
-        },
-        { merge: true }
-      );
-
-      // 6. Update book analytics: /book_analytics/{bookId}
-      for (const item of cartItems) {
-        try {
-          const analyticsDocRef = doc(firestoreInstance, 'book_analytics', item.book.id);
-          await setDoc(
-            analyticsDocRef,
-            {
-              bookId: item.book.id,
-              title: item.book.title,
-              category: item.book.category || 'General',
-              totalPurchases: increment(1),
-              lastPurchasedAt: now,
-            },
-            { merge: true }
-          );
-        } catch (analyticsErr) {
-          // Non-blocking analytics write
-        }
-      }
-
-      recordedInCloud = true;
-    } catch (err) {
-      console.warn('Firestore cloud purchase sync attempt error:', err);
     }
+
+    // 4. Top-level /purchases/{paymentId}
+    const topPurchaseDocRef = doc(db, 'purchases', purchaseRecord.paymentId);
+    await setDoc(topPurchaseDocRef, purchaseRecord, { merge: true });
+
+    // 5. Top-level /orders/{orderId}
+    const topOrderDocRef = doc(db, 'orders', purchaseRecord.orderId);
+    await setDoc(
+      topOrderDocRef,
+      {
+        orderId: purchaseRecord.orderId,
+        paymentId: purchaseRecord.paymentId,
+        amount: purchaseRecord.amount,
+        currency: purchaseRecord.currency,
+        status: purchaseRecord.status,
+        purchasedAt: now,
+        userId: effectiveUserId,
+        userEmail: effectiveUserEmail,
+        books: purchaseItemDetails,
+        bookIds,
+        updatedAt: now,
+      },
+      { merge: true }
+    );
+
+    // 6. Update book analytics: /book_analytics/{bookId}
+    for (const item of cartItems) {
+      try {
+        const analyticsDocRef = doc(db, 'book_analytics', item.book.id);
+        await setDoc(
+          analyticsDocRef,
+          {
+            bookId: item.book.id,
+            title: item.book.title,
+            category: item.book.category || 'General',
+            totalPurchases: increment(1),
+            lastPurchasedAt: now,
+          },
+          { merge: true }
+        );
+      } catch (analyticsErr) {
+        // Non-blocking analytics write
+      }
+    }
+
+    recordedInCloud = true;
+  } catch (err) {
+    console.warn('Firestore cloud purchase sync attempt error:', err);
   }
 
   // 3. If offline or cloud write failed, queue for automated background sync
@@ -327,72 +322,67 @@ export async function syncUserPurchases(userId?: string, userEmail?: string): Pr
   syncPendingPurchasesToFirestore().catch(() => {});
 
   if (userId && userId !== 'guest_user') {
-    const instances = [db, defaultDb].filter(Boolean);
-    for (const firestoreInstance of instances) {
-      if (!firestoreInstance) continue;
-      try {
-        // A. Check primary user document: /users/{userId}
-        const userDocRef = doc(firestoreInstance, 'users', userId);
-        const snap = await getDoc(userDocRef);
-        if (snap.exists()) {
-          const data = snap.data();
-          if (Array.isArray(data?.purchasedBooks)) {
-            remoteBookIds.push(...data.purchasedBooks);
-          }
+    try {
+      // A. Check primary user document: /users/{userId}
+      const userDocRef = doc(db, 'users', userId);
+      const snap = await getDoc(userDocRef);
+      if (snap.exists()) {
+        const data = snap.data();
+        if (Array.isArray(data?.purchasedBooks)) {
+          remoteBookIds.push(...data.purchasedBooks);
         }
-
-        // B. Check subcollection /users/{userId}/purchases
-        try {
-          const subColRef = collection(firestoreInstance, 'users', userId, 'purchases');
-          const subSnap = await getDocs(subColRef);
-          subSnap.forEach((d) => {
-            const pData = d.data();
-            if (Array.isArray(pData?.bookIds)) {
-              remoteBookIds.push(...pData.bookIds);
-            }
-          });
-        } catch (subErr) {}
-
-        // C. Check /user_purchases/{userId}
-        try {
-          const upRef = doc(firestoreInstance, 'user_purchases', userId);
-          const upSnap = await getDoc(upRef);
-          if (upSnap.exists()) {
-            const upData = upSnap.data();
-            if (Array.isArray(upData?.purchasedBooks)) {
-              remoteBookIds.push(...upData.purchasedBooks);
-            }
-          }
-        } catch (upErr) {}
-
-        // D. Check /user_purchases_by_email/{normalizedEmail}
-        if (userEmail) {
-          try {
-            const normEmail = normalizeEmailForDocId(userEmail);
-            const emailDocRef = doc(firestoreInstance, 'user_purchases_by_email', normEmail);
-            const emailSnap = await getDoc(emailDocRef);
-            if (emailSnap.exists()) {
-              const eData = emailSnap.data();
-              if (Array.isArray(eData?.purchasedBooks)) {
-                remoteBookIds.push(...eData.purchasedBooks);
-              }
-            }
-          } catch (eErr) {}
-        }
-
-        if (remoteBookIds.length > 0) break;
-      } catch (err) {
-        console.warn('Could not sync user purchases from cloud:', err);
       }
+
+      // B. Check subcollection /users/{userId}/purchases
+      try {
+        const subColRef = collection(db, 'users', userId, 'purchases');
+        const subSnap = await getDocs(subColRef);
+        subSnap.forEach((d) => {
+          const pData = d.data();
+          if (Array.isArray(pData?.bookIds)) {
+            remoteBookIds.push(...pData.bookIds);
+          }
+        });
+      } catch (subErr) {}
+
+      // C. Check /user_purchases/{userId}
+      try {
+        const upRef = doc(db, 'user_purchases', userId);
+        const upSnap = await getDoc(upRef);
+        if (upSnap.exists()) {
+          const upData = upSnap.data();
+          if (Array.isArray(upData?.purchasedBooks)) {
+            remoteBookIds.push(...upData.purchasedBooks);
+          }
+        }
+      } catch (upErr) {}
+
+      // D. Check /user_purchases_by_email/{normalizedEmail}
+      if (userEmail) {
+        try {
+          const normEmail = normalizeEmailForDocId(userEmail);
+          const emailDocRef = doc(db, 'user_purchases_by_email', normEmail);
+          const emailSnap = await getDoc(emailDocRef);
+          if (emailSnap.exists()) {
+            const eData = emailSnap.data();
+            if (Array.isArray(eData?.purchasedBooks)) {
+              remoteBookIds.push(...eData.purchasedBooks);
+            }
+          }
+        } catch (eErr) {}
+      }
+    } catch (err) {
+      console.warn('Could not sync user purchases from cloud:', err);
     }
   }
 
   const uniqueRemoteIds = Array.from(new Set(remoteBookIds));
 
-  // If user is authenticated, purchase list comes directly from Firebase collections
+  // Merge remote with local purchases to ensure offline resilience
   if (userId && userId !== 'guest_user') {
-    await savePurchasedBookIds(uniqueRemoteIds);
-    return uniqueRemoteIds;
+    const mergedIds = Array.from(new Set([...localPurchased, ...uniqueRemoteIds]));
+    await savePurchasedBookIds(mergedIds);
+    return mergedIds;
   }
 
   // Fallback for guest users without an account: return local storage
@@ -412,24 +402,18 @@ export async function getUserPurchaseHistory(
 
   if (!userId || userId === 'guest_user') return [];
 
-  const instances = [db, defaultDb];
-  for (const firestoreInstance of instances) {
-    if (!firestoreInstance) continue;
-    try {
-      const subColRef = collection(firestoreInstance, 'users', userId, 'purchases');
-      const subSnap = await getDocs(subColRef);
-      subSnap.forEach((docSnap) => {
-        const data = docSnap.data() as PurchaseRecord;
-        if (data.paymentId && !seenPaymentIds.has(data.paymentId)) {
-          seenPaymentIds.add(data.paymentId);
-          records.push(data);
-        }
-      });
-
-      if (records.length > 0) break;
-    } catch (err) {
-      console.warn('Error fetching user purchase history from subcollection:', err);
-    }
+  try {
+    const subColRef = collection(db, 'users', userId, 'purchases');
+    const subSnap = await getDocs(subColRef);
+    subSnap.forEach((docSnap) => {
+      const data = docSnap.data() as PurchaseRecord;
+      if (data.paymentId && !seenPaymentIds.has(data.paymentId)) {
+        seenPaymentIds.add(data.paymentId);
+        records.push(data);
+      }
+    });
+  } catch (err) {
+    console.warn('Error fetching user purchase history from subcollection:', err);
   }
 
   // Sort by newest purchasedAt first
@@ -559,27 +543,22 @@ async function backfillLocalPurchasesToCloud(
   userEmail: string,
   allBookIds: string[]
 ): Promise<void> {
-  const instances = [db, defaultDb];
   const now = new Date().toISOString();
-  for (const firestoreInstance of instances) {
-    if (!firestoreInstance) continue;
-    try {
-      const userDocRef = doc(firestoreInstance, 'users', userId);
-      await setDoc(
-        userDocRef,
-        {
-          uid: userId,
-          email: userEmail,
-          purchasedBooks: arrayUnion(...allBookIds),
-          purchasesCount: allBookIds.length,
-          updatedAt: now,
-        },
-        { merge: true }
-      );
-      break;
-    } catch (e) {
-      console.warn('Backfill local purchases note:', e);
-    }
+  try {
+    const userDocRef = doc(db, 'users', userId);
+    await setDoc(
+      userDocRef,
+      {
+        uid: userId,
+        email: userEmail,
+        purchasedBooks: arrayUnion(...allBookIds),
+        purchasesCount: allBookIds.length,
+        updatedAt: now,
+      },
+      { merge: true }
+    );
+  } catch (e) {
+    console.warn('Backfill local purchases note:', e);
   }
 }
 
@@ -593,67 +572,84 @@ export function subscribeToUserPurchases(
   onPurchasesUpdated: (bookIds: string[]) => void
 ): () => void {
   const unsubscribers: (() => void)[] = [];
+  let lastKnownIds: string[] = getPurchasedBookIdsFromLocal();
 
   const handleNewBookIds = async (newIds: string[]) => {
     if (!newIds || !Array.isArray(newIds)) return;
-    const unique = Array.from(new Set(newIds));
-    if (unique.length > 0) {
-      await savePurchasedBookIds(unique);
-      onPurchasesUpdated(unique);
+    const unique = Array.from(new Set(newIds)).sort();
+    
+    // Check if the IDs are actually different from what we already have
+    if (
+      lastKnownIds.length === unique.length &&
+      lastKnownIds.every((id, idx) => id === unique[idx])
+    ) {
+      return;
     }
+
+    lastKnownIds = unique;
+    await savePurchasedBookIds(unique);
+    onPurchasesUpdated(unique);
   };
 
-  const instances = [db, defaultDb].filter(Boolean);
-
-  instances.forEach((firestoreInstance) => {
-    if (!firestoreInstance) return;
-
-    if (userId && userId !== 'guest_user') {
-      try {
-        // 1. Real-time listener for /users/{userId}
-        const userProfileDocRef = doc(firestoreInstance, 'users', userId);
-        const unsubProfile = onSnapshot(
-          userProfileDocRef,
-          (snap) => {
-            if (snap.exists()) {
-              const data = snap.data();
-              if (Array.isArray(data?.purchasedBooks)) {
-                handleNewBookIds(data.purchasedBooks);
-              }
+  if (userId && userId !== 'guest_user') {
+    try {
+      // 1. Real-time listener for /users/{userId}
+      const userProfileDocRef = doc(db, 'users', userId);
+      let unsubProfile: (() => void) | null = null;
+      unsubProfile = onSnapshot(
+        userProfileDocRef,
+        (snap) => {
+          if (snap.exists()) {
+            const data = snap.data();
+            if (Array.isArray(data?.purchasedBooks)) {
+              handleNewBookIds(data.purchasedBooks);
             }
-          },
-          (err) => {
+          }
+        },
+        (err) => {
+          if (err?.code === 'not-found' || err?.message?.includes('NOT_FOUND') || err?.message?.includes('not-found')) {
+            try { unsubProfile?.(); } catch {}
+          } else {
             console.warn('Realtime users doc sync note:', err?.message || err);
           }
-        );
-        unsubscribers.push(unsubProfile);
+        }
+      );
+      if (unsubProfile) unsubscribers.push(unsubProfile);
 
-        // 2. Real-time listener for /users/{userId}/purchases subcollection
-        const subColRef = collection(firestoreInstance, 'users', userId, 'purchases');
-        const unsubSubCol = onSnapshot(
-          subColRef,
-          (snap) => {
-            const ids: string[] = [];
-            snap.forEach((d) => {
-              const pData = d.data();
-              if (Array.isArray(pData?.bookIds)) {
-                ids.push(...pData.bookIds);
-              }
-            });
-            if (ids.length > 0) {
-              handleNewBookIds(ids);
+      // 2. Real-time listener for /users/{userId}/purchases subcollection
+      const subColRef = collection(db, 'users', userId, 'purchases');
+      let unsubSubCol: (() => void) | null = null;
+      unsubSubCol = onSnapshot(
+        subColRef,
+        (snap) => {
+          const ids: string[] = [];
+          snap.forEach((d) => {
+            const pData = d.data();
+            if (Array.isArray(pData?.bookIds)) {
+              ids.push(...pData.bookIds);
             }
-          },
-          (err) => {
+          });
+          if (ids.length > 0) {
+            handleNewBookIds(ids);
+          }
+        },
+        (err) => {
+          if (err?.code === 'not-found' || err?.message?.includes('NOT_FOUND') || err?.message?.includes('not-found')) {
+            try { unsubSubCol?.(); } catch {}
+          } else {
             console.warn('Realtime subcollection purchases sync note:', err?.message || err);
           }
-        );
-        unsubscribers.push(unsubSubCol);
+        }
+      );
+      if (unsubSubCol) unsubscribers.push(unsubSubCol);
 
-        // 3. Real-time listener for /user_purchases/{userId}
-        const userPurchasesDocRef = doc(firestoreInstance, 'user_purchases', userId);
-        const unsubUserPurchases = onSnapshot(
-          userPurchasesDocRef,
+      // 3. Real-time listener for /user_purchases_by_email/{normalizedEmail}
+      if (userEmail) {
+        const normEmail = normalizeEmailForDocId(userEmail);
+        const emailDocRef = doc(db, 'user_purchases_by_email', normEmail);
+        let unsubEmail: (() => void) | null = null;
+        unsubEmail = onSnapshot(
+          emailDocRef,
           (snap) => {
             if (snap.exists()) {
               const data = snap.data();
@@ -662,33 +658,18 @@ export function subscribeToUserPurchases(
               }
             }
           },
-          () => {}
+          (err) => {
+            if (err?.code === 'not-found' || err?.message?.includes('NOT_FOUND') || err?.message?.includes('not-found')) {
+              try { unsubEmail?.(); } catch {}
+            }
+          }
         );
-        unsubscribers.push(unsubUserPurchases);
-
-        // 4. Real-time listener for /user_purchases_by_email/{normalizedEmail}
-        if (userEmail) {
-          const normEmail = normalizeEmailForDocId(userEmail);
-          const emailDocRef = doc(firestoreInstance, 'user_purchases_by_email', normEmail);
-          const unsubEmail = onSnapshot(
-            emailDocRef,
-            (snap) => {
-              if (snap.exists()) {
-                const data = snap.data();
-                if (Array.isArray(data?.purchasedBooks)) {
-                  handleNewBookIds(data.purchasedBooks);
-                }
-              }
-            },
-            () => {}
-          );
-          unsubscribers.push(unsubEmail);
-        }
-      } catch (e) {
-        console.warn('Realtime listener attach error:', e);
+        if (unsubEmail) unsubscribers.push(unsubEmail);
       }
+    } catch (e) {
+      console.warn('Realtime listener attach error:', e);
     }
-  });
+  }
 
   return () => {
     unsubscribers.forEach((fn) => {

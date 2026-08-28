@@ -33,18 +33,6 @@ googleProvider.setCustomParameters({ prompt: 'select_account' });
 export async function signInWithGoogle(): Promise<{ user: User | null; fallbackNeeded?: boolean; cancelled?: boolean; error?: any }> {
   try {
     const result = await signInWithPopup(auth, googleProvider);
-    if (result.user) {
-      // Automatically sync user profile document to /users/{uid} in Firestore
-      import('./services/users').then(({ syncUserProfileToFirestore }) => {
-        syncUserProfileToFirestore({
-          uid: result.user.uid,
-          email: result.user.email,
-          displayName: result.user.displayName,
-          photoURL: result.user.photoURL,
-          providerId: 'google.com',
-        }).catch((err) => console.warn('User profile sync on Google sign in note:', err));
-      });
-    }
     return { user: result.user };
   } catch (error: any) {
     if (error?.code === 'auth/unauthorized-domain' || error?.message?.includes('unauthorized-domain')) {
@@ -150,14 +138,7 @@ export async function ensureFirebaseAuth(): Promise<User | null> {
   }
 }
 
-// Initialize Firestore (Attempting with database ID 'bookscircle', fallback to default)
-let firestoreDb: Firestore;
-try {
-  firestoreDb = getFirestore(app, 'bookscircle');
-} catch (e) {
-  firestoreDb = getFirestore(app);
-}
-
-export const db = firestoreDb;
-export const defaultDb = getFirestore(app);
+// Initialize Firestore with default database
+export const db: Firestore = getFirestore(app);
+export const defaultDb: Firestore = db;
 
