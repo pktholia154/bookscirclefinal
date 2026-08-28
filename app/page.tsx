@@ -442,11 +442,10 @@ export default function HomePage() {
     }
     init();
 
-    // Attach real-time snapshot listeners to 'bookscircle' database
+    // Attach real-time snapshot listeners to 'bookscircle' database for background sync
     const unsubBooks = subscribeToFirestoreBooks((updatedBooks) => {
       if (isMounted && updatedBooks && updatedBooks.length > 0) {
         setBooks(updatedBooks);
-        setIsLoading(false);
       }
     });
 
@@ -766,14 +765,7 @@ export default function HomePage() {
                   onSelectCategory={(cat) => setSelectedCategory(cat)}
                 />
 
-                {isLoading ? (
-                  <div className="flex flex-col items-center justify-center py-20 gap-3">
-                    <RefreshCw className="w-8 h-8 text-[#4029AB] animate-spin" />
-                    <p className="text-xs font-bold text-gray-500">
-                      Loading curated exam e-books from BooksCircle...
-                    </p>
-                  </div>
-                ) : searchQuery.trim() ? (
+                {searchQuery.trim() ? (
                   /* Search Results */
                   <div className="pt-2">
                     <BookListView
