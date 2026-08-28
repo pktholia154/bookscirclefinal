@@ -16,10 +16,9 @@ const db = getFirestore(app, 'bookscircle');
 
 function sanitize(val) {
   if (typeof val !== 'string') return val;
-  // Strip control characters except newline, carriage return, tab
-  // Also strip invalid surrogate halves or non-UTF8 binary artifacts
+  // Strip control characters and invalid surrogate halves
   return val
-    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F\uD800-\uDFFF]/g, '')
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F\uD800-\uDFFF\uFFFD]/g, '')
     .trim();
 }
 
