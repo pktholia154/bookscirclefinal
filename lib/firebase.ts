@@ -138,7 +138,7 @@ export async function ensureFirebaseAuth(): Promise<User | null> {
   }
 }
 
-// Initialize Firestore with default database
-export const db: Firestore = getFirestore(app);
+// Initialize Firestore explicitly connected to the user's 'bookscircle' database
+export const db: Firestore = getFirestore(app, 'bookscircle');
 export const defaultDb: Firestore = db;
 

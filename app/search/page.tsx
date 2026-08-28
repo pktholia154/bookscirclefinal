@@ -8,6 +8,7 @@ import { CartDrawer } from '@/components/CartDrawer';
 import { BottomNav } from '@/components/BottomNav';
 import { GoogleSignInModal } from '@/components/GoogleSignInModal';
 import { Book, Category, CartItem } from '@/lib/types';
+import { INITIAL_BOOKS, INITIAL_CATEGORIES } from '@/lib/data';
 import { UserProfile } from '@/components/Header';
 import { getBooksFromFirestore, getCategoriesFromFirestore } from '@/lib/services/books';
 import { getPurchasedBookIdsFromLocal, savePurchasedBookIds } from '@/lib/offline-storage';
@@ -23,41 +24,42 @@ function SearchPageContent() {
   const searchParams = useSearchParams();
   const queryParam = searchParams.get('q') || '';
 
-  const [books, setBooks] = useState<Book[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [books, setBooks] = useState<Book[]>(INITIAL_BOOKS);
+  const [categories, setCategories] = useState<Category[]>(INITIAL_CATEGORIES);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
-  const [cart, setCart] = useState<CartItem[]>(() => {
-    if (typeof window === 'undefined') return [];
-    try {
-      const savedCart = localStorage.getItem('bookscircle_cart');
-      if (savedCart) {
-        const parsed = JSON.parse(savedCart);
-        if (Array.isArray(parsed)) return parsed;
-      }
-    } catch {}
-    return [];
-  });
+  const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
-  const [purchasedBookIds, setPurchasedBookIds] = useState<string[]>(() => {
-    if (typeof window === 'undefined') return [];
-    try {
-      return getPurchasedBookIdsFromLocal();
-    } catch {
-      return [];
-    }
-  });
-  const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
-    if (typeof window === 'undefined') return null;
-    try {
-      const savedUser = localStorage.getItem('bookscircle_auth_user');
-      if (savedUser) return JSON.parse(savedUser);
-    } catch {}
-    return null;
-  });
+  const [purchasedBookIds, setPurchasedBookIds] = useState<string[]>([]);
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [isGoogleModalOpen, setIsGoogleModalOpen] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [pendingActionAfterLogin, setPendingActionAfterLogin] = useState<((user: UserProfile) => void) | null>(null);
+
+  // Load client persisted data on mount
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try {
+        const savedCart = localStorage.getItem('bookscircle_cart');
+        if (savedCart) {
+          const parsed = JSON.parse(savedCart);
+          if (Array.isArray(parsed)) setCart(parsed);
+        }
+      } catch {}
+
+      try {
+        const localPurchased = getPurchasedBookIdsFromLocal();
+        if (localPurchased.length > 0) setPurchasedBookIds(localPurchased);
+      } catch {}
+
+      try {
+        const savedUser = localStorage.getItem('bookscircle_auth_user');
+        if (savedUser) setCurrentUser(JSON.parse(savedUser));
+      } catch {}
+    }, 0);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   // Load books & categories from Firestore
   useEffect(() => {

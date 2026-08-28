@@ -16,8 +16,15 @@ import { ProfileView } from '@/components/ProfileView';
 import { IOSInstallGuideModal } from '@/components/IOSInstallGuideModal';
 import { Footer } from '@/components/Footer';
 import { Book, Category, CartItem } from '@/lib/types';
-import { DEFAULT_BOOK_COVER } from '@/lib/data';
-import { getBooksFromFirestore, getCategoriesFromFirestore } from '@/lib/services/books';
+import { DEFAULT_BOOK_COVER, INITIAL_BOOKS, INITIAL_CATEGORIES } from '@/lib/data';
+import {
+  getBooksFromFirestore,
+  getCategoriesFromFirestore,
+  getCachedBooksSync,
+  getCachedCategoriesSync,
+  subscribeToFirestoreBooks,
+  subscribeToFirestoreCategories,
+} from '@/lib/services/books';
 import { getPurchasedBookIdsFromLocal, savePurchasedBookIds } from '@/lib/offline-storage';
 import { recordUserPurchaseInFirestore, syncUserPurchases, subscribeToUserPurchases } from '@/lib/services/purchases';
 import { syncUserProfileToFirestore } from '@/lib/services/users';
@@ -73,12 +80,12 @@ const getPendingCheckoutItems = (): CartItem[] | null => {
 };
 
 export default function HomePage() {
-  const [books, setBooks] = useState<Book[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [books, setBooks] = useState<Book[]>(INITIAL_BOOKS);
+  const [categories, setCategories] = useState<Category[]>(INITIAL_CATEGORIES);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [activeTab, setActiveTab] = useState<TabKey>('home');
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [isGoogleModalOpen, setIsGoogleModalOpen] = useState<boolean>(false);
   const [loginModalConfig, setLoginModalConfig] = useState<{
@@ -411,6 +418,7 @@ export default function HomePage() {
 
   useEffect(() => {
     let isMounted = true;
+
     async function init() {
       try {
         const [fetchedBooks, fetchedCats] = await Promise.all([
@@ -418,10 +426,10 @@ export default function HomePage() {
           getCategoriesFromFirestore(),
         ]);
         if (!isMounted) return;
-        if (fetchedBooks.length > 0) {
+        if (fetchedBooks && fetchedBooks.length > 0) {
           setBooks(fetchedBooks);
         }
-        if (fetchedCats.length > 0) {
+        if (fetchedCats && fetchedCats.length > 0) {
           setCategories(fetchedCats);
         }
       } catch (err) {
@@ -433,8 +441,25 @@ export default function HomePage() {
       }
     }
     init();
+
+    // Attach real-time snapshot listeners to 'bookscircle' database
+    const unsubBooks = subscribeToFirestoreBooks((updatedBooks) => {
+      if (isMounted && updatedBooks && updatedBooks.length > 0) {
+        setBooks(updatedBooks);
+        setIsLoading(false);
+      }
+    });
+
+    const unsubCats = subscribeToFirestoreCategories((updatedCats) => {
+      if (isMounted && updatedCats && updatedCats.length > 0) {
+        setCategories(updatedCats);
+      }
+    });
+
     return () => {
       isMounted = false;
+      unsubBooks();
+      unsubCats();
     };
   }, []);
 
@@ -601,20 +626,27 @@ export default function HomePage() {
 
     // Filter by category
     if (selectedCategory !== 'all') {
-      result = result.filter(
-        (b) => b.category.toLowerCase() === selectedCategory.toLowerCase()
-      );
+      const target = selectedCategory.toLowerCase().trim();
+      result = result.filter((b) => {
+        const cat = (b.category || '').toLowerCase();
+        const slug = (b.categorySlug || '').toLowerCase();
+        return cat === target || slug === target || target.includes(slug) || slug.includes(target) || target.includes(cat) || cat.includes(target);
+      });
     }
 
     // Filter by search query
     if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
+      const q = searchQuery.toLowerCase().trim();
       result = result.filter(
         (b) =>
           b.title.toLowerCase().includes(q) ||
           b.category.toLowerCase().includes(q) ||
+          (b.categorySlug && b.categorySlug.toLowerCase().includes(q)) ||
+          (b.seoDescription && b.seoDescription.toLowerCase().includes(q)) ||
           (b.topics && b.topics.some((t) => t.toLowerCase().includes(q))) ||
-          b.author?.toLowerCase().includes(q)
+          b.author?.toLowerCase().includes(q) ||
+          b.publisher?.toLowerCase().includes(q) ||
+          b.language?.toLowerCase().includes(q)
       );
     }
 
@@ -623,22 +655,25 @@ export default function HomePage() {
 
   // Curated collections for Horizontal Carousel Sections
   const featuredTrendingBooks = useMemo(() => {
-    return books.filter((b) => (b.rating && b.rating >= 4.6) || (b.tags && b.tags.includes('featured')));
+    const featured = books.filter((b) => (b.rating && b.rating >= 4.6) || (b.tags && b.tags.includes('featured')));
+    return featured.length > 0 ? featured : books.slice(0, 10);
   }, [books]);
 
   const newReleasesBooks = useMemo(() => {
-    return books.filter((b) => (b.rating && b.rating >= 4.7) || (b.tags && b.tags.includes('bestseller')));
+    const best = books.filter((b) => (b.rating && b.rating >= 4.7) || (b.tags && b.tags.includes('bestseller')));
+    return best.length > 0 ? best : books.slice(10, 20);
   }, [books]);
 
   const category1Books = useMemo(() => {
-    const catName = categories[0]?.title || 'UPSC Civil Services';
-    return books.filter((b) => b.category.toLowerCase() === catName.toLowerCase());
+    const cuetBooks = books.filter((b) => b.category?.toLowerCase().includes('cuet') || b.categorySlug?.toLowerCase().includes('cuet'));
+    if (cuetBooks.length > 0) return cuetBooks.slice(0, 8);
+    const catName = (categories[0]?.title || '').toLowerCase();
+    return books.filter((b) => b.category.toLowerCase() === catName).slice(0, 8);
   }, [books, categories]);
 
   const category2Books = useMemo(() => {
-    const catName = categories[1]?.title || 'SSC & Govt Exams';
-    return books.filter((b) => b.category.toLowerCase() === catName.toLowerCase());
-  }, [books, categories]);
+    return books.slice(8, 16);
+  }, [books]);
 
   // Switch tab with smooth scroll
   const handleTabChange = (tab: TabKey) => {

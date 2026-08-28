@@ -62,10 +62,8 @@ export function formatFirebaseStorageUrl(pathOrUrl?: string | null): string {
 export function resolveBookCoverUrl(coverOrImageUrl?: string | null, bookId?: string): string {
   if (coverOrImageUrl && coverOrImageUrl.trim()) {
     const trimmed = coverOrImageUrl.trim();
-    if (trimmed.includes('books%2F') || trimmed.includes('/books/')) {
-      if (bookId) {
-        return formatFirebaseStorageUrl(`public/covers/${bookId}.png`);
-      }
+    if (trimmed.startsWith('https://') || trimmed.startsWith('http://')) {
+      return trimmed;
     }
     return formatFirebaseStorageUrl(trimmed);
   }
@@ -80,7 +78,11 @@ export function resolveBookCoverUrl(coverOrImageUrl?: string | null, bookId?: st
  */
 export function resolveBookSampleUrl(sampleUrlOrPath?: string | null, bookId?: string): string {
   if (sampleUrlOrPath && sampleUrlOrPath.trim()) {
-    return formatFirebaseStorageUrl(sampleUrlOrPath);
+    const trimmed = sampleUrlOrPath.trim();
+    if (trimmed.startsWith('https://') || trimmed.startsWith('http://')) {
+      return trimmed;
+    }
+    return formatFirebaseStorageUrl(trimmed);
   }
   if (bookId) {
     return formatFirebaseStorageUrl(`public/samples/${bookId}.pdf`);
@@ -93,7 +95,11 @@ export function resolveBookSampleUrl(sampleUrlOrPath?: string | null, bookId?: s
  */
 export function resolveBookPdfUrl(pdfUrlOrPath?: string | null, bookId?: string): string {
   if (pdfUrlOrPath && pdfUrlOrPath.trim()) {
-    return formatFirebaseStorageUrl(pdfUrlOrPath);
+    const trimmed = pdfUrlOrPath.trim();
+    if (trimmed.startsWith('https://') || trimmed.startsWith('http://')) {
+      return trimmed;
+    }
+    return formatFirebaseStorageUrl(trimmed);
   }
   if (bookId) {
     return formatFirebaseStorageUrl(`public/samples/${bookId}.pdf`);

@@ -32,12 +32,16 @@ export const CategoriesView: React.FC<CategoriesViewProps> = ({
 }) => {
   const [selectedCat, setSelectedCat] = useState<string>('all');
 
-  // Compute book count per category
+  // Compute book count per category with flexible title and slug matching
   const categoryCounts = useMemo(() => {
     const map: Record<string, number> = {};
     books.forEach((b) => {
-      const cat = b.category || 'General';
+      const cat = (b.category || 'General').toLowerCase();
+      const slug = (b.categorySlug || '').toLowerCase();
       map[cat] = (map[cat] || 0) + 1;
+      if (slug && slug !== cat) {
+        map[slug] = (map[slug] || 0) + 1;
+      }
     });
     return map;
   }, [books]);
@@ -45,9 +49,12 @@ export const CategoriesView: React.FC<CategoriesViewProps> = ({
   // Filtered books by category only (no search box)
   const filteredBooks = useMemo(() => {
     if (selectedCat === 'all') return books;
-    return books.filter(
-      (b) => b.category.toLowerCase() === selectedCat.toLowerCase()
-    );
+    const target = selectedCat.toLowerCase();
+    return books.filter((b) => {
+      const cat = (b.category || '').toLowerCase();
+      const slug = (b.categorySlug || '').toLowerCase();
+      return cat === target || slug === target || target.includes(slug) || slug.includes(target);
+    });
   }, [books, selectedCat]);
 
   return (
@@ -94,7 +101,7 @@ export const CategoriesView: React.FC<CategoriesViewProps> = ({
           {/* Individual Category Chips - Seamlessly placed without background boxes */}
           {categories.map((cat) => {
             const isSelected = selectedCat.toLowerCase() === cat.title.toLowerCase();
-            const count = categoryCounts[cat.title] || 0;
+            const count = categoryCounts[cat.title.toLowerCase()] || (cat.seolsug ? categoryCounts[cat.seolsug.toLowerCase()] : 0) || 0;
 
             return (
               <button

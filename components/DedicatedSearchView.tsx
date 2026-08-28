@@ -34,16 +34,16 @@ interface DedicatedSearchViewProps {
 }
 
 const POPULAR_SEARCH_TAGS = [
-  'UPSC Prelims',
-  'SSC CGL',
-  'Banking PO',
-  'Engineering',
+  'CUET PG',
+  'Agribusiness',
+  'Agama',
+  'History',
+  'Mock Tests',
+  'Question Bank',
+  'Sanskrit',
+  'Agricultural Science',
+  'Economics',
   'General Studies',
-  'Reasoning',
-  'Quantitative Aptitude',
-  'Current Affairs',
-  'NCERT Notes',
-  'Indian Polity',
 ];
 
 const ANIMATED_PLACEHOLDERS = [
@@ -70,25 +70,26 @@ export const DedicatedSearchView: React.FC<DedicatedSearchViewProps> = ({
   const [query, setQuery] = useState(initialQuery);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'relevance' | 'rating' | 'price_low' | 'price_high'>('relevance');
-  const [recentSearches, setRecentSearches] = useState<string[]>(() => {
-    if (typeof window === 'undefined') return [];
-    try {
-      const saved = localStorage.getItem('bookscircle_recent_searches');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          return parsed.slice(0, 8);
-        }
-      }
-    } catch {}
-    return [];
-  });
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Focus input automatically on mount
+  // Focus input and load recent searches on mount
   useEffect(() => {
     inputRef.current?.focus();
+    const timer = setTimeout(() => {
+      try {
+        const saved = localStorage.getItem('bookscircle_recent_searches');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) {
+            setRecentSearches(parsed.slice(0, 8));
+          }
+        }
+      } catch {}
+    }, 0);
+
+    return () => clearTimeout(timer);
   }, []);
 
   // Save query to recent searches
@@ -125,7 +126,12 @@ export const DedicatedSearchView: React.FC<DedicatedSearchViewProps> = ({
 
     // 1. Filter by category
     if (selectedCategory !== 'all') {
-      list = list.filter((b) => b.category.toLowerCase() === selectedCategory.toLowerCase());
+      const target = selectedCategory.toLowerCase().trim();
+      list = list.filter((b) => {
+        const cat = (b.category || '').toLowerCase();
+        const slug = (b.categorySlug || '').toLowerCase();
+        return cat === target || slug === target || target.includes(slug) || slug.includes(target) || target.includes(cat) || cat.includes(target);
+      });
     }
 
     // 2. Filter by search query
