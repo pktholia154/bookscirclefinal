@@ -16,10 +16,17 @@ const db = getFirestore(app, 'bookscircle');
 
 function sanitize(val) {
   if (typeof val !== 'string') return val;
-  // Strip control characters and invalid surrogate halves
-  return val
+  // Strip control characters, surrogate pairs, and non-printable control ranges
+  let cleaned = val
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F\uD800-\uDFFF\uFFFD]/g, '')
     .trim();
+
+  // If there are raw binary artifacts (such as embedded zlib/gzip headers)
+  if (cleaned.includes('x\x9c') || cleaned.includes('\x1f\x8b')) {
+    cleaned = cleaned.replace(/[^\x20-\x7E\n\r\t\u0900-\u097F\u2000-\u206F\u2070-\u209F\u20A0-\u20CF\u2100-\u214F\u2200-\u22FF\uA8E0-\uA8FF]/g, '');
+  }
+
+  return cleaned.trim();
 }
 
 function sanitizeObject(obj) {
