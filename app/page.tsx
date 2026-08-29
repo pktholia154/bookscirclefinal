@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback, useTransition } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useTransition, useRef } from 'react';
 import Image from 'next/image';
 import { Header, UserProfile } from '@/components/Header';
 import { CategoryChips } from '@/components/CategoryChips';
@@ -158,6 +158,12 @@ export default function HomePage() {
     return () => clearTimeout(timer);
   }, []);
 
+  // Stabilize refs to avoid cyclical re-renders and re-subscribing auth listeners
+  const currentUserRef = useRef<UserProfile | null>(currentUser);
+  useEffect(() => {
+    currentUserRef.current = currentUser;
+  }, [currentUser]);
+
   // Listen to cross-tab / cross-component cart synchronization events
   useEffect(() => {
     const unsubscribe = subscribeToCartChanges((updatedCart) => {
@@ -170,8 +176,11 @@ export default function HomePage() {
   useEffect(() => {
     if (purchasedBookIds.length > 0) {
       const timer = setTimeout(() => {
-        const filtered = syncCartWithPurchases(getCartItemsFromLocal(), purchasedBookIds);
-        setCart(filtered);
+        const currentCart = getCartItemsFromLocal();
+        const filtered = syncCartWithPurchases(currentCart, purchasedBookIds);
+        if (filtered.length !== currentCart.length) {
+          setCart(filtered);
+        }
       }, 0);
       return () => clearTimeout(timer);
     }
@@ -196,13 +205,17 @@ export default function HomePage() {
       userOverride?: UserProfile | null
     ) => {
       const newPurchasedIds = purchasedItems.map((item) => item.book.id);
-      const activeUser = userOverride || currentUser;
+      const activeUser = userOverride || currentUserRef.current;
       const effectiveUserId = activeUser?.uid || auth?.currentUser?.uid || 'guest_user';
       const effectiveUserEmail = activeUser?.email || auth?.currentUser?.email || 'user@bookscircle.org';
 
       // 1. Instant local state update & persistence
       savePurchasedBookIds(newPurchasedIds);
-      setPurchasedBookIds((prev) => Array.from(new Set([...prev, ...newPurchasedIds])));
+      setPurchasedBookIds((prev) => {
+        const next = Array.from(new Set([...prev, ...newPurchasedIds]));
+        if (next.length === prev.length) return prev;
+        return next;
+      });
 
       // 2. Perform Firestore cloud purchase record asynchronously in background without blocking UI
       recordUserPurchaseInFirestore(
@@ -217,7 +230,11 @@ export default function HomePage() {
       )
         .then((allPurchased) => {
           if (allPurchased && allPurchased.length > 0) {
-            setPurchasedBookIds(allPurchased);
+            setPurchasedBookIds((prev) => {
+              const unique = Array.from(new Set([...prev, ...allPurchased]));
+              if (unique.length === prev.length) return prev;
+              return unique;
+            });
           }
         })
         .catch((e) => {
@@ -244,7 +261,7 @@ export default function HomePage() {
         }
       });
     },
-    [currentUser, showToast]
+    [showToast]
   );
 
   // Central Razorpay checkout executor that supports instant auto-resume
@@ -255,7 +272,7 @@ export default function HomePage() {
     ) => {
       if (itemsToBuy.length === 0) return;
 
-      const activeUser = userOverride || currentUser;
+      const activeUser = userOverride || currentUserRef.current;
       const userEmail = activeUser?.email || '';
       const userName = activeUser?.displayName || 'Reader';
       const userId = activeUser?.uid || 'guest_user';
@@ -293,26 +310,36 @@ export default function HomePage() {
         showToast(e?.message || 'Unable to load payment gateway.', 3500);
       }
     },
-    [currentUser, handleSuccessfulCheckout, showToast]
+    [handleSuccessfulCheckout, showToast]
   );
+
+  const executeRazorpayCheckoutRef = useRef(executeRazorpayCheckout);
+  useEffect(() => {
+    executeRazorpayCheckoutRef.current = executeRazorpayCheckout;
+  }, [executeRazorpayCheckout]);
+
+  const pendingActionAfterLoginRef = useRef(pendingActionAfterLogin);
+  useEffect(() => {
+    pendingActionAfterLoginRef.current = pendingActionAfterLogin;
+  }, [pendingActionAfterLogin]);
 
   // Auto-resume pending purchase pipeline after sign in without requiring user to click buy again
   const autoResumePendingCheckout = useCallback(
     (user: UserProfile) => {
       const pendingItems = getPendingCheckoutItems();
-      if (pendingItems) {
+      if (pendingItems && pendingItems.length > 0) {
         showToast('Sign in complete! Opening payment gateway...', 2500);
         setTimeout(() => {
-          executeRazorpayCheckout(pendingItems, user);
+          executeRazorpayCheckoutRef.current(pendingItems, user);
         }, 350);
         return true;
       }
       return false;
     },
-    [executeRazorpayCheckout, showToast]
+    [showToast]
   );
 
-  // Listen to Firebase Auth state for real Google Sign-In & cloud purchase sync
+  // Listen to Firebase Auth state for real Google Sign-In & cloud purchase sync (Mounted ONCE)
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user && !user.isAnonymous) {
@@ -322,7 +349,21 @@ export default function HomePage() {
           displayName: user.displayName || user.email?.split('@')[0] || 'Google User',
           photoURL: user.photoURL,
         };
-        setCurrentUser(profile);
+
+        // Guard against state reference churn
+        setCurrentUser((prev) => {
+          if (
+            prev &&
+            prev.uid === profile.uid &&
+            prev.email === profile.email &&
+            prev.displayName === profile.displayName &&
+            prev.photoURL === profile.photoURL
+          ) {
+            return prev;
+          }
+          return profile;
+        });
+
         if (typeof window !== 'undefined') {
           localStorage.removeItem('bookscircle_user_session');
         }
@@ -340,28 +381,56 @@ export default function HomePage() {
         syncUserPurchases(user.uid, user.email || undefined)
           .then((syncedIds) => {
             if (syncedIds && syncedIds.length > 0) {
-              setPurchasedBookIds(syncedIds);
+              setPurchasedBookIds((prev) => {
+                const unique = Array.from(new Set([...prev, ...syncedIds]));
+                if (unique.length === prev.length) return prev;
+                return unique;
+              });
             }
           })
           .catch((e) => console.warn('Initial cloud purchase sync note:', e));
 
         // Auto-resume pending purchase if visitor clicked buy before signing in
-        autoResumePendingCheckout(profile);
+        const pendingItems = getPendingCheckoutItems();
+        if (pendingItems && pendingItems.length > 0) {
+          showToast('Sign in complete! Opening payment gateway...', 2500);
+          setTimeout(() => {
+            executeRazorpayCheckoutRef.current(pendingItems, profile);
+          }, 350);
+        } else if (pendingActionAfterLoginRef.current) {
+          const action = pendingActionAfterLoginRef.current;
+          setPendingActionAfterLogin(null);
+          setTimeout(() => {
+            action(profile);
+          }, 150);
+        }
+      } else {
+        setCurrentUser(null);
       }
     });
 
     return () => unsubscribe();
-  }, [autoResumePendingCheckout]);
+  }, [showToast]);
 
   // Real-time continuous Firebase Firestore subscription for multi-device instant auto-sync
   useEffect(() => {
-    if (!currentUser) return;
+    const currentUid = currentUser?.uid;
+    const currentEmail = currentUser?.email || undefined;
+    if (!currentUid) return;
 
     const unsubscribe = subscribeToUserPurchases(
-      currentUser.uid,
-      currentUser.email || undefined,
+      currentUid,
+      currentEmail,
       (syncedBookIds) => {
-        setPurchasedBookIds(syncedBookIds);
+        setPurchasedBookIds((prev) => {
+          if (
+            prev.length === syncedBookIds.length &&
+            prev.every((id, idx) => id === syncedBookIds[idx])
+          ) {
+            return prev;
+          }
+          return syncedBookIds;
+        });
       }
     );
 
@@ -372,10 +441,14 @@ export default function HomePage() {
       if (now - lastAutoSyncTime < 15000) return; // at most once every 15s
       lastAutoSyncTime = now;
 
-      syncUserPurchases(currentUser.uid, currentUser.email || undefined)
+      syncUserPurchases(currentUid, currentEmail)
         .then((synced) => {
           if (synced && synced.length > 0) {
-            setPurchasedBookIds(synced);
+            setPurchasedBookIds((prev) => {
+              const unique = Array.from(new Set([...prev, ...synced]));
+              if (unique.length === prev.length) return prev;
+              return unique;
+            });
           }
         })
         .catch(() => {});
@@ -389,7 +462,7 @@ export default function HomePage() {
       window.removeEventListener('focus', handleAutoSync);
       window.removeEventListener('online', handleAutoSync);
     };
-  }, [currentUser]);
+  }, [currentUser?.uid, currentUser?.email]);
 
   // Fetch live books & categories from Firestore
   const loadData = useCallback(async (showLoadingSpinner = false) => {
@@ -503,7 +576,19 @@ export default function HomePage() {
   };
 
   const handleSelectUserProfile = async (profile: UserProfile) => {
-    setCurrentUser(profile);
+    setCurrentUser((prev) => {
+      if (
+        prev &&
+        prev.uid === profile.uid &&
+        prev.email === profile.email &&
+        prev.displayName === profile.displayName &&
+        prev.photoURL === profile.photoURL
+      ) {
+        return prev;
+      }
+      return profile;
+    });
+
     if (typeof window !== 'undefined') {
       localStorage.setItem('bookscircle_user_session', JSON.stringify(profile));
     }
@@ -522,7 +607,11 @@ export default function HomePage() {
     syncUserPurchases(profile.uid, profile.email || undefined)
       .then((mergedBookIds) => {
         if (mergedBookIds && mergedBookIds.length > 0) {
-          setPurchasedBookIds(mergedBookIds);
+          setPurchasedBookIds((prev) => {
+            const unique = Array.from(new Set([...prev, ...mergedBookIds]));
+            if (unique.length === prev.length) return prev;
+            return unique;
+          });
         }
       })
       .catch((e) => console.warn('User purchase cloud sync note:', e));
