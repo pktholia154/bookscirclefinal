@@ -2,7 +2,7 @@ import { MetadataRoute } from 'next';
 import { getBooksFromFirestore, getCategoriesFromFirestore } from '@/lib/services/books';
 import { SITE_URL } from '@/lib/seo';
 
-export const revalidate = 3600; // Revalidate sitemap hourly
+export const revalidate = 0; // Fully dynamic, updates immediately when books are added
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticRoutes: MetadataRoute.Sitemap = [

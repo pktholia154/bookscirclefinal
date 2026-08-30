@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback, useTransition, useRef } from 'react';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import { Header, UserProfile } from '@/components/Header';
 import { CategoryChips } from '@/components/CategoryChips';
 import { CarouselSection } from '@/components/CarouselSection';
@@ -80,6 +81,7 @@ const getPendingCheckoutItems = (): CartItem[] | null => {
 };
 
 export default function HomePage() {
+  const router = useRouter();
   const [books, setBooks] = useState<Book[]>(INITIAL_BOOKS);
   const [categories, setCategories] = useState<Category[]>(INITIAL_CATEGORIES);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -836,7 +838,7 @@ export default function HomePage() {
                   setSearchQuery('');
                   setActiveTab('home');
                 }}
-                onSelectBook={(book) => setSelectedBook(book)}
+                onSelectBook={(book) => router.push(`/book/${encodeURIComponent(book.slug || book.id)}`)}
                 onAddToCart={handleAddToCart}
                 onBuyNow={handleBuyNow}
                 cartBookIds={cartBookIds}
@@ -860,7 +862,7 @@ export default function HomePage() {
                     <BookListView
                       title={`Search Results (${filteredBooks.length})`}
                       books={filteredBooks}
-                      onSelectBook={(book) => setSelectedBook(book)}
+                      onSelectBook={(book) => router.push(`/book/${encodeURIComponent(book.slug || book.id)}`)}
                       onAddToCart={handleAddToCart}
                       onBuyNow={handleBuyNow}
                       cartBookIds={cartBookIds}
@@ -873,7 +875,7 @@ export default function HomePage() {
                     <BookListView
                       title={`${selectedCategory} Books (${filteredBooks.length})`}
                       books={filteredBooks}
-                      onSelectBook={(book) => setSelectedBook(book)}
+                      onSelectBook={(book) => router.push(`/book/${encodeURIComponent(book.slug || book.id)}`)}
                       onAddToCart={handleAddToCart}
                       onBuyNow={handleBuyNow}
                       cartBookIds={cartBookIds}
@@ -888,7 +890,7 @@ export default function HomePage() {
                       title="Trending & Top Rated"
                       sectionId="trending-books"
                       books={featuredTrendingBooks.length > 0 ? featuredTrendingBooks : books.slice(0, 6)}
-                      onSelectBook={(book) => setSelectedBook(book)}
+                      onSelectBook={(book) => router.push(`/book/${encodeURIComponent(book.slug || book.id)}`)}
                       onAddToCart={handleAddToCart}
                       onBuyNow={handleBuyNow}
                       cartBookIds={cartBookIds}
@@ -899,7 +901,7 @@ export default function HomePage() {
                     <BookListView
                       title="All Curated Study Materials & Guides"
                       books={books}
-                      onSelectBook={(book) => setSelectedBook(book)}
+                      onSelectBook={(book) => router.push(`/book/${encodeURIComponent(book.slug || book.id)}`)}
                       onAddToCart={handleAddToCart}
                       onBuyNow={handleBuyNow}
                       cartBookIds={cartBookIds}
@@ -911,7 +913,7 @@ export default function HomePage() {
                       <BookListView
                         title={categories[0]?.title || 'UPSC Civil Services Materials'}
                         books={category1Books}
-                        onSelectBook={(book) => setSelectedBook(book)}
+                        onSelectBook={(book) => router.push(`/book/${encodeURIComponent(book.slug || book.id)}`)}
                         onAddToCart={handleAddToCart}
                         onBuyNow={handleBuyNow}
                         cartBookIds={cartBookIds}
@@ -924,7 +926,7 @@ export default function HomePage() {
                       <BookListView
                         title={categories[1]?.title || 'SSC & Competitive Exam Guides'}
                         books={category2Books}
-                        onSelectBook={(book) => setSelectedBook(book)}
+                        onSelectBook={(book) => router.push(`/book/${encodeURIComponent(book.slug || book.id)}`)}
                         onAddToCart={handleAddToCart}
                         onBuyNow={handleBuyNow}
                         cartBookIds={cartBookIds}
@@ -944,7 +946,7 @@ export default function HomePage() {
               <CategoriesView
                 categories={categories}
                 books={books}
-                onSelectBook={(book) => setSelectedBook(book)}
+                onSelectBook={(book) => router.push(`/book/${encodeURIComponent(book.slug || book.id)}`)}
                 onAddToCart={handleAddToCart}
                 onBuyNow={handleBuyNow}
                 cartBookIds={cartBookIds}
@@ -1114,7 +1116,7 @@ export default function HomePage() {
                 books={books}
                 purchasedBookIds={purchasedBookIds}
                 currentUser={currentUser}
-                onSelectBook={(book) => setSelectedBook(book)}
+                onSelectBook={(book) => router.push(`/book/${encodeURIComponent(book.slug || book.id)}`)}
                 onNavigateHome={() => handleTabChange('home')}
               />
             )}
