@@ -293,13 +293,22 @@ export function subscribeToFirestoreCategories(onUpdate: (categories: Category[]
 // Fetch a single book by ID or Slug from Firestore or fast cache
 export async function getFirestoreBookById(idOrSlug: string): Promise<Book | null> {
   const books = await getBooksFromFirestore();
+  const target = idOrSlug.trim().toLowerCase();
   const found = books.find(
-    (b) => b.id === idOrSlug || b.slug === idOrSlug || b.title.toLowerCase() === idOrSlug.toLowerCase()
+    (b) =>
+      (b.seoslug && b.seoslug.toLowerCase() === target) ||
+      (b.slug && b.slug.toLowerCase() === target) ||
+      b.id.toLowerCase() === target ||
+      b.title.toLowerCase() === target
   );
   if (found) return found;
 
   const fallback = getCachedBooksSync().find(
-    (b) => b.id === idOrSlug || b.slug === idOrSlug || b.title.toLowerCase() === idOrSlug.toLowerCase()
+    (b) =>
+      (b.seoslug && b.seoslug.toLowerCase() === target) ||
+      (b.slug && b.slug.toLowerCase() === target) ||
+      b.id.toLowerCase() === target ||
+      b.title.toLowerCase() === target
   );
   return fallback || null;
 }

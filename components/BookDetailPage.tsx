@@ -12,15 +12,18 @@ import {
   Check,
   Eye,
   ShoppingBag,
+  Zap,
   ChevronRight,
   Send,
-  MoreVertical
+  MoreVertical,
+  Heart
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Book, Review } from '@/lib/types';
 import { DEFAULT_BOOK_COVER } from '@/lib/data';
 import { PDFReaderModal } from '@/components/PDFReaderModal';
 import { loadRazorpayScript } from '@/lib/services/razorpay';
+import { getWishlistIdsFromLocal, toggleWishlistAction, subscribeToWishlistChanges } from '@/lib/services/wishlist';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
@@ -47,7 +50,10 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
   onSelectRelatedBook,
 }) => {
   const [imgLoadFailed, setImgLoadFailed] = useState(false);
-  const [isWishlisted, setIsWishlisted] = useState(false);
+  const [isWishlisted, setIsWishlisted] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return getWishlistIdsFromLocal().includes(book.id);
+  });
   const [activePdfReaderMode, setActivePdfReaderMode] = useState<'sample' | 'full' | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -98,12 +104,18 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
     }
   };
 
-  const toggleWishlist = () => {
-    setIsWishlisted((prev) => {
-      const next = !prev;
-      showToast(next ? 'Added to your wishlist!' : 'Removed from wishlist');
-      return next;
+  // Wishlist state synced with local storage
+  useEffect(() => {
+    const unsub = subscribeToWishlistChanges((newIds) => {
+      setIsWishlisted(newIds.includes(book.id));
     });
+    return () => unsub();
+  }, [book.id]);
+
+  const toggleWishlist = () => {
+    const res = toggleWishlistAction(book);
+    setIsWishlisted(res.isWishlisted);
+    showToast(res.isWishlisted ? 'Added to your wishlist!' : 'Removed from wishlist');
   };
 
   const handleAddReview = (e: React.FormEvent) => {
@@ -167,7 +179,7 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
   ];
 
   return (
-    <div className="min-h-screen bg-white text-gray-900 pb-28 sm:pb-20 antialiased selection:bg-[#4029AB] selection:text-white">
+    <div className="min-h-screen bg-white text-gray-900 pb-12 sm:pb-16 antialiased selection:bg-[#4029AB] selection:text-white">
       {/* 1. Dedicated Top Navigation Bar */}
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-gray-100 px-4 sm:px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3 min-w-0">
@@ -182,33 +194,6 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
           <span className="text-xs font-bold uppercase tracking-wider text-gray-500 truncate">
             {book.category} Ebook
           </span>
-        </div>
-
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            onClick={handleShare}
-            className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 active:scale-95 flex items-center justify-center text-gray-700 transition-all cursor-pointer"
-            title="Share this book"
-            aria-label="Share"
-          >
-            <Share2 className="w-4 h-4 text-gray-700" />
-          </button>
-          <button
-            onClick={toggleWishlist}
-            className={`w-9 h-9 rounded-full flex items-center justify-center transition-all cursor-pointer active:scale-95 ${
-              isWishlisted
-                ? 'bg-[#4029AB]/10 text-[#4029AB]'
-                : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-            }`}
-            title="Wishlist"
-            aria-label="Wishlist"
-          >
-            {isWishlisted ? (
-              <BookmarkCheck className="w-4 h-4 text-[#4029AB] fill-[#4029AB]" />
-            ) : (
-              <Bookmark className="w-4 h-4 text-gray-700" />
-            )}
-          </button>
         </div>
       </header>
 
@@ -229,6 +214,24 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
               referrerPolicy="no-referrer"
               onError={() => setImgLoadFailed(true)}
             />
+            {/* Wishlist toggle button on cover top-right */}
+            <button
+              id={`detail-cover-wishlist-${book.id}`}
+              onClick={toggleWishlist}
+              className={`absolute top-1.5 right-1.5 w-6.5 h-6.5 rounded-full flex items-center justify-center shadow-md transition-all duration-200 active:scale-90 cursor-pointer z-10 ${
+                isWishlisted
+                  ? 'bg-white text-rose-600'
+                  : 'bg-white/85 text-gray-700 hover:bg-white hover:text-rose-600'
+              }`}
+              aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+              title={isWishlisted ? 'In Wishlist' : 'Add to Wishlist'}
+            >
+              <Heart
+                className={`w-3.5 h-3.5 transition-colors ${
+                  isWishlisted ? 'fill-rose-600 text-rose-600' : 'text-gray-700'
+                }`}
+              />
+            </button>
           </div>
 
           {/* Title, Publisher & Price */}
@@ -267,49 +270,78 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
           </div>
         </section>
 
-        {/* 3. Key Metrics Bar (Divided by subtle vertical rules) */}
-        <section className="border-y border-gray-100 py-3">
-          <div className="grid grid-cols-3 items-center text-center">
-            {/* Stat 1: Rating */}
-            <div className="flex flex-col items-center justify-center px-1">
-              <div className="flex items-center gap-0.5 text-xs font-bold text-gray-900">
+        {/* 3. Key Metrics & Action Bar: Reviews | Share | Wishlist | Add to cart */}
+        <section className="border-y border-gray-200/80 py-2.5 my-1">
+          <div className="grid grid-cols-4 items-center text-center divide-x divide-gray-200">
+            {/* 1. Reviews */}
+            <button
+              type="button"
+              id="book-detail-reviews-stat-btn"
+              onClick={() => {
+                const el = document.getElementById('book-detail-reviews-section');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="flex flex-col items-center justify-center px-1 py-0.5 hover:bg-gray-50/80 transition-colors cursor-pointer"
+            >
+              <div className="flex items-center justify-center gap-0.5 text-xs font-bold text-gray-800">
                 <span>{rating.toFixed(1)}</span>
-                <Star className="w-3.5 h-3.5 fill-gray-900 text-gray-900" />
+                <Star className="w-3 h-3 fill-gray-700 text-gray-700" />
               </div>
               <span className="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">
-                {formattedReviewsCount} reviews
+                {formattedReviewsCount} {ratingCount === 1 ? 'review' : 'reviews'}
               </span>
-            </div>
+            </button>
 
-            {/* Stat 2: Share */}
-            <div
+            {/* 2. Share */}
+            <button
+              type="button"
+              id="book-detail-share-stat-btn"
               onClick={handleShare}
-              className="flex flex-col items-center justify-center px-1 border-l border-gray-200 cursor-pointer active:scale-95 transition-transform"
+              className="flex flex-col items-center justify-center px-1 py-0.5 hover:bg-gray-50/80 transition-all active:scale-95 cursor-pointer"
             >
-              <Share2 className="w-4 h-4 text-[#4029AB]" />
-              <span className="text-[11px] font-semibold text-[#4029AB] mt-0.5 whitespace-nowrap">
+              <Share2 className="w-4 h-4 text-gray-700" />
+              <span className="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">
                 Share
               </span>
-            </div>
+            </button>
 
-            {/* Stat 3: Add to Cart */}
-            <div
+            {/* 3. Wishlist */}
+            <button
+              type="button"
+              id="book-detail-wishlist-stat-btn"
+              onClick={toggleWishlist}
+              className="flex flex-col items-center justify-center px-1 py-0.5 hover:bg-gray-50/80 transition-all active:scale-95 cursor-pointer"
+            >
+              {isWishlisted ? (
+                <BookmarkCheck className="w-4 h-4 text-gray-800 fill-gray-800" />
+              ) : (
+                <Bookmark className="w-4 h-4 text-gray-700" />
+              )}
+              <span className="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">
+                {isWishlisted ? 'Saved' : 'Wishlist'}
+              </span>
+            </button>
+
+            {/* 4. Add to Cart (Base theme color) */}
+            <button
+              type="button"
+              id="book-detail-cart-stat-btn"
               onClick={() => onAddToCart(book)}
-              className="flex flex-col items-center justify-center px-1 border-l border-gray-200 cursor-pointer active:scale-95 transition-transform"
+              className="flex flex-col items-center justify-center px-1 py-0.5 hover:bg-[#4029AB]/5 transition-all active:scale-95 cursor-pointer"
             >
               {isInCart ? (
                 <Check className="w-4 h-4 text-[#4029AB]" />
               ) : (
                 <ShoppingBag className="w-4 h-4 text-[#4029AB]" />
               )}
-              <span className="text-[11px] font-semibold text-[#4029AB] mt-0.5 whitespace-nowrap">
+              <span className="text-[11px] font-bold text-[#4029AB] mt-0.5 whitespace-nowrap">
                 {isInCart ? 'In cart' : 'Add to cart'}
               </span>
-            </div>
+            </button>
           </div>
         </section>
 
-        {/* 4. Action Buttons (Free Sample & Buy/Add to Cart/Read PDF) */}
+        {/* 4. Action Buttons (Sample & Buy) */}
         <section className="grid grid-cols-2 gap-3 pt-1">
           <button
             id="book-detail-free-sample-btn"
@@ -317,7 +349,7 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
             className="w-full py-2.5 px-4 rounded-lg border border-gray-300 hover:border-gray-400 hover:bg-gray-50 text-xs sm:text-sm font-bold text-[#4029AB] bg-white transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
           >
             <Eye className="w-4 h-4 text-[#4029AB]" />
-            <span>Free Sample</span>
+            <span>Sample</span>
           </button>
 
           {isPurchased ? (
@@ -337,10 +369,8 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
               onClick={() => onBuyNow(book)}
               className="w-full py-2.5 px-4 rounded-lg bg-[#4029AB] hover:bg-[#34208e] text-white text-xs sm:text-sm font-bold transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
             >
-              <ShoppingBag className="w-4 h-4 text-white" />
-              <span>
-                Buy Now (₹{book.buy_price})
-              </span>
+              <Zap className="w-4 h-4 fill-white" />
+              <span>Buy (₹{book.buy_price})</span>
             </button>
           )}
         </section>
@@ -429,7 +459,7 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
         </section>
 
         {/* 6. "Ratings and reviews" Section */}
-        <section className="space-y-4 pt-4 border-t border-gray-100">
+        <section id="book-detail-reviews-section" className="space-y-4 pt-4 border-t border-gray-100">
           <div className="flex items-center justify-between">
             <h2 className="text-base sm:text-lg font-bold text-gray-900 flex items-center gap-1.5">
               <span>Ratings and reviews</span>
@@ -652,49 +682,6 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
           </section>
         )}
       </main>
-
-      {/* Floating Bottom Sticky Bar for Quick Purchase on Mobile */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-t border-gray-200 px-4 sm:px-6 py-3">
-        <div className="max-w-2xl mx-auto flex items-center justify-between gap-3">
-          <div className="flex flex-col">
-            <span className="text-[11px] text-gray-500 font-medium">Digital Edition</span>
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-lg font-black text-gray-950">₹{book.buy_price}</span>
-              {book.list_price > book.buy_price && (
-                <span className="text-xs text-gray-400 line-through">₹{book.list_price}</span>
-              )}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setActivePdfReaderMode('sample')}
-              className="px-3.5 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 text-xs font-bold text-[#4029AB] transition-all cursor-pointer flex items-center gap-1"
-            >
-              <Eye className="w-3.5 h-3.5" />
-              <span>Sample</span>
-            </button>
-            {isPurchased ? (
-              <button
-                onClick={() => setActivePdfReaderMode('full')}
-                className="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs active:scale-95 cursor-pointer flex items-center gap-1.5"
-              >
-                <BookOpen className="w-3.5 h-3.5" />
-                <span>Read Full PDF</span>
-              </button>
-            ) : (
-              <button
-                onClick={() => onBuyNow(book)}
-                onMouseEnter={() => loadRazorpayScript()}
-                onTouchStart={() => loadRazorpayScript()}
-                className="px-5 py-2 rounded-lg bg-[#4029AB] hover:bg-[#34208e] text-white text-xs font-bold transition-all shadow-xs active:scale-95 cursor-pointer"
-              >
-                Buy Ebook
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
 
       {/* Real-time PDFium WASM Vector PDF Reader for Sample & Purchased Reading */}
       {activePdfReaderMode && (

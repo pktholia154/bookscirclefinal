@@ -7,6 +7,8 @@ import { Header, UserProfile } from '@/components/Header';
 import { CategoryChips } from '@/components/CategoryChips';
 import { CarouselSection } from '@/components/CarouselSection';
 import { BookListView } from '@/components/BookListView';
+import { BookGridView } from '@/components/BookGridView';
+import { HomeShimmerSkeleton } from '@/components/HomeShimmerSkeleton';
 import { BookDetailPage } from '@/components/BookDetailPage';
 import { CartDrawer } from '@/components/CartDrawer';
 import { BottomNav, TabKey } from '@/components/BottomNav';
@@ -39,6 +41,11 @@ import {
   calculateCartSummary,
   subscribeToCartChanges,
 } from '@/lib/services/cart';
+import {
+  getWishlistIdsFromLocal,
+  toggleWishlistAction,
+  subscribeToWishlistChanges,
+} from '@/lib/services/wishlist';
 import { auth, signOutUser, signInWithGoogle } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { usePWAInstall } from '@/hooks/use-pwa-install';
@@ -87,7 +94,7 @@ export default function HomePage() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [activeTab, setActiveTab] = useState<TabKey>('home');
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [isGoogleModalOpen, setIsGoogleModalOpen] = useState<boolean>(false);
   const [loginModalConfig, setLoginModalConfig] = useState<{
@@ -99,6 +106,7 @@ export default function HomePage() {
   const [isClientLoaded, setIsClientLoaded] = useState<boolean>(false);
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [purchasedBookIds, setPurchasedBookIds] = useState<string[]>([]);
+  const [wishlistIds, setWishlistIds] = useState<string[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
@@ -136,6 +144,13 @@ export default function HomePage() {
       }
 
       try {
+        const localWishlist = getWishlistIdsFromLocal();
+        setWishlistIds(localWishlist);
+      } catch (e) {
+        console.warn('Wishlist load note:', e);
+      }
+
+      try {
         const loadedCart = getCartItemsFromLocal();
         setCart(loadedCart);
       } catch (e) {
@@ -159,6 +174,28 @@ export default function HomePage() {
 
     return () => clearTimeout(timer);
   }, []);
+
+  // Subscribe to wishlist updates
+  useEffect(() => {
+    const unsubscribe = subscribeToWishlistChanges((ids) => {
+      setWishlistIds(ids);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const wishlistBookIds = useMemo(() => new Set(wishlistIds), [wishlistIds]);
+
+  const handleToggleWishlist = (book: Book, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const { isWishlisted, wishlistIds: updated } = toggleWishlistAction(book);
+    setWishlistIds(updated);
+    showToast(
+      isWishlisted
+        ? `Added "${book.title.slice(0, 20)}..." to Wishlist`
+        : `Removed from Wishlist`,
+      2000
+    );
+  };
 
   // Stabilize refs to avoid cyclical re-renders and re-subscribing auth listeners
   const currentUserRef = useRef<UserProfile | null>(currentUser);
@@ -749,21 +786,46 @@ export default function HomePage() {
     return featured.length > 0 ? featured : books.slice(0, 10);
   }, [books]);
 
-  const newReleasesBooks = useMemo(() => {
-    const best = books.filter((b) => (b.rating && b.rating >= 4.7) || (b.tags && b.tags.includes('bestseller')));
-    return best.length > 0 ? best : books.slice(10, 20);
+  const bestSellerBooks = useMemo(() => {
+    const best = books.filter(
+      (b) =>
+        b.is_bestseller ||
+        b.badge === 'Bestseller' ||
+        (b.tags && b.tags.includes('bestseller')) ||
+        (b.rating_count && b.rating_count >= 200) ||
+        (b.rating && b.rating >= 4.7)
+    );
+    return best.length > 0 ? best : books.slice(0, 8);
   }, [books]);
 
-  const category1Books = useMemo(() => {
-    const cuetBooks = books.filter((b) => b.category?.toLowerCase().includes('cuet') || b.categorySlug?.toLowerCase().includes('cuet'));
-    if (cuetBooks.length > 0) return cuetBooks.slice(0, 8);
-    const catName = (categories[0]?.title || '').toLowerCase();
-    return books.filter((b) => b.category.toLowerCase() === catName).slice(0, 8);
+  // Top 3 categories with highest number of books
+  const topCategoriesWithBooks = useMemo(() => {
+    const counts: Record<string, { category: Category; books: Book[] }> = {};
+
+    categories.forEach((cat) => {
+      const target = (cat.title || '').toLowerCase();
+      const slug = (cat.seolsug || cat.id).toLowerCase();
+      const matched = books.filter((b) => {
+        const bCat = (b.category || '').toLowerCase();
+        const bSlug = (b.categorySlug || '').toLowerCase();
+        return (
+          bCat === target ||
+          bSlug === slug ||
+          target.includes(bSlug) ||
+          bSlug.includes(target) ||
+          bCat.includes(target) ||
+          target.includes(bCat)
+        );
+      });
+      if (matched.length > 0) {
+        counts[cat.id] = { category: cat, books: matched };
+      }
+    });
+
+    return Object.values(counts)
+      .sort((a, b) => b.books.length - a.books.length)
+      .slice(0, 3);
   }, [books, categories]);
-
-  const category2Books = useMemo(() => {
-    return books.slice(8, 16);
-  }, [books]);
 
   // Switch tab with smooth scroll
   const handleTabChange = (tab: TabKey) => {
@@ -856,7 +918,9 @@ export default function HomePage() {
                   onSelectCategory={(cat) => setSelectedCategory(cat)}
                 />
 
-                {searchQuery.trim() ? (
+                {isLoading ? (
+                  <HomeShimmerSkeleton />
+                ) : searchQuery.trim() ? (
                   /* Search Results */
                   <div className="pt-2">
                     <BookListView
@@ -867,6 +931,8 @@ export default function HomePage() {
                       onBuyNow={handleBuyNow}
                       cartBookIds={cartBookIds}
                       purchasedBookIds={purchasedBookIds}
+                      wishlistBookIds={wishlistBookIds}
+                      onToggleWishlist={handleToggleWishlist}
                     />
                   </div>
                 ) : selectedCategory !== 'all' ? (
@@ -880,59 +946,116 @@ export default function HomePage() {
                       onBuyNow={handleBuyNow}
                       cartBookIds={cartBookIds}
                       purchasedBookIds={purchasedBookIds}
+                      wishlistBookIds={wishlistBookIds}
+                      onToggleWishlist={handleToggleWishlist}
                     />
                   </div>
                 ) : (
-                  /* Default Full Home View with Peekaboo Carousel & Standard List */
+                  /* Default Full Home View with Peekaboo Carousel & Grids & Standard List */
                   <>
-                    {/* Horizontal Carousel 1: Trending & Top Rated */}
+                    {/* Horizontal Carousel 1: Trending & Top Rated with Peekaboo Effect */}
                     <CarouselSection
                       title="Trending & Top Rated"
                       sectionId="trending-books"
-                      books={featuredTrendingBooks.length > 0 ? featuredTrendingBooks : books.slice(0, 6)}
+                      viewAllHref="/collection/trending"
+                      books={featuredTrendingBooks.length > 0 ? featuredTrendingBooks : books.slice(0, 8)}
                       onSelectBook={(book) => router.push(`/book/${encodeURIComponent(book.slug || book.id)}`)}
                       onAddToCart={handleAddToCart}
                       onBuyNow={handleBuyNow}
                       cartBookIds={cartBookIds}
                       purchasedBookIds={purchasedBookIds}
+                      wishlistBookIds={wishlistBookIds}
+                      onToggleWishlist={handleToggleWishlist}
                     />
 
-                    {/* Standard List View: Complete Catalog */}
+                    {/* Horizontal Carousel 2: Best Sellers (Most Sold Books) */}
+                    <CarouselSection
+                      title="Best Sellers"
+                      subtitle="Top-selling exam preparation e-books with proven student success"
+                      badge="Hot"
+                      sectionId="bestseller-books"
+                      viewAllHref="/collection/bestsellers"
+                      books={bestSellerBooks}
+                      onSelectBook={(book) => router.push(`/book/${encodeURIComponent(book.slug || book.id)}`)}
+                      onAddToCart={handleAddToCart}
+                      onBuyNow={handleBuyNow}
+                      cartBookIds={cartBookIds}
+                      purchasedBookIds={purchasedBookIds}
+                      wishlistBookIds={wishlistBookIds}
+                      onToggleWishlist={handleToggleWishlist}
+                    />
+
+                    {/* Horizontal Carousel 3: Top Exam Category 1 */}
+                    {topCategoriesWithBooks[0] && (
+                      <CarouselSection
+                        title={`${topCategoriesWithBooks[0].category.title} Guides`}
+                        subtitle={topCategoriesWithBooks[0].category.seo_description || `Complete syllabus books and study material for ${topCategoriesWithBooks[0].category.title}`}
+                        badge="Top Exam"
+                        sectionId={`category-${topCategoriesWithBooks[0].category.id}`}
+                        viewAllHref={`/category/${encodeURIComponent(topCategoriesWithBooks[0].category.seolsug || topCategoriesWithBooks[0].category.id)}`}
+                        books={topCategoriesWithBooks[0].books}
+                        onSelectBook={(book) => router.push(`/book/${encodeURIComponent(book.slug || book.id)}`)}
+                        onAddToCart={handleAddToCart}
+                        onBuyNow={handleBuyNow}
+                        cartBookIds={cartBookIds}
+                        purchasedBookIds={purchasedBookIds}
+                        wishlistBookIds={wishlistBookIds}
+                        onToggleWishlist={handleToggleWishlist}
+                      />
+                    )}
+
+                    {/* Horizontal Carousel 4: Top Exam Category 2 */}
+                    {topCategoriesWithBooks[1] && (
+                      <CarouselSection
+                        title={`${topCategoriesWithBooks[1].category.title} Prep`}
+                        subtitle={topCategoriesWithBooks[1].category.seo_description || `Solved question banks and previous years papers for ${topCategoriesWithBooks[1].category.title}`}
+                        badge="Popular"
+                        sectionId={`category-${topCategoriesWithBooks[1].category.id}`}
+                        viewAllHref={`/category/${encodeURIComponent(topCategoriesWithBooks[1].category.seolsug || topCategoriesWithBooks[1].category.id)}`}
+                        books={topCategoriesWithBooks[1].books}
+                        onSelectBook={(book) => router.push(`/book/${encodeURIComponent(book.slug || book.id)}`)}
+                        onAddToCart={handleAddToCart}
+                        onBuyNow={handleBuyNow}
+                        cartBookIds={cartBookIds}
+                        purchasedBookIds={purchasedBookIds}
+                        wishlistBookIds={wishlistBookIds}
+                        onToggleWishlist={handleToggleWishlist}
+                      />
+                    )}
+
+                    {/* Horizontal Carousel 5: Top Exam Category 3 */}
+                    {topCategoriesWithBooks[2] && (
+                      <CarouselSection
+                        title={`${topCategoriesWithBooks[2].category.title} Series`}
+                        subtitle={topCategoriesWithBooks[2].category.seo_description || `Structured reference modules and practice sets for ${topCategoriesWithBooks[2].category.title}`}
+                        badge="Curated"
+                        sectionId={`category-${topCategoriesWithBooks[2].category.id}`}
+                        viewAllHref={`/category/${encodeURIComponent(topCategoriesWithBooks[2].category.seolsug || topCategoriesWithBooks[2].category.id)}`}
+                        books={topCategoriesWithBooks[2].books}
+                        onSelectBook={(book) => router.push(`/book/${encodeURIComponent(book.slug || book.id)}`)}
+                        onAddToCart={handleAddToCart}
+                        onBuyNow={handleBuyNow}
+                        cartBookIds={cartBookIds}
+                        purchasedBookIds={purchasedBookIds}
+                        wishlistBookIds={wishlistBookIds}
+                        onToggleWishlist={handleToggleWishlist}
+                      />
+                    )}
+
+                    {/* Standard List View: Complete Catalog - Limited to max 10 */}
                     <BookListView
                       title="All Curated Study Materials & Guides"
+                      limit={10}
+                      viewAllHref="/collection/all"
                       books={books}
                       onSelectBook={(book) => router.push(`/book/${encodeURIComponent(book.slug || book.id)}`)}
                       onAddToCart={handleAddToCart}
                       onBuyNow={handleBuyNow}
                       cartBookIds={cartBookIds}
                       purchasedBookIds={purchasedBookIds}
+                      wishlistBookIds={wishlistBookIds}
+                      onToggleWishlist={handleToggleWishlist}
                     />
-
-                    {/* Category Spotlight 1 */}
-                    {category1Books.length > 0 && (
-                      <BookListView
-                        title={categories[0]?.title || 'UPSC Civil Services Materials'}
-                        books={category1Books}
-                        onSelectBook={(book) => router.push(`/book/${encodeURIComponent(book.slug || book.id)}`)}
-                        onAddToCart={handleAddToCart}
-                        onBuyNow={handleBuyNow}
-                        cartBookIds={cartBookIds}
-                        purchasedBookIds={purchasedBookIds}
-                      />
-                    )}
-
-                    {/* Category Spotlight 2 */}
-                    {category2Books.length > 0 && (
-                      <BookListView
-                        title={categories[1]?.title || 'SSC & Competitive Exam Guides'}
-                        books={category2Books}
-                        onSelectBook={(book) => router.push(`/book/${encodeURIComponent(book.slug || book.id)}`)}
-                        onAddToCart={handleAddToCart}
-                        onBuyNow={handleBuyNow}
-                        cartBookIds={cartBookIds}
-                        purchasedBookIds={purchasedBookIds}
-                      />
-                    )}
                   </>
                 )}
 

@@ -1,36 +1,46 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { Category } from '@/lib/types';
 
 interface CategoryChipsProps {
   categories: Category[];
-  selectedCategory: string;
-  onSelectCategory: (category: string) => void;
+  selectedCategory?: string;
+  onSelectCategory?: (category: string) => void;
   initialVisibleCount?: number;
 }
 
 export const CategoryChips: React.FC<CategoryChipsProps> = ({
   categories,
-  selectedCategory,
+  selectedCategory = 'all',
   onSelectCategory,
   initialVisibleCount = 7,
 }) => {
+  const router = useRouter();
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
 
-  // If selected category is outside visible range, auto-expand or include it
   const hasMore = categories.length > initialVisibleCount;
   const visibleCategories = isExpanded ? categories : categories.slice(0, initialVisibleCount);
+
+  const handleCategoryClick = (cat: Category, e: React.MouseEvent) => {
+    const slug = cat.seolsug || cat.id;
+    if (onSelectCategory) {
+      onSelectCategory(cat.title);
+    }
+    router.push(`/category/${encodeURIComponent(slug)}`);
+  };
 
   return (
     <div className="w-full py-2.5 px-4 sm:px-6">
       {/* Wrapped Category Chips Layout */}
       <div className="flex flex-wrap items-center gap-2">
         {/* "All" Chip */}
-        <button
+        <Link
           id="chip-all"
-          onClick={() => onSelectCategory('all')}
+          href="/"
           className={`shrink-0 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all duration-200 active:scale-95 whitespace-nowrap cursor-pointer ${
             selectedCategory.toLowerCase() === 'all'
               ? 'bg-[#4029AB] text-white border border-[#4029AB] shadow-xs'
@@ -38,16 +48,18 @@ export const CategoryChips: React.FC<CategoryChipsProps> = ({
           }`}
         >
           All
-        </button>
+        </Link>
 
-        {/* Category Chips (at least 7 visible by default) */}
+        {/* Category Chips (linking directly to SEO ready /category/[slug]) */}
         {visibleCategories.map((cat) => {
           const isSelected = selectedCategory.toLowerCase() === cat.title.toLowerCase();
+          const slug = cat.seolsug || cat.id;
+
           return (
-            <button
+            <Link
               key={cat.id}
-              id={`chip-${cat.seolsug || cat.id}`}
-              onClick={() => onSelectCategory(cat.title)}
+              id={`chip-${slug}`}
+              href={`/category/${encodeURIComponent(slug)}`}
               className={`shrink-0 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all duration-200 active:scale-95 whitespace-nowrap cursor-pointer ${
                 isSelected
                   ? 'bg-[#4029AB] text-white border border-[#4029AB] shadow-xs'
@@ -55,7 +67,7 @@ export const CategoryChips: React.FC<CategoryChipsProps> = ({
               }`}
             >
               {cat.title}
-            </button>
+            </Link>
           );
         })}
 
@@ -79,4 +91,5 @@ export const CategoryChips: React.FC<CategoryChipsProps> = ({
     </div>
   );
 };
+
 

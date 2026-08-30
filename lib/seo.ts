@@ -227,3 +227,75 @@ export function generateBookSchema(book: Book) {
     ],
   };
 }
+
+/**
+ * Generates Schema.org CollectionPage & ItemList Schema for dedicated Category Pages
+ */
+export function generateCategorySchema(
+  categoryTitle: string,
+  categorySlug: string,
+  categoryDescription: string,
+  books: Book[]
+) {
+  const categoryUrl = `${SITE_URL}/category/${encodeURIComponent(categorySlug)}`;
+
+  return {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'BreadcrumbList',
+        '@id': `${categoryUrl}#breadcrumb`,
+        itemListElement: [
+          {
+            '@type': 'ListItem',
+            position: 1,
+            name: 'Home',
+            item: SITE_URL,
+          },
+          {
+            '@type': 'ListItem',
+            position: 2,
+            name: 'Categories',
+            item: `${SITE_URL}/#categories`,
+          },
+          {
+            '@type': 'ListItem',
+            position: 3,
+            name: categoryTitle,
+            item: categoryUrl,
+          },
+        ],
+      },
+      {
+        '@type': 'CollectionPage',
+        '@id': `${categoryUrl}#webpage`,
+        url: categoryUrl,
+        name: `${categoryTitle} PDF E-Books & Study Material | BooksCircle`,
+        description: categoryDescription,
+        isPartOf: {
+          '@id': `${SITE_URL}/#website`,
+        },
+        mainEntity: {
+          '@type': 'ItemList',
+          numberOfItems: books.length,
+          itemListElement: books.map((book, index) => ({
+            '@type': 'ListItem',
+            position: index + 1,
+            item: {
+              '@type': 'Book',
+              name: book.title,
+              url: `${SITE_URL}/book/${book.slug || book.id}`,
+              image: book.cover,
+              offers: {
+                '@type': 'Offer',
+                price: book.buy_price.toString(),
+                priceCurrency: 'INR',
+              },
+            },
+          })),
+        },
+      },
+    ],
+  };
+}
+

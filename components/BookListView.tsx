@@ -1,11 +1,13 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import Image from 'next/image';
-import { ShoppingCart, Check, BookOpen } from 'lucide-react';
+import { ShoppingCart, Check, Heart, ChevronRight } from 'lucide-react';
 import { Book } from '@/lib/types';
 import { DEFAULT_BOOK_COVER } from '@/lib/data';
 import { loadRazorpayScript } from '@/lib/services/razorpay';
+import { toggleWishlistAction } from '@/lib/services/wishlist';
 
 interface BookListViewProps {
   books: Book[];
@@ -15,6 +17,11 @@ interface BookListViewProps {
   onBuyNow?: (book: Book) => void;
   cartBookIds: Set<string>;
   purchasedBookIds?: string[];
+  wishlistBookIds?: Set<string>;
+  onToggleWishlist?: (book: Book, e: React.MouseEvent) => void;
+  onViewAll?: () => void;
+  viewAllHref?: string;
+  limit?: number;
 }
 
 const BookListItem: React.FC<{
@@ -24,11 +31,31 @@ const BookListItem: React.FC<{
   onBuyNow?: (book: Book) => void;
   inCart: boolean;
   isPurchased: boolean;
-}> = ({ book, onSelectBook, onAddToCart, onBuyNow, inCart, isPurchased }) => {
+  isWishlisted: boolean;
+  onToggleWishlist?: (book: Book, e: React.MouseEvent) => void;
+}> = ({
+  book,
+  onSelectBook,
+  onAddToCart,
+  onBuyNow,
+  inCart,
+  isPurchased,
+  isWishlisted,
+  onToggleWishlist,
+}) => {
   const [imgSrc, setImgSrc] = useState(book.cover || DEFAULT_BOOK_COVER);
 
   const handlePreload = () => {
     loadRazorpayScript().catch(() => {});
+  };
+
+  const handleWishlistClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onToggleWishlist) {
+      onToggleWishlist(book, e);
+    } else {
+      toggleWishlistAction(book);
+    }
   };
 
   return (
@@ -39,7 +66,7 @@ const BookListItem: React.FC<{
       onTouchStart={handlePreload}
       className="group flex items-start gap-3.5 sm:gap-4 bg-transparent p-2 sm:p-3.5 rounded-2xl border border-gray-100 hover:border-[#4029AB]/30 hover:bg-gray-50/50 cursor-pointer transition-all active:scale-[0.99]"
     >
-      {/* Book Cover Thumbnail: Aligned to top, 3:4 ratio, sharp corners */}
+      {/* Book Cover Thumbnail: Aligned to top, 3:4 ratio, sharp corners with Wishlist icon on top right */}
       <div className="relative w-14 sm:w-16 aspect-[3/4] rounded-none overflow-hidden shrink-0 self-start bg-gray-200 shadow-2xs border border-gray-200">
         <Image
           src={imgSrc}
@@ -51,6 +78,25 @@ const BookListItem: React.FC<{
           referrerPolicy="no-referrer"
           onError={() => setImgSrc(DEFAULT_BOOK_COVER)}
         />
+
+        {/* Wishlist Heart button on top right of thumbnail */}
+        <button
+          id={`list-wishlist-${book.id}`}
+          onClick={handleWishlistClick}
+          className={`absolute top-0.5 right-0.5 sm:top-1 sm:right-1 w-4.5 h-4.5 sm:w-5.5 sm:h-5.5 rounded-full flex items-center justify-center shadow-md transition-all duration-200 active:scale-90 cursor-pointer z-10 ${
+            isWishlisted
+              ? 'bg-white text-rose-600'
+              : 'bg-white/80 text-gray-700 hover:bg-white hover:text-rose-600'
+          }`}
+          aria-label={isWishlisted ? `Remove ${book.title} from wishlist` : `Add ${book.title} to wishlist`}
+          title={isWishlisted ? 'In Wishlist' : 'Add to Wishlist'}
+        >
+          <Heart
+            className={`w-2.5 h-2.5 sm:w-3 sm:h-3 transition-colors ${
+              isWishlisted ? 'fill-rose-600 text-rose-600' : 'text-gray-700'
+            }`}
+          />
+        </button>
       </div>
 
       {/* Middle Information Column */}
@@ -152,25 +198,50 @@ export const BookListView: React.FC<BookListViewProps> = ({
   onBuyNow,
   cartBookIds,
   purchasedBookIds = [],
+  wishlistBookIds = new Set(),
+  onToggleWishlist,
+  onViewAll,
+  viewAllHref,
+  limit,
 }) => {
-  if (!books || books.length === 0) return null;
+  const displayBooks = limit && limit > 0 ? books.slice(0, limit) : books;
+  if (!displayBooks || displayBooks.length === 0) return null;
 
   return (
     <section id="standard-list-view" className="w-full py-3 px-3 sm:px-6">
       {title && (
         <div className="flex justify-between items-end mb-3">
-          <h2 className="text-lg font-bold text-gray-800 tracking-tight">
-            {title}
-          </h2>
-          <span className="text-xs font-bold text-gray-400">
-            {books.length} Books
-          </span>
+          <div>
+            <h2 className="text-base sm:text-lg font-bold text-gray-900 tracking-tight">
+              {title}
+            </h2>
+            <span className="text-[11px] font-semibold text-gray-400">
+              Showing {displayBooks.length} Books
+            </span>
+          </div>
+          {viewAllHref ? (
+            <Link
+              href={viewAllHref}
+              className="text-xs sm:text-sm font-semibold text-[#4029AB] hover:text-[#34208e] flex items-center gap-0.5 transition-colors py-1 pl-2"
+            >
+              <span>View All</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </Link>
+          ) : onViewAll ? (
+            <button
+              onClick={onViewAll}
+              className="text-xs sm:text-sm font-semibold text-[#4029AB] hover:text-[#34208e] flex items-center gap-0.5 cursor-pointer transition-colors py-1 pl-2"
+            >
+              <span>View All</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          ) : null}
         </div>
       )}
 
       {/* Professional Polish Card List Items */}
       <div className="space-y-3">
-        {books.map((book) => (
+        {displayBooks.map((book) => (
           <BookListItem
             key={book.id}
             book={book}
@@ -179,6 +250,8 @@ export const BookListView: React.FC<BookListViewProps> = ({
             onBuyNow={onBuyNow}
             inCart={cartBookIds.has(book.id)}
             isPurchased={purchasedBookIds.includes(book.id)}
+            isWishlisted={wishlistBookIds.has(book.id)}
+            onToggleWishlist={onToggleWishlist}
           />
         ))}
       </div>

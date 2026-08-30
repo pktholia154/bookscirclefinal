@@ -8,20 +8,14 @@ import { BookPageClient } from '@/components/BookPageClient';
 import { Book } from '@/lib/types';
 
 export const revalidate = 60; // ISR: revalidate every 60 seconds
+export const dynamicParams = true;
 
 interface PageProps {
   params: Promise<{ slug: string }>;
 }
 
 export async function generateStaticParams() {
-  try {
-    const books = await getBooksFromFirestore();
-    return books.map((b) => ({
-      slug: encodeURIComponent(b.slug || b.id),
-    }));
-  } catch {
-    return [];
-  }
+  return [];
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {

@@ -42,6 +42,8 @@ export interface Book {
   language?: string;
   type?: string;
   file_size?: string;
+  is_bestseller?: boolean;
+  badge?: string;
   topics?: string[];
   reviews?: Review[];
 }
@@ -51,6 +53,8 @@ export interface Category {
   title: string;
   seolsug: string;
   seo_description?: string;
+  description?: string;
+  slug?: string;
 }
 
 export interface CartItem {

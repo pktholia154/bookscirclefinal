@@ -3,73 +3,58 @@
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import {
-  User as UserIcon,
   Mail,
   Share2,
   Copy,
   Check,
-  HardDrive,
-  BookOpen,
   Trash2,
-  ExternalLink,
   ShieldCheck,
   Send,
   MessageCircle,
-  Smartphone,
   LogIn,
   LogOut,
-  Key,
-  CreditCard,
-  AlertTriangle,
   RefreshCw,
-  Sparkles
+  Heart,
+  ShoppingCart,
 } from 'lucide-react';
-import { getOfflineStorageStats, clearAllOfflinePdfs } from '@/lib/offline-storage';
 import { UserProfile } from '@/components/Header';
-import { syncUserProfileToFirestore } from '@/lib/services/users';
-
-// Crisp Google 'G' vector icon component
-const GoogleIcon: React.FC<{ className?: string }> = ({ className = 'w-4 h-4' }) => (
-  <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
-    <path
-      fill="#4285F4"
-      d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"
-    />
-    <path
-      fill="#34A853"
-      d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"
-    />
-    <path
-      fill="#FBBC05"
-      d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
-    />
-    <path
-      fill="#EA4335"
-      d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
-    />
-  </svg>
-);
+import { Book } from '@/lib/types';
+import { DEFAULT_BOOK_COVER } from '@/lib/data';
+import {
+  getWishlistIdsFromLocal,
+  getWishlistBooksFromLocal,
+  removeFromWishlistAction,
+  subscribeToWishlistChanges,
+} from '@/lib/services/wishlist';
 
 interface ProfileViewProps {
   currentUser: UserProfile | null;
-  purchasedCount: number;
-  onNavigateToPurchased: () => void;
+  purchasedCount?: number;
+  allBooks?: Book[];
+  onSelectBook?: (book: Book) => void;
+  onAddToCart?: (book: Book, e: React.MouseEvent) => void;
+  onBuyNow?: (book: Book) => void;
+  onNavigateToPurchased?: () => void;
   onGoogleSignIn: () => void;
   onSignOut: () => void;
+  cartBookIds?: Set<string>;
 }
 
 export const ProfileView: React.FC<ProfileViewProps> = ({
   currentUser,
-  purchasedCount = 0,
-  onNavigateToPurchased,
+  allBooks = [],
+  onSelectBook,
+  onAddToCart,
+  onBuyNow,
   onGoogleSignIn,
   onSignOut,
+  cartBookIds = new Set(),
 }) => {
   const [copied, setCopied] = useState(false);
   const [isSigningIn, setIsSigningIn] = useState(false);
-  const [offlineStats, setOfflineStats] = useState<{ count: number; totalBytes: number }>({
-    count: 0,
-    totalBytes: 0,
+  const [wishlistIds, setWishlistIds] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return [];
+    return getWishlistIdsFromLocal();
   });
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -79,8 +64,32 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   };
 
   useEffect(() => {
-    getOfflineStorageStats().then(setOfflineStats);
+    const unsub = subscribeToWishlistChanges((ids) => {
+      setWishlistIds(ids);
+    });
+    return () => unsub();
   }, []);
+
+  // Resolve full book objects for wishlist items
+  const wishlistedBooks: Book[] = React.useMemo(() => {
+    const cachedBooks = getWishlistBooksFromLocal();
+    const booksMap = new Map<string, Book>();
+
+    allBooks.forEach((b) => booksMap.set(b.id, b));
+    cachedBooks.forEach((b) => {
+      if (!booksMap.has(b.id)) booksMap.set(b.id, b);
+    });
+
+    return wishlistIds
+      .map((id) => booksMap.get(id))
+      .filter((b): b is Book => Boolean(b));
+  }, [wishlistIds, allBooks]);
+
+  const handleRemoveFromWishlist = (bookId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    removeFromWishlistAction(bookId);
+    showToast('Removed from wishlist');
+  };
 
   const getShareUrl = () => {
     if (typeof window !== 'undefined') {
@@ -147,213 +156,115 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     window.open(`https://t.me/share/url?url=${url}&text=${text}`, '_blank');
   };
 
-  const handleTwitterShare = () => {
-    const url = encodeURIComponent(getShareUrl());
-    const text = encodeURIComponent(shareText);
-    window.open(`https://twitter.com/intent/tweet?text=${text}&url=${url}`, '_blank');
-  };
-
   const handleEmailShare = () => {
     const subject = encodeURIComponent('Recommended: BooksCircle PDF Library');
     const body = encodeURIComponent(`${shareText}\n\nVisit: ${getShareUrl()}`);
     window.location.href = `mailto:?subject=${subject}&body=${body}`;
   };
 
-  // Clear offline cache
-  const handleClearCache = async () => {
-    if (confirm('Clear all downloaded offline PDFs from this device?')) {
-      await clearAllOfflinePdfs();
-      setOfflineStats({ count: 0, totalBytes: 0 });
-      showToast('Device offline PDF storage cleared.');
-    }
-  };
-
-  const formattedStorage = (offlineStats.totalBytes / (1024 * 1024)).toFixed(1);
-
   const displayUserName = currentUser?.displayName || 'Guest Reader';
   const displayUserEmail = currentUser?.email || 'Not signed in';
   const userInitial = displayUserName.charAt(0).toUpperCase();
 
   return (
-    <div className="w-full px-4 sm:px-6 py-5 max-w-2xl mx-auto space-y-6">
-      {/* 1. Profile Identity Card */}
-      <div className="p-5 sm:p-6 rounded-3xl bg-gray-50 border border-gray-200/80 flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-5 text-center sm:text-left shadow-2xs">
-        {/* Avatar */}
-        {currentUser?.photoURL ? (
-          <div className="relative w-18 h-18 sm:w-20 sm:h-20 rounded-full overflow-hidden shadow-md shrink-0 ring-4 ring-white border border-gray-200">
-            <Image
-              src={currentUser.photoURL}
-              alt={displayUserName}
-              fill
-              sizes="80px"
-              className="object-cover"
-              referrerPolicy="no-referrer"
-            />
-            <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center border-2 border-white shadow-xs">
-              <ShieldCheck className="w-3.5 h-3.5" />
-            </div>
-          </div>
-        ) : (
-          <div className="relative w-18 h-18 sm:w-20 sm:h-20 rounded-full bg-[#4029AB] text-white flex items-center justify-center text-2xl font-black shadow-md shrink-0 ring-4 ring-white">
-            <span>{userInitial}</span>
-            {currentUser && (
-              <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center border-2 border-white shadow-xs">
-                <ShieldCheck className="w-3.5 h-3.5" />
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* User Info Details */}
-        <div className="flex-1 min-w-0">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2 justify-center sm:justify-start">
-            <h2 className="text-lg sm:text-xl font-black text-gray-950">{displayUserName}</h2>
-            {currentUser ? (
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full">
+    <div className="w-full px-4 sm:px-6 py-6 max-w-3xl mx-auto space-y-8 bg-white">
+      {/* 1. Minimal Profile Identity Header (Seamless, Unboxed) */}
+      <section id="profile-identity-section" className="flex items-center justify-between gap-4 pb-6 border-b border-gray-100">
+        <div className="flex items-center gap-4 min-w-0">
+          {/* Avatar */}
+          {currentUser?.photoURL ? (
+            <div className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden shrink-0 border border-gray-200">
+              <Image
+                src={currentUser.photoURL}
+                alt={displayUserName}
+                fill
+                sizes="64px"
+                className="object-cover"
+                referrerPolicy="no-referrer"
+              />
+              <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center border-2 border-white">
                 <ShieldCheck className="w-2.5 h-2.5" />
-                Verified Reader
-              </span>
-            ) : (
-              <span className="inline-block px-2.5 py-0.5 text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 rounded-full">
-                Guest Mode
-              </span>
-            )}
-          </div>
-
-          <div className="flex items-center justify-center sm:justify-start gap-1.5 text-xs text-gray-600 mt-1 font-medium">
-            <Mail className="w-3.5 h-3.5 text-gray-400" />
-            <span className="font-mono text-gray-800">{displayUserEmail}</span>
-          </div>
-
-          <p className="text-[11px] text-gray-500 mt-2">
-            {currentUser
-              ? 'Account synchronized • Instant access to purchased e-books & bookmarks'
-              : 'Sign in to access your purchased PDF library across all your devices.'}
-          </p>
-
-          {/* Action Buttons: Sign In / Sign Out */}
-          <div className="pt-3 flex flex-wrap items-center justify-center sm:justify-start gap-2">
-            {!currentUser ? (
-              <button
-                id="profile-login-btn"
-                onClick={handleGoogleAuth}
-                disabled={isSigningIn}
-                className="px-4 py-2 bg-[#4029AB] hover:bg-[#34208e] text-white text-xs font-bold rounded-xl shadow-xs active:scale-95 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-60"
-              >
-                {isSigningIn ? (
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin text-white" />
-                ) : (
-                  <LogIn className="w-3.5 h-3.5" />
-                )}
-                <span>Login</span>
-              </button>
-            ) : (
-              <div className="flex items-center gap-2">
-                <button
-                  id="profile-signout-btn"
-                  onClick={() => {
-                    onSignOut();
-                    showToast('Signed out successfully.');
-                  }}
-                  className="px-4 py-2 bg-white hover:bg-red-50 border border-gray-200 hover:border-red-200 text-red-600 text-xs font-bold rounded-xl active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
-                >
-                  <LogOut className="w-3.5 h-3.5" />
-                  <span>Sign Out</span>
-                </button>
               </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-
-      {/* 2. My Digital Library & Cloud Records Overview Card */}
-      <div className="p-5 sm:p-6 rounded-3xl bg-white border border-gray-200 space-y-4 shadow-2xs">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-purple-100 text-[#4029AB] flex items-center justify-center">
-              <BookOpen className="w-4 h-4" />
             </div>
-            <div>
-              <h3 className="text-sm sm:text-base font-bold text-gray-950">
-                Digital Library &amp; Cloud Records
-              </h3>
-              <p className="text-xs text-gray-500">
-                Synchronized with Firebase Firestore database
-              </p>
+          ) : (
+            <div className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-[#4029AB] text-white flex items-center justify-center text-xl sm:text-2xl font-black shrink-0">
+              <span>{userInitial}</span>
+              {currentUser && (
+                <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center border-2 border-white">
+                  <ShieldCheck className="w-2.5 h-2.5" />
+                </div>
+              )}
             </div>
-          </div>
-          <span className="px-2.5 py-1 bg-purple-50 border border-purple-200 text-[#4029AB] text-xs font-bold rounded-full">
-            {purchasedCount} Ebooks
-          </span>
-        </div>
+          )}
 
-        <div className="grid grid-cols-2 gap-3 pt-1">
-          <div className="p-3 bg-gray-50 rounded-2xl border border-gray-100 space-y-1">
-            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-              Unlocked Books
-            </span>
-            <div className="text-lg font-black text-gray-900 font-mono">
-              {purchasedCount}
+          {/* User Info Details */}
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="text-base sm:text-lg font-black text-gray-950 truncate">{displayUserName}</h2>
+              {currentUser ? (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full shrink-0">
+                  <ShieldCheck className="w-2.5 h-2.5" />
+                  Verified
+                </span>
+              ) : (
+                <span className="inline-block px-2 py-0.5 text-[9px] font-bold bg-gray-100 text-gray-600 rounded-full shrink-0">
+                  Guest
+                </span>
+              )}
             </div>
-          </div>
 
-          <div className="p-3 bg-gray-50 rounded-2xl border border-gray-100 space-y-1">
-            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-              Offline Storage
-            </span>
-            <div className="text-lg font-black text-gray-900 font-mono">
-              {formattedStorage} MB
+            <div className="flex items-center gap-1.5 text-xs text-gray-500 mt-0.5 font-medium truncate">
+              <Mail className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+              <span className="font-mono text-gray-600 truncate">{displayUserEmail}</span>
             </div>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 pt-1">
-          <button
-            onClick={onNavigateToPurchased}
-            className="flex-1 py-2.5 px-4 bg-[#4029AB] hover:bg-[#34208e] text-white text-xs font-bold rounded-xl shadow-xs transition-all active:scale-98 cursor-pointer flex items-center justify-center gap-2"
-          >
-            <BookOpen className="w-3.5 h-3.5" />
-            <span>Open Purchased Library &amp; Invoices</span>
-          </button>
-
-          {offlineStats.count > 0 && (
+        {/* Action Button: Login / Sign Out */}
+        <div className="shrink-0">
+          {!currentUser ? (
             <button
-              onClick={handleClearCache}
-              className="py-2.5 px-3 bg-gray-100 hover:bg-red-50 hover:text-red-600 text-gray-700 text-xs font-semibold rounded-xl transition-all cursor-pointer flex items-center gap-1.5"
-              title="Clear downloaded offline PDF files from device"
+              id="profile-login-btn"
+              onClick={handleGoogleAuth}
+              disabled={isSigningIn}
+              className="px-4 py-2 bg-[#4029AB] hover:bg-[#34208e] text-white text-xs font-bold rounded-xl shadow-xs active:scale-95 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-60"
             >
-              <Trash2 className="w-3.5 h-3.5" />
-              <span>Clear Cache</span>
+              {isSigningIn ? (
+                <RefreshCw className="w-3.5 h-3.5 animate-spin text-white" />
+              ) : (
+                <LogIn className="w-3.5 h-3.5" />
+              )}
+              <span>Login</span>
+            </button>
+          ) : (
+            <button
+              id="profile-signout-btn"
+              onClick={() => {
+                onSignOut();
+                showToast('Signed out successfully.');
+              }}
+              className="px-3.5 py-1.5 bg-gray-50 hover:bg-red-50 border border-gray-200 hover:border-red-200 text-gray-700 hover:text-red-600 text-xs font-bold rounded-xl active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span>Sign Out</span>
             </button>
           )}
         </div>
-      </div>
+      </section>
 
-      {/* 3. Share BooksCircle App Section */}
-      <div className="p-5 sm:p-6 rounded-3xl border border-gray-200 bg-white space-y-4 shadow-2xs">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-sm sm:text-base font-bold text-gray-950 flex items-center gap-1.5">
-              <Share2 className="w-4 h-4 text-[#4029AB]" />
-              <span>Share BooksCircle App</span>
-            </h3>
-            <p className="text-xs text-gray-500 mt-0.5">
-              Recommend study materials and books to friends and colleagues.
-            </p>
-          </div>
+      {/* 2. Share BooksCircle App (Seamless Section) */}
+      <section id="profile-share-section" className="space-y-3 pb-6 border-b border-gray-100">
+        <div>
+          <h3 className="text-sm font-bold text-gray-950 flex items-center gap-1.5">
+            <Share2 className="w-4 h-4 text-[#4029AB]" />
+            <span>Share BooksCircle App</span>
+          </h3>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Recommend study materials and books to friends and colleagues.
+          </p>
         </div>
 
-        {/* Primary Share Button */}
-        <button
-          onClick={handleNativeShare}
-          className="w-full py-3 px-4 rounded-2xl bg-[#4029AB] hover:bg-[#34208e] text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-xs transition-all active:scale-[0.99] cursor-pointer"
-        >
-          <Share2 className="w-4 h-4" />
-          <span>Share Application Link</span>
-        </button>
-
-        {/* Quick Social Share Options Grid */}
+        {/* Quick Share Options Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
           {/* Copy Link */}
           <button
@@ -395,7 +306,125 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             <span>Email</span>
           </button>
         </div>
-      </div>
+      </section>
+
+      {/* 3. My Saved Wishlist (Unboxed, Continuous Placement at the Bottom) */}
+      <section id="profile-wishlist-section" className="space-y-4 pt-1">
+        <div className="space-y-1">
+          {/* Top Row: Icon, Title & Number of Books */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Heart className="w-4 h-4 text-[#4029AB] fill-[#4029AB]" />
+              <h3 className="text-base font-bold text-gray-950">
+                My Saved Wishlist
+              </h3>
+            </div>
+            <span className="px-2.5 py-0.5 bg-gray-100 text-gray-700 text-xs font-bold rounded-full shrink-0">
+              {wishlistedBooks.length} {wishlistedBooks.length === 1 ? 'Book' : 'Books'}
+            </span>
+          </div>
+          {/* Second Row: Description */}
+          <p className="text-xs text-gray-500">
+            Books you have bookmarked to read or buy later
+          </p>
+        </div>
+
+        {wishlistedBooks.length === 0 ? (
+          <div className="py-10 px-4 text-center border border-dashed border-gray-200 rounded-2xl bg-gray-50/50 space-y-2">
+            <Heart className="w-7 h-7 text-gray-300 mx-auto" />
+            <p className="text-xs font-semibold text-gray-600">Your wishlist is currently empty</p>
+            <p className="text-[11px] text-gray-400 max-w-sm mx-auto">
+              Tap the heart icon on any book card in the catalog to save it here.
+            </p>
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-100 border-t border-b border-gray-100">
+            {wishlistedBooks.map((book) => (
+              <div
+                key={book.id}
+                onClick={() => onSelectBook && onSelectBook(book)}
+                className="py-3.5 flex items-center gap-3.5 group cursor-pointer hover:bg-gray-50/60 px-2 rounded-xl transition-all"
+              >
+                {/* Book Thumbnail */}
+                <div className="relative w-12 aspect-[3/4] shrink-0 overflow-hidden bg-gray-100 border border-gray-200 shadow-2xs">
+                  <Image
+                    src={book.cover || DEFAULT_BOOK_COVER}
+                    alt={book.title}
+                    fill
+                    unoptimized
+                    sizes="48px"
+                    className="object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                </div>
+
+                {/* Details */}
+                <div className="flex-1 min-w-0">
+                  <span className="text-[9px] font-bold text-[#4029AB] uppercase tracking-wider">
+                    {book.category}
+                  </span>
+                  <h4 className="text-xs sm:text-sm font-bold text-gray-900 line-clamp-1 group-hover:text-[#4029AB] transition-colors">
+                    {book.title}
+                  </h4>
+                  <div className="flex items-baseline gap-1.5 mt-0.5">
+                    <span className="text-xs sm:text-sm font-black text-gray-950">
+                      ₹{book.buy_price}
+                    </span>
+                    {book.list_price && book.list_price > book.buy_price && (
+                      <span className="text-[10px] text-gray-400 line-through">
+                        ₹{book.list_price}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {onAddToCart && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onAddToCart(book, e);
+                      }}
+                      className={`p-2 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
+                        cartBookIds.has(book.id)
+                          ? 'bg-[#4029AB] text-white border-[#4029AB]'
+                          : 'border-gray-200 text-gray-700 bg-white hover:border-[#4029AB] hover:text-[#4029AB]'
+                      }`}
+                      title={cartBookIds.has(book.id) ? 'In Cart' : 'Add to Cart'}
+                      aria-label="Add to cart"
+                    >
+                      <ShoppingCart className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+
+                  {onBuyNow && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onBuyNow(book);
+                      }}
+                      className="px-2.5 py-1.5 bg-[#4029AB] hover:bg-[#34208e] text-white text-[10px] font-bold rounded-lg transition-all active:scale-95 cursor-pointer shadow-2xs"
+                    >
+                      Buy Now
+                    </button>
+                  )}
+
+                  {/* Remove button */}
+                  <button
+                    onClick={(e) => handleRemoveFromWishlist(book.id, e)}
+                    className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all cursor-pointer"
+                    title="Remove from Wishlist"
+                    aria-label="Remove from wishlist"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
       {/* Toast Notification */}
       {toastMessage && (

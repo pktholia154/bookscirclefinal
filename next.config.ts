@@ -1,7 +1,6 @@
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
-  output: 'standalone',
   reactStrictMode: true,
   eslint: {
     ignoreDuringBuilds: true,
@@ -80,13 +79,7 @@ const nextConfig: NextConfig = {
     ];
   },
   transpilePackages: ['motion'],
-  webpack: (config, {dev, isServer, webpack}) => {
-    if (dev && process.env.DISABLE_HMR === 'true') {
-      config.watchOptions = {
-        ignored: /.*/,
-      };
-    }
-
+  webpack: (config, {isServer, webpack}) => {
     if (!isServer) {
       config.plugins.push(
         new webpack.NormalModuleReplacementPlugin(/^node:/, (resource: any) => {

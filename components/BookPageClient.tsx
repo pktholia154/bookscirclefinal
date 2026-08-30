@@ -22,6 +22,7 @@ import {
   Award,
   Zap,
   HelpCircle,
+  Heart,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Book, Review, CartItem } from '@/lib/types';
@@ -34,6 +35,7 @@ import { recordUserPurchaseInFirestore, syncUserPurchases, subscribeToUserPurcha
 import { syncUserProfileToFirestore } from '@/lib/services/users';
 import { getPurchasedBookIdsFromLocal, savePurchasedBookIds } from '@/lib/offline-storage';
 import { addToCartAction, getCartFromLocal, subscribeToCartChanges } from '@/lib/services/cart';
+import { getWishlistIdsFromLocal, toggleWishlistAction, subscribeToWishlistChanges } from '@/lib/services/wishlist';
 import { auth, signInWithGoogle } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import Markdown from 'react-markdown';
@@ -104,7 +106,7 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
   const [newReviewComment, setNewReviewComment] = useState('');
   const [newReviewName, setNewReviewName] = useState('');
 
-  // Hydrate user & cart on client
+  // Hydrate user, cart & wishlist on client
   useEffect(() => {
     const timer = setTimeout(() => {
       try {
@@ -123,10 +125,19 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
           setCart(savedCart);
         }
       } catch {}
+
+      try {
+        const ids = getWishlistIdsFromLocal();
+        setIsWishlisted(ids.includes(book.id));
+      } catch {}
     }, 0);
 
     const unsubCart = subscribeToCartChanges((newCart) => {
       setCart(newCart);
+    });
+
+    const unsubWishlist = subscribeToWishlistChanges((wishlistIds) => {
+      setIsWishlisted(wishlistIds.includes(book.id));
     });
 
     const unsub = onAuthStateChanged(auth, async (user) => {
@@ -148,9 +159,16 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
     return () => {
       clearTimeout(timer);
       unsubCart();
+      unsubWishlist();
       unsub();
     };
-  }, []);
+  }, [book.id]);
+
+  const handleToggleWishlist = () => {
+    const res = toggleWishlistAction(book);
+    setIsWishlisted(res.isWishlisted);
+    showToast(res.isWishlisted ? 'Saved to Wishlist' : 'Removed from Wishlist');
+  };
 
   // Real-time continuous listener for Firebase DB purchase updates
   useEffect(() => {
@@ -405,7 +423,7 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
       : 25;
 
   return (
-    <div className="min-h-screen bg-white text-gray-900 pb-28 sm:pb-24 antialiased selection:bg-[#4029AB] selection:text-white">
+    <div className="min-h-screen bg-white text-gray-900 pb-12 sm:pb-16 antialiased selection:bg-[#4029AB] selection:text-white">
       {/* Top Header Navigation */}
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-gray-100 px-4 sm:px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3 min-w-0">
@@ -421,36 +439,6 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
             <ChevronRight className="w-3 h-3 text-gray-400" />
             <span className="text-[#4029AB] font-bold truncate">{book.category}</span>
           </div>
-        </div>
-
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            onClick={handleShare}
-            className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 active:scale-95 flex items-center justify-center text-gray-700 transition-all cursor-pointer"
-            title="Share"
-            aria-label="Share this book"
-          >
-            <Share2 className="w-4 h-4 text-gray-700" />
-          </button>
-          <button
-            onClick={() => {
-              setIsWishlisted(!isWishlisted);
-              showToast(!isWishlisted ? 'Saved to Wishlist' : 'Removed from Wishlist');
-            }}
-            className={`w-9 h-9 rounded-full flex items-center justify-center transition-all cursor-pointer active:scale-95 ${
-              isWishlisted
-                ? 'bg-[#4029AB]/10 text-[#4029AB]'
-                : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-            }`}
-            title="Wishlist"
-            aria-label="Save to wishlist"
-          >
-            {isWishlisted ? (
-              <BookmarkCheck className="w-4 h-4 text-[#4029AB] fill-[#4029AB]" />
-            ) : (
-              <Bookmark className="w-4 h-4 text-gray-700" />
-            )}
-          </button>
         </div>
       </header>
 
@@ -471,6 +459,24 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
               referrerPolicy="no-referrer"
               onError={() => setImgLoadFailed(true)}
             />
+            {/* Top-Right Cover Wishlist Heart Button */}
+            <button
+              id={`ssr-detail-cover-wishlist-${book.id}`}
+              onClick={handleToggleWishlist}
+              className={`absolute top-1.5 right-1.5 w-6.5 h-6.5 rounded-full flex items-center justify-center shadow-md transition-all duration-200 active:scale-90 cursor-pointer z-10 ${
+                isWishlisted
+                  ? 'bg-white text-rose-600'
+                  : 'bg-white/85 text-gray-700 hover:bg-white hover:text-rose-600'
+              }`}
+              aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+              title={isWishlisted ? 'In Wishlist' : 'Add to Wishlist'}
+            >
+              <Heart
+                className={`w-3.5 h-3.5 transition-colors ${
+                  isWishlisted ? 'fill-rose-600 text-rose-600' : 'text-gray-700'
+                }`}
+              />
+            </button>
           </div>
 
           {/* Book Info */}
@@ -481,8 +487,8 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
             <h1 className="text-lg sm:text-xl md:text-2xl font-black text-gray-950 leading-snug tracking-tight mt-1.5">
               {book.title}
             </h1>
-            <p className="text-xs text-gray-500 font-medium mt-1">
-              By {book.author || 'Exam Editorial Panel'} • {book.publisher || 'Exam Kart'}
+            <p className="text-xs text-gray-500 font-normal mt-1">
+              {book.publisher || 'Mocktime Publication'}
             </p>
 
             {/* Metadata row below publication: category, language, type (values only, no labels) */}
@@ -510,23 +516,81 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
                 </span>
               )}
             </div>
-
-            {/* Quick Feature Chips */}
-            <div className="flex flex-wrap gap-1.5 mt-3">
-              <span className="text-[10px] font-bold text-gray-600 bg-gray-100 px-2 py-0.5 rounded">
-                Instant PDF Download
-              </span>
-              <span className="text-[10px] font-bold text-gray-600 bg-gray-100 px-2 py-0.5 rounded">
-                {book.pages ? `${book.pages} Pages` : 'Comprehensive Guide'}
-              </span>
-              <span className="text-[10px] font-bold text-gray-600 bg-gray-100 px-2 py-0.5 rounded">
-                Offline Reader
-              </span>
-            </div>
           </div>
         </section>
 
-        {/* Action Buttons (Sample Preview & 1-Click Checkout) */}
+        {/* Key Metrics & Action Bar: Reviews | Share | Wishlist | Add to cart */}
+        <section className="border-y border-gray-200/80 py-2.5 my-1">
+          <div className="grid grid-cols-4 items-center text-center divide-x divide-gray-200">
+            {/* 1. Reviews */}
+            <button
+              type="button"
+              id="book-ssr-reviews-stat-btn"
+              onClick={() => {
+                const el = document.getElementById('book-ssr-reviews-section');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="flex flex-col items-center justify-center px-1 py-0.5 hover:bg-gray-50/80 transition-colors cursor-pointer"
+            >
+              <div className="flex items-center justify-center gap-0.5 text-xs font-bold text-gray-800">
+                <span>{rating.toFixed(1)}</span>
+                <Star className="w-3 h-3 fill-gray-700 text-gray-700" />
+              </div>
+              <span className="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">
+                {formattedReviewsCount} {ratingCount === 1 ? 'review' : 'reviews'}
+              </span>
+            </button>
+
+            {/* 2. Share */}
+            <button
+              type="button"
+              id="book-ssr-share-stat-btn"
+              onClick={handleShare}
+              className="flex flex-col items-center justify-center px-1 py-0.5 hover:bg-gray-50/80 transition-all active:scale-95 cursor-pointer"
+            >
+              <Share2 className="w-4 h-4 text-gray-700" />
+              <span className="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">
+                Share
+              </span>
+            </button>
+
+            {/* 3. Wishlist */}
+            <button
+              type="button"
+              id="book-ssr-wishlist-stat-btn"
+              onClick={handleToggleWishlist}
+              className="flex flex-col items-center justify-center px-1 py-0.5 hover:bg-gray-50/80 transition-all active:scale-95 cursor-pointer"
+            >
+              {isWishlisted ? (
+                <BookmarkCheck className="w-4 h-4 text-gray-800 fill-gray-800" />
+              ) : (
+                <Bookmark className="w-4 h-4 text-gray-700" />
+              )}
+              <span className="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">
+                {isWishlisted ? 'Saved' : 'Wishlist'}
+              </span>
+            </button>
+
+            {/* 4. Add to Cart (Base theme color) */}
+            <button
+              type="button"
+              id="book-ssr-cart-stat-btn"
+              onClick={handleAddToCart}
+              className="flex flex-col items-center justify-center px-1 py-0.5 hover:bg-[#4029AB]/5 transition-all active:scale-95 cursor-pointer"
+            >
+              {isInCart ? (
+                <Check className="w-4 h-4 text-[#4029AB]" />
+              ) : (
+                <ShoppingBag className="w-4 h-4 text-[#4029AB]" />
+              )}
+              <span className="text-[11px] font-bold text-[#4029AB] mt-0.5 whitespace-nowrap">
+                {isInCart ? 'In cart' : 'Add to cart'}
+              </span>
+            </button>
+          </div>
+        </section>
+
+        {/* Action Buttons (Sample & Buy) */}
         <section className="grid grid-cols-2 gap-3 pt-1">
           <button
             id="book-page-sample-btn"
@@ -534,7 +598,7 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
             className="w-full py-3 px-4 rounded-xl border border-gray-300 hover:border-gray-400 hover:bg-gray-50 text-xs sm:text-sm font-bold text-[#4029AB] bg-white transition-all active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
           >
             <Eye className="w-4 h-4 text-[#4029AB]" />
-            <span>Free Sample Preview</span>
+            <span>Sample</span>
           </button>
 
           {isPurchased ? (
@@ -555,7 +619,7 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
               className="w-full py-3 px-4 rounded-xl bg-[#4029AB] hover:bg-[#34208e] text-white text-xs sm:text-sm font-bold transition-all active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer shadow-xs"
             >
               <Zap className="w-4 h-4 text-white fill-white" />
-              <span>Instant Buy (₹{book.buy_price})</span>
+              <span>Buy (₹{book.buy_price})</span>
             </button>
           )}
         </section>
@@ -671,7 +735,7 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
         </section>
 
         {/* Customer Reviews Section */}
-        <section className="space-y-4 pt-4 border-t border-gray-100">
+        <section id="book-ssr-reviews-section" className="space-y-4 pt-4 border-t border-gray-100">
           <div className="flex items-center justify-between">
             <h2 className="text-base sm:text-lg font-bold text-gray-900">
               Verified Candidate Ratings &amp; Reviews
@@ -815,55 +879,6 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
           </section>
         )}
       </main>
-
-      {/* Floating Sticky Purchase Bar on Mobile & Desktop */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-t border-gray-200 px-4 sm:px-6 py-3 shadow-lg">
-        <div className="max-w-2xl mx-auto flex items-center justify-between gap-3">
-          <div className="flex flex-col">
-            <span className="text-[10px] text-gray-500 font-semibold uppercase tracking-wider">
-              Digital PDF Edition
-            </span>
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-xl font-black text-gray-950">₹{book.buy_price}</span>
-              {book.list_price > book.buy_price && (
-                <span className="text-xs text-gray-400 line-through font-medium">
-                  ₹{book.list_price}
-                </span>
-              )}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setActivePdfReaderMode('sample')}
-              className="px-3.5 py-2.5 rounded-xl border border-gray-300 hover:bg-gray-50 text-xs font-bold text-[#4029AB] transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs"
-            >
-              <Eye className="w-3.5 h-3.5" />
-              <span>Sample</span>
-            </button>
-
-            {isPurchased ? (
-              <button
-                onClick={() => setActivePdfReaderMode('full')}
-                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs active:scale-95 cursor-pointer flex items-center gap-1.5"
-              >
-                <BookOpen className="w-3.5 h-3.5" />
-                <span>Read Full PDF</span>
-              </button>
-            ) : (
-              <button
-                onClick={handleBuyNow}
-                onMouseEnter={() => loadRazorpayScript()}
-                onTouchStart={() => loadRazorpayScript()}
-                className="px-5 py-2.5 rounded-xl bg-[#4029AB] hover:bg-[#34208e] text-white text-xs font-bold transition-all shadow-xs active:scale-95 cursor-pointer flex items-center gap-1.5"
-              >
-                <Zap className="w-3.5 h-3.5 fill-white" />
-                <span>Instant Buy Now</span>
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
 
       {/* PDF Reader Modal */}
       {activePdfReaderMode && (

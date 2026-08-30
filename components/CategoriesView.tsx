@@ -1,12 +1,15 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
+import Link from 'next/link';
 import Image from 'next/image';
 import {
   BookOpen,
   ShoppingCart,
   Check,
   Layers,
+  ChevronRight,
+  ExternalLink,
 } from 'lucide-react';
 import { Book, Category } from '@/lib/types';
 import { DEFAULT_BOOK_COVER } from '@/lib/data';
@@ -133,12 +136,28 @@ export const CategoriesView: React.FC<CategoriesViewProps> = ({
       {/* 3. Filtered Books Results */}
       <div className="space-y-3 pt-2">
         <div className="flex items-center justify-between border-b border-gray-100 pb-2">
-          <h2 className="text-sm sm:text-base font-black text-gray-950">
-            {selectedCat === 'all' ? 'All E-Books' : `${selectedCat} Titles`}
-          </h2>
-          <span className="text-xs font-bold text-gray-400">
-            {filteredBooks.length} Books Found
-          </span>
+          <div>
+            <h2 className="text-sm sm:text-base font-black text-gray-950">
+              {selectedCat === 'all' ? 'All E-Books' : `${selectedCat} Titles`}
+            </h2>
+            <span className="text-xs font-bold text-gray-400">
+              {filteredBooks.length} Books Found
+            </span>
+          </div>
+
+          {selectedCat !== 'all' && (
+            <Link
+              href={`/category/${encodeURIComponent(
+                categories.find((c) => c.title.toLowerCase() === selectedCat.toLowerCase())?.seolsug ||
+                  categories.find((c) => c.title.toLowerCase() === selectedCat.toLowerCase())?.id ||
+                  selectedCat
+              )}`}
+              className="text-xs font-bold text-[#4029AB] hover:text-[#32208a] flex items-center gap-1 bg-[#4029AB]/10 hover:bg-[#4029AB]/15 px-3 py-1.5 rounded-full transition-all"
+            >
+              <span>Dedicated Page</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </Link>
+          )}
         </div>
 
         {filteredBooks.length === 0 ? (
