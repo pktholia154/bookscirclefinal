@@ -341,7 +341,7 @@ export const DedicatedSearchView: React.FC<DedicatedSearchViewProps> = ({
 
                     {/* Publication below above row */}
                     <p className="text-[11px] text-gray-400 truncate mt-0.5">
-                      {book.publisher || book.publication || 'Exam Kart'}
+                      {book.publisher || book.publication || 'Mocktime Publication'}
                     </p>
 
                     <div className="flex items-center gap-1 text-amber-500 mt-1">

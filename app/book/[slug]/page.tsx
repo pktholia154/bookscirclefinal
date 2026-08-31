@@ -36,7 +36,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     book.seo_description ||
     book.full_description ||
     `Download ${book.title} PDF eBook for ${book.category}. Complete syllabus, study notes, and solved questions with instant delivery.`;
-  const canonicalUrl = `${SITE_URL}/book/${encodeURIComponent(book.slug || book.id)}`;
+  const canonicalUrl = `${SITE_URL}/book/${encodeURIComponent(book.id)}`;
   const coverUrl = book.cover || 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?q=80&w=1200&auto=format&fit=crop';
 
   return {

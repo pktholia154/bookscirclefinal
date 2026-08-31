@@ -77,7 +77,7 @@ export function generateBookSchema(book: Book) {
   const ratingCount = Number(book.rating_count || 120);
   const buyPrice = Number(book.buy_price || 0);
   const listPrice = Number(book.list_price || buyPrice);
-  const bookUrl = `${SITE_URL}/book/${book.slug || book.id}`;
+  const bookUrl = `${SITE_URL}/book/${encodeURIComponent(book.id)}`;
   const coverUrl = book.cover || `${SITE_URL}/cover-placeholder.jpg`;
 
   const faqItems = [
@@ -284,7 +284,7 @@ export function generateCategorySchema(
             item: {
               '@type': 'Book',
               name: book.title,
-              url: `${SITE_URL}/book/${book.slug || book.id}`,
+              url: `${SITE_URL}/book/${encodeURIComponent(book.id)}`,
               image: book.cover,
               offers: {
                 '@type': 'Offer',

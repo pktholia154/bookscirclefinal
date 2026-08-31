@@ -36,6 +36,7 @@ import { syncUserProfileToFirestore } from '@/lib/services/users';
 import { getPurchasedBookIdsFromLocal, savePurchasedBookIds } from '@/lib/offline-storage';
 import { addToCartAction, getCartFromLocal, subscribeToCartChanges } from '@/lib/services/cart';
 import { getWishlistIdsFromLocal, toggleWishlistAction, subscribeToWishlistChanges } from '@/lib/services/wishlist';
+import { subscribeToFirestoreBook } from '@/lib/services/books';
 import { auth, signInWithGoogle } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import Markdown from 'react-markdown';
@@ -83,10 +84,11 @@ const getPendingCheckoutItems = (): CartItem[] | null => {
 };
 
 export const BookPageClient: React.FC<BookPageClientProps> = ({
-  book,
+  book: initialBook,
   relatedBooks = [],
 }) => {
   const router = useRouter();
+  const [currentBook, setCurrentBook] = useState<Book>(initialBook);
   const [imgLoadFailed, setImgLoadFailed] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [activePdfReaderMode, setActivePdfReaderMode] = useState<'sample' | 'full' | null>(null);
@@ -98,6 +100,25 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
   const [cart, setCart] = useState<CartItem[]>([]);
   const [pendingActionAfterLogin, setPendingActionAfterLogin] = useState<((user: UserProfile) => void) | null>(null);
   const [, startTransition] = useTransition();
+
+  // Keep in sync with initialBook prop
+  useEffect(() => {
+    setCurrentBook(initialBook);
+    setImgLoadFailed(false);
+  }, [initialBook.id, initialBook]);
+
+  // Real-time Firestore synchronization for this exact book
+  useEffect(() => {
+    if (!initialBook.id) return;
+    const unsubscribe = subscribeToFirestoreBook(initialBook.id, (liveDoc) => {
+      if (liveDoc) {
+        setCurrentBook(liveDoc);
+      }
+    });
+    return () => unsubscribe();
+  }, [initialBook.id]);
+
+  const book = currentBook;
 
   // Reviews state with local interactive submission
   const [customReviews, setCustomReviews] = useState<Review[]>([]);
@@ -390,8 +411,8 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
     showToast('Thank you! Your verified review has been posted.');
   };
 
-  const rating = book.rating || 4.8;
-  const ratingCount = book.rating_count || 1420;
+  const rating = book.rating && book.rating > 0 ? book.rating : 4.8;
+  const ratingCount = book.rating_count && book.rating_count > 0 ? book.rating_count : 120;
   const formattedReviewsCount =
     ratingCount >= 1000 ? `${(ratingCount / 1000).toFixed(1)}K` : ratingCount.toString();
 
@@ -399,7 +420,7 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
     return [...customReviews, ...(book.reviews && Array.isArray(book.reviews) ? book.reviews : [])];
   }, [customReviews, book.reviews]);
 
-  // 6 tags for the book details page
+  // Real tags for the book details page
   const displayTags = useMemo(() => {
     const rawTags = Array.isArray(book.tags) ? book.tags.filter((t) => Boolean(t && t.trim())) : [];
     if (rawTags.length >= 6) {
@@ -407,15 +428,15 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
     }
     const defaultTagPool = [
       book.category || 'Competitive Exam',
+      book.language || 'English',
+      book.type || 'Question Bank',
       `${book.category || 'Exam'} PDF`,
-      'Study Guide',
       'Solved Papers',
-      'Revision Notes',
       'Instant Download',
     ];
     const combined = Array.from(new Set([...rawTags, ...defaultTagPool]));
     return combined.slice(0, 6);
-  }, [book.tags, book.category]);
+  }, [book.tags, book.category, book.language, book.type]);
 
   const discountPercent =
     book.list_price && book.list_price > book.buy_price
@@ -853,7 +874,7 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
               {relatedBooks.map((relBook) => (
                 <Link
                   key={relBook.id}
-                  href={`/book/${encodeURIComponent(relBook.slug || relBook.id)}`}
+                  href={`/book/${encodeURIComponent(relBook.id)}`}
                   className="w-24 shrink-0 group"
                 >
                   <div className="relative aspect-[3/4] w-full rounded-none overflow-hidden bg-gray-100 border border-gray-200 shadow-2xs">

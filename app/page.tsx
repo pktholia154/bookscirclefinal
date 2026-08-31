@@ -900,7 +900,7 @@ export default function HomePage() {
                   setSearchQuery('');
                   setActiveTab('home');
                 }}
-                onSelectBook={(book) => router.push(`/book/${encodeURIComponent(book.slug || book.id)}`)}
+                onSelectBook={(book) => router.push(`/book/${encodeURIComponent(book.id)}`)}
                 onAddToCart={handleAddToCart}
                 onBuyNow={handleBuyNow}
                 cartBookIds={cartBookIds}
@@ -926,7 +926,7 @@ export default function HomePage() {
                     <BookListView
                       title={`Search Results (${filteredBooks.length})`}
                       books={filteredBooks}
-                      onSelectBook={(book) => router.push(`/book/${encodeURIComponent(book.slug || book.id)}`)}
+                      onSelectBook={(book) => router.push(`/book/${encodeURIComponent(book.id)}`)}
                       onAddToCart={handleAddToCart}
                       onBuyNow={handleBuyNow}
                       cartBookIds={cartBookIds}
@@ -941,7 +941,7 @@ export default function HomePage() {
                     <BookListView
                       title={`${selectedCategory} Books (${filteredBooks.length})`}
                       books={filteredBooks}
-                      onSelectBook={(book) => router.push(`/book/${encodeURIComponent(book.slug || book.id)}`)}
+                      onSelectBook={(book) => router.push(`/book/${encodeURIComponent(book.id)}`)}
                       onAddToCart={handleAddToCart}
                       onBuyNow={handleBuyNow}
                       cartBookIds={cartBookIds}
@@ -959,7 +959,7 @@ export default function HomePage() {
                       sectionId="trending-books"
                       viewAllHref="/collection/trending"
                       books={featuredTrendingBooks.length > 0 ? featuredTrendingBooks : books.slice(0, 8)}
-                      onSelectBook={(book) => router.push(`/book/${encodeURIComponent(book.slug || book.id)}`)}
+                      onSelectBook={(book) => router.push(`/book/${encodeURIComponent(book.id)}`)}
                       onAddToCart={handleAddToCart}
                       onBuyNow={handleBuyNow}
                       cartBookIds={cartBookIds}
@@ -976,7 +976,7 @@ export default function HomePage() {
                       sectionId="bestseller-books"
                       viewAllHref="/collection/bestsellers"
                       books={bestSellerBooks}
-                      onSelectBook={(book) => router.push(`/book/${encodeURIComponent(book.slug || book.id)}`)}
+                      onSelectBook={(book) => router.push(`/book/${encodeURIComponent(book.id)}`)}
                       onAddToCart={handleAddToCart}
                       onBuyNow={handleBuyNow}
                       cartBookIds={cartBookIds}
@@ -994,7 +994,7 @@ export default function HomePage() {
                         sectionId={`category-${topCategoriesWithBooks[0].category.id}`}
                         viewAllHref={`/category/${encodeURIComponent(topCategoriesWithBooks[0].category.seolsug || topCategoriesWithBooks[0].category.id)}`}
                         books={topCategoriesWithBooks[0].books}
-                        onSelectBook={(book) => router.push(`/book/${encodeURIComponent(book.slug || book.id)}`)}
+                        onSelectBook={(book) => router.push(`/book/${encodeURIComponent(book.id)}`)}
                         onAddToCart={handleAddToCart}
                         onBuyNow={handleBuyNow}
                         cartBookIds={cartBookIds}
@@ -1013,7 +1013,7 @@ export default function HomePage() {
                         sectionId={`category-${topCategoriesWithBooks[1].category.id}`}
                         viewAllHref={`/category/${encodeURIComponent(topCategoriesWithBooks[1].category.seolsug || topCategoriesWithBooks[1].category.id)}`}
                         books={topCategoriesWithBooks[1].books}
-                        onSelectBook={(book) => router.push(`/book/${encodeURIComponent(book.slug || book.id)}`)}
+                        onSelectBook={(book) => router.push(`/book/${encodeURIComponent(book.id)}`)}
                         onAddToCart={handleAddToCart}
                         onBuyNow={handleBuyNow}
                         cartBookIds={cartBookIds}
@@ -1032,7 +1032,7 @@ export default function HomePage() {
                         sectionId={`category-${topCategoriesWithBooks[2].category.id}`}
                         viewAllHref={`/category/${encodeURIComponent(topCategoriesWithBooks[2].category.seolsug || topCategoriesWithBooks[2].category.id)}`}
                         books={topCategoriesWithBooks[2].books}
-                        onSelectBook={(book) => router.push(`/book/${encodeURIComponent(book.slug || book.id)}`)}
+                        onSelectBook={(book) => router.push(`/book/${encodeURIComponent(book.id)}`)}
                         onAddToCart={handleAddToCart}
                         onBuyNow={handleBuyNow}
                         cartBookIds={cartBookIds}
@@ -1048,7 +1048,7 @@ export default function HomePage() {
                       limit={10}
                       viewAllHref="/collection/all"
                       books={books}
-                      onSelectBook={(book) => router.push(`/book/${encodeURIComponent(book.slug || book.id)}`)}
+                      onSelectBook={(book) => router.push(`/book/${encodeURIComponent(book.id)}`)}
                       onAddToCart={handleAddToCart}
                       onBuyNow={handleBuyNow}
                       cartBookIds={cartBookIds}
@@ -1069,7 +1069,7 @@ export default function HomePage() {
               <CategoriesView
                 categories={categories}
                 books={books}
-                onSelectBook={(book) => router.push(`/book/${encodeURIComponent(book.slug || book.id)}`)}
+                onSelectBook={(book) => router.push(`/book/${encodeURIComponent(book.id)}`)}
                 onAddToCart={handleAddToCart}
                 onBuyNow={handleBuyNow}
                 cartBookIds={cartBookIds}
@@ -1239,7 +1239,7 @@ export default function HomePage() {
                 books={books}
                 purchasedBookIds={purchasedBookIds}
                 currentUser={currentUser}
-                onSelectBook={(book) => router.push(`/book/${encodeURIComponent(book.slug || book.id)}`)}
+                onSelectBook={(book) => router.push(`/book/${encodeURIComponent(book.id)}`)}
                 onNavigateHome={() => handleTabChange('home')}
               />
             )}

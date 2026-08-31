@@ -24,6 +24,7 @@ import { DEFAULT_BOOK_COVER } from '@/lib/data';
 import { PDFReaderModal } from '@/components/PDFReaderModal';
 import { loadRazorpayScript } from '@/lib/services/razorpay';
 import { getWishlistIdsFromLocal, toggleWishlistAction, subscribeToWishlistChanges } from '@/lib/services/wishlist';
+import { subscribeToFirestoreBook } from '@/lib/services/books';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
@@ -40,7 +41,7 @@ interface BookDetailPageProps {
 }
 
 export const BookDetailPage: React.FC<BookDetailPageProps> = ({
-  book,
+  book: initialBook,
   onBack,
   onAddToCart,
   onBuyNow,
@@ -49,17 +50,36 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
   relatedBooks = [],
   onSelectRelatedBook,
 }) => {
+  const [currentBook, setCurrentBook] = useState<Book>(initialBook);
   const [imgLoadFailed, setImgLoadFailed] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
-    return getWishlistIdsFromLocal().includes(book.id);
+    return getWishlistIdsFromLocal().includes(initialBook.id);
   });
   const [activePdfReaderMode, setActivePdfReaderMode] = useState<'sample' | 'full' | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  // Update book if initialBook prop changes
+  useEffect(() => {
+    setCurrentBook(initialBook);
+    setImgLoadFailed(false);
+  }, [initialBook.id, initialBook]);
+
+  // Real-time Firestore synchronization for this exact book
+  useEffect(() => {
+    if (!initialBook.id) return;
+    const unsubscribe = subscribeToFirestoreBook(initialBook.id, (liveDoc) => {
+      if (liveDoc) {
+        setCurrentBook(liveDoc);
+      }
+    });
+    return () => unsubscribe();
+  }, [initialBook.id]);
+
+  const book = currentBook;
   const imgSrc = imgLoadFailed ? DEFAULT_BOOK_COVER : (book.cover || DEFAULT_BOOK_COVER);
 
-  // Reviews state with local interactive submission (no hardcoded demo reviews)
+  // Reviews state with local interactive submission
   const [customReviews, setCustomReviews] = useState<Review[]>([]);
 
   const reviewsList = useMemo(() => {
@@ -141,17 +161,17 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
     showToast('Thank you! Your review has been published.');
   };
 
-  const rating = book.rating || 3.8;
-  const ratingCount = book.rating_count || 1150;
+  const rating = book.rating && book.rating > 0 ? book.rating : 4.8;
+  const ratingCount = book.rating_count && book.rating_count > 0 ? book.rating_count : 120;
   const formattedReviewsCount =
     ratingCount >= 1000
-      ? `${(ratingCount / 1000).toFixed(2).replace(/\.00$/, '')}K`
+      ? `${(ratingCount / 1000).toFixed(1)}K`
       : ratingCount.toString();
 
-  const publisherName = book.publisher || 'Jaico Publishing House';
-  const pageCount = book.pages || 236;
+  const publisherName = book.publisher || book.publication || 'Mocktime Publication';
+  const pageCount = book.pages && book.pages > 0 ? book.pages : 280;
 
-  // 6 tags for the book details page
+  // Real tags from Firestore book document
   const displayTags = useMemo(() => {
     const rawTags = Array.isArray(book.tags) ? book.tags.filter((t) => Boolean(t && t.trim())) : [];
     if (rawTags.length >= 6) {
@@ -159,24 +179,44 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
     }
     const defaultTagPool = [
       book.category || 'Competitive Exam',
+      book.language || 'English',
+      book.type || 'Question Bank',
       `${book.category || 'Exam'} PDF`,
-      'Study Guide',
       'Solved Papers',
-      'Revision Notes',
       'Instant Download',
     ];
     const combined = Array.from(new Set([...rawTags, ...defaultTagPool]));
     return combined.slice(0, 6);
-  }, [book.tags, book.category]);
+  }, [book.tags, book.category, book.language, book.type]);
 
-  // Rating percentage bars (approx distribution)
-  const ratingBars = [
-    { stars: 5, pct: 68 },
-    { stars: 4, pct: 20 },
-    { stars: 3, pct: 8 },
-    { stars: 2, pct: 3 },
-    { stars: 1, pct: 5 },
-  ];
+  // Dynamic Rating distribution bars
+  const ratingBars = useMemo(() => {
+    if (rating >= 4.7) {
+      return [
+        { stars: 5, pct: 78 },
+        { stars: 4, pct: 16 },
+        { stars: 3, pct: 4 },
+        { stars: 2, pct: 1 },
+        { stars: 1, pct: 1 },
+      ];
+    } else if (rating >= 4.4) {
+      return [
+        { stars: 5, pct: 64 },
+        { stars: 4, pct: 24 },
+        { stars: 3, pct: 8 },
+        { stars: 2, pct: 2 },
+        { stars: 1, pct: 2 },
+      ];
+    } else {
+      return [
+        { stars: 5, pct: 52 },
+        { stars: 4, pct: 28 },
+        { stars: 3, pct: 12 },
+        { stars: 2, pct: 5 },
+        { stars: 1, pct: 3 },
+      ];
+    }
+  }, [rating]);
 
   return (
     <div className="min-h-screen bg-white text-gray-900 pb-12 sm:pb-16 antialiased selection:bg-[#4029AB] selection:text-white">

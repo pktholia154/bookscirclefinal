@@ -586,7 +586,7 @@ export default function PDFReader() {
                 </div>
                 {bookData && (
                   <button
-                    onClick={() => router.push(`/book/${bookData.slug || bookData.id}`)}
+                    onClick={() => router.push(`/book/${encodeURIComponent(bookData.id)}`)}
                     className="w-full py-3 rounded-xl bg-[#4029AB] hover:bg-[#34208e] text-white font-bold text-xs shadow-lg transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2"
                   >
                     <ShoppingBag className="w-4 h-4" />
