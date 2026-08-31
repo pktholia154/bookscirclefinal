@@ -1,4 +1,5 @@
 const { initializeApp } = require('firebase/app');
+const { getAuth, signInAnonymously } = require('firebase/auth');
 const { getFirestore, collection, getDocs } = require('firebase/firestore');
 const fs = require('fs');
 
@@ -12,14 +13,18 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
 const db = getFirestore(app, 'bookscircle');
 
 function sanitize(val) {
   if (typeof val !== 'string') return val;
-  // Normalize Unicode and replace unprintable control codes safely
-  let cleaned = val
-    .normalize('NFC')
+  // Convert to well-formed UTF-16 to eliminate lone surrogates (causes Rust/SWC utf-8 stream error)
+  let cleaned = val.toWellFormed ? val.toWellFormed() : val;
+  // Remove lone/unpaired surrogates and unprintable control characters
+  cleaned = cleaned
+    .replace(/[\uD800-\uDFFF]/g, '')
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F\uFFFD]/g, '')
+    .normalize('NFC')
     .trim();
 
   return cleaned;
@@ -40,6 +45,13 @@ function sanitizeObject(obj) {
 }
 
 async function exportData() {
+  console.log('Authenticating with Firebase...');
+  try {
+    await signInAnonymously(auth);
+    console.log('Authenticated anonymously.');
+  } catch (err) {
+    console.warn('Anonymous auth warning:', err.message);
+  }
   console.log('Fetching collections from Firestore bookscircle...');
   const booksSnap = await getDocs(collection(db, 'books'));
   const catSnap = await getDocs(collection(db, 'categories'));

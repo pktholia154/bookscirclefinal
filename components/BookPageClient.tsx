@@ -874,7 +874,7 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
               {relatedBooks.map((relBook) => (
                 <Link
                   key={relBook.id}
-                  href={`/book/${encodeURIComponent(relBook.id)}`}
+                  href={`/book/${encodeURIComponent(relBook.seoslug || relBook.slug || relBook.id)}`}
                   className="w-24 shrink-0 group"
                 >
                   <div className="relative aspect-[3/4] w-full rounded-none overflow-hidden bg-gray-100 border border-gray-200 shadow-2xs">

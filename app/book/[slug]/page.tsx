@@ -15,13 +15,20 @@ interface PageProps {
 }
 
 export async function generateStaticParams() {
-  return [];
+  try {
+    const books = await getBooksFromFirestore();
+    return books.map((book) => ({
+      slug: book.seoslug || book.slug || book.id,
+    }));
+  } catch (error) {
+    console.warn('generateStaticParams error:', error);
+    return [];
+  }
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  const decodedSlug = decodeURIComponent(slug);
-  const book = await getFirestoreBookById(decodedSlug);
+  const book = await getFirestoreBookById(slug);
 
   if (!book) {
     return {
@@ -36,7 +43,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     book.seo_description ||
     book.full_description ||
     `Download ${book.title} PDF eBook for ${book.category}. Complete syllabus, study notes, and solved questions with instant delivery.`;
-  const canonicalUrl = `${SITE_URL}/book/${encodeURIComponent(book.id)}`;
+  const canonicalUrl = `${SITE_URL}/book/${encodeURIComponent(book.seoslug || book.slug || book.id)}`;
   const coverUrl = book.cover || 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?q=80&w=1200&auto=format&fit=crop';
 
   return {
@@ -91,8 +98,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function BookSSRPage({ params }: PageProps) {
   const { slug } = await params;
-  const decodedSlug = decodeURIComponent(slug);
-  const book = await getFirestoreBookById(decodedSlug);
+  const book = await getFirestoreBookById(slug);
 
   if (!book) {
     return (

@@ -214,7 +214,7 @@ export const CategoryPageClient: React.FC<CategoryPageClientProps> = ({
   };
 
   const handleSelectBook = (book: Book) => {
-    router.push(`/book/${encodeURIComponent(book.id)}`);
+    router.push(`/book/${encodeURIComponent(book.seoslug || book.slug || book.id)}`);
   };
 
   const handleAddToCart = (book: Book, e?: React.MouseEvent) => {

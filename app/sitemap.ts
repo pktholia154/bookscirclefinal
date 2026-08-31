@@ -56,7 +56,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     bookRoutes = books
       .filter((b) => b.isActive !== false)
       .map((book) => ({
-        url: `${SITE_URL}/book/${encodeURIComponent(book.id)}`,
+        url: `${SITE_URL}/book/${encodeURIComponent(book.seoslug || book.slug || book.id)}`,
         lastModified: new Date(book.published_date || Date.now()),
         changeFrequency: 'weekly' as const,
         priority: 0.9,

@@ -5,6 +5,9 @@ import {
   onSnapshot,
   doc,
   setDoc,
+  query,
+  where,
+  limit,
 } from 'firebase/firestore';
 import { db, defaultDb, ensureFirebaseAuth } from '../firebase';
 import { Book, Category } from '../types';
@@ -325,7 +328,7 @@ export async function getFirestoreBookById(idOrSlug: string): Promise<Book | nul
   const rawTarget = idOrSlug.trim();
   const target = rawTarget.toLowerCase();
 
-  // 1. Direct single-document Firestore read for 100% exact match
+  // 1. Direct single-document Firestore read for 100% exact ID match
   try {
     const docRef = doc(db, 'books', rawTarget);
     const snap = await getDoc(docRef);
@@ -334,6 +337,21 @@ export async function getFirestoreBookById(idOrSlug: string): Promise<Book | nul
     }
   } catch (e) {
     console.warn('Direct doc lookup note:', e);
+  }
+
+  // 2. Direct Firestore query by clean seoslug
+  try {
+    const seoslugQuery = query(
+      collection(db, 'books'),
+      where('seoslug', '==', target),
+      limit(1)
+    );
+    const slugSnap = await getDocs(seoslugQuery);
+    if (!slugSnap.empty) {
+      return parseBookDocument(slugSnap.docs[0]);
+    }
+  } catch (e) {
+    console.warn('Direct seoslug query note:', e);
   }
 
   // 2. Fetch all books and search by exact ID, then slug, then title
