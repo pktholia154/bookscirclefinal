@@ -3,6 +3,7 @@ import { Roboto } from 'next/font/google';
 import './globals.css';
 import { generateWebsiteSchema, SITE_URL, SITE_NAME } from '@/lib/seo';
 import { PWARegister } from '@/components/PWARegister';
+import { NativePageLoadingProvider } from '@/components/NativePageLoadingIndicator';
 
 const roboto = Roboto({
   weight: ['300', '400', '500', '700', '900'],
@@ -147,8 +148,10 @@ export default function RootLayout({
       >
         {/* Standard Boxed Limits Container for PC/Desktop screens */}
         <div className="w-full max-w-2xl lg:max-w-3xl min-h-screen bg-white md:shadow-2xl md:shadow-gray-300/40 md:border-x md:border-gray-200/80 flex flex-col relative">
-          <PWARegister />
-          {children}
+          <NativePageLoadingProvider>
+            <PWARegister />
+            {children}
+          </NativePageLoadingProvider>
         </div>
       </body>
     </html>

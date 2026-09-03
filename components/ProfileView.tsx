@@ -52,10 +52,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 }) => {
   const [copied, setCopied] = useState(false);
   const [isSigningIn, setIsSigningIn] = useState(false);
-  const [wishlistIds, setWishlistIds] = useState<string[]>(() => {
-    if (typeof window === 'undefined') return [];
-    return getWishlistIdsFromLocal();
-  });
+  const [wishlistIds, setWishlistIds] = useState<string[]>([]);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
@@ -64,6 +61,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   };
 
   useEffect(() => {
+    try {
+      setWishlistIds(getWishlistIdsFromLocal());
+    } catch {}
+
     const unsub = subscribeToWishlistChanges((ids) => {
       setWishlistIds(ids);
     });

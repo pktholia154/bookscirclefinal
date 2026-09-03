@@ -2,12 +2,17 @@
 
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { X, Trash2, ArrowRight, CheckCircle2, Shield, Lock, AlertCircle, RefreshCw, Sparkles } from 'lucide-react';
+import { X, Trash2, ArrowRight, CheckCircle2, Shield, Lock, AlertCircle, RefreshCw, Sparkles, Check, Zap, Flame } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { CartItem } from '@/lib/types';
+import { CartItem, CartTierDiscount } from '@/lib/types';
 import { DEFAULT_BOOK_COVER } from '@/lib/data';
 import { processRazorpayPayment, loadRazorpayScript } from '@/lib/services/razorpay';
 import { calculateCartSummary } from '@/lib/services/cart';
+import {
+  subscribeToFirestoreDiscounts,
+  getCachedCartTierDiscountSync,
+  DEFAULT_CART_TIER_DISCOUNT,
+} from '@/lib/services/discounts';
 
 import { UserProfile } from '@/components/Header';
 
@@ -123,17 +128,30 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   const [orderSuccess, setOrderSuccess] = useState(false);
   const [lastPaymentId, setLastPaymentId] = useState<string | null>(null);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [tierDiscount, setTierDiscount] = useState<CartTierDiscount | null>(null);
+
+  // Sync tier discounts from Firestore & local storage
+  useEffect(() => {
+    setTierDiscount(getCachedCartTierDiscountSync());
+    const unsub = subscribeToFirestoreDiscounts((disc) => {
+      setTierDiscount(disc);
+    });
+    return () => unsub();
+  }, []);
 
   // Preload Razorpay script when cart is open
   useEffect(() => {
     if (isOpen) {
       loadRazorpayScript().catch(() => {});
+      setCheckoutError(null);
     }
   }, [isOpen]);
 
-  const summary = calculateCartSummary(items);
+  const summary = calculateCartSummary(items, tierDiscount);
   const subtotal = summary.subtotal;
+  const regularSubtotal = summary.regularSubtotal;
   const savings = summary.savings;
+  const isDiscountEligible = summary.applicable_discount_pct > 0;
 
   const handleCheckout = async (userOverride?: UserProfile) => {
     if (items.length === 0) return;
@@ -191,9 +209,8 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
         },
       });
     } catch (err: any) {
-      console.error('Checkout error:', err);
       setIsCheckingOut(false);
-      setCheckoutError(err?.message || 'Payment could not be initiated.');
+      setCheckoutError(err?.message || 'Payment initiation failed. Please try again.');
     }
   };
 
@@ -201,39 +218,43 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 overflow-hidden bg-black/50 backdrop-blur-xs flex justify-end">
+      <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
         {/* Backdrop */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="absolute inset-0"
           onClick={onClose}
+          className="fixed inset-0 bg-black/40 backdrop-blur-2xs transition-opacity"
         />
 
-        {/* Drawer Panel */}
+        {/* Drawer panel */}
         <motion.div
           initial={{ x: '100%' }}
           animate={{ x: 0 }}
           exit={{ x: '100%' }}
-          transition={{ type: 'spring', damping: 26, stiffness: 300 }}
-          className="relative z-10 w-full max-w-md bg-white h-full shadow-2xl flex flex-col"
+          transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+          className="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col z-10"
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <div className="p-4 border-b border-gray-100 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <h2 className="text-lg font-bold text-gray-950">Your Cart</h2>
+              <h2 className="text-base sm:text-lg font-bold text-gray-950">
+                Your eBook Cart
+              </h2>
               <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-[#4029AB]/10 text-[#4029AB]">
-                {items.length} {items.length === 1 ? 'eBook' : 'eBooks'}
+                {items.length} {items.length === 1 ? 'item' : 'items'}
               </span>
             </div>
+
             <div className="flex items-center gap-2">
-              {items.length > 0 && (
+              {items.length > 0 && !orderSuccess && (
                 <button
                   onClick={onClearCart}
-                  className="text-xs font-semibold text-gray-400 hover:text-red-500 transition-colors px-2 py-1 cursor-pointer"
+                  className="text-xs font-semibold text-gray-400 hover:text-red-600 transition-colors p-1 cursor-pointer"
+                  title="Clear all items"
                 >
-                  Clear All
+                  Clear
                 </button>
               )}
               <button
@@ -301,8 +322,42 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                 ))}
               </div>
 
+              {/* Tier Offer Banner inside Cart Drawer */}
+              <div className="px-4 py-2.5 bg-gradient-to-r from-[#4029AB]/10 via-[#4029AB]/5 to-indigo-50/70 border-t border-b border-gray-100 space-y-1.5">
+                <div className="flex items-center justify-between text-xs font-bold">
+                  <span className="flex items-center gap-1.5 text-gray-900">
+                    <Sparkles className="w-3.5 h-3.5 text-[#4029AB]" />
+                    <span>{tierDiscount?.title || 'Mega Diwali Sale'}</span>
+                  </span>
+                  {isDiscountEligible ? (
+                    <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full flex items-center gap-1">
+                      <Flame className="w-3 h-3 text-amber-500 fill-amber-500" />
+                      <span>{summary.applicable_discount_pct}% OFF UNLOCKED</span>
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-bold text-[#4029AB] bg-white px-2 py-0.5 rounded-full border border-[#4029AB]/20">
+                      Tier Discounts Active
+                    </span>
+                  )}
+                </div>
+
+                <p className="text-[11px] font-medium text-gray-700 leading-tight">
+                  {summary.nudgeMessage}
+                </p>
+
+                {summary.nextTier && (
+                  <div className="w-full bg-gray-200/80 rounded-full h-1.5 overflow-hidden mt-1">
+                    <motion.div
+                      className="bg-[#4029AB] h-full rounded-full transition-all duration-500"
+                      initial={{ width: 0 }}
+                      animate={{ width: `${Math.max(4, Math.min(100, summary.progressPct))}%` }}
+                    />
+                  </div>
+                )}
+              </div>
+
               {/* Price summary & Checkout footer */}
-              <div className="p-4 border-t border-gray-100 bg-gray-50 space-y-3">
+              <div className="p-4 bg-gray-50 space-y-3">
                 {checkoutError && (
                   <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-start gap-2">
                     <AlertCircle className="w-4 h-4 shrink-0 text-red-500 mt-0.5" />
@@ -313,21 +368,44 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                   </div>
                 )}
 
+                {/* Price Breakdown */}
                 <div className="space-y-1.5 text-xs text-gray-600">
                   <div className="flex justify-between">
-                    <span>Subtotal ({items.length} {items.length === 1 ? 'item' : 'items'})</span>
-                    <span className="font-semibold text-gray-900">₹{subtotal}</span>
+                    <span>List Price Total</span>
+                    <span className="font-semibold text-gray-400 line-through">
+                      ₹{summary.totalListPrice}
+                    </span>
                   </div>
-                  {savings > 0 && (
-                    <div className="flex justify-between text-emerald-600">
-                      <span>Total Savings ({summary.savingsPercent}% OFF)</span>
-                      <span className="font-semibold">-₹{savings}</span>
+
+                  <div className="flex justify-between">
+                    <span>Cart Subtotal</span>
+                    <span className="font-semibold text-gray-900">
+                      ₹{regularSubtotal}
+                    </span>
+                  </div>
+
+                  {summary.tierDiscountAmount > 0 && (
+                    <div className="flex justify-between text-emerald-700 font-bold">
+                      <span className="flex items-center gap-1">
+                        <Zap className="w-3.5 h-3.5 text-emerald-600 fill-emerald-600" />
+                        <span>Tier Discount ({summary.applicable_discount_pct}% OFF)</span>
+                      </span>
+                      <span>-₹{summary.tierDiscountAmount}</span>
                     </div>
                   )}
+
+                  {savings > 0 && (
+                    <div className="flex justify-between text-emerald-600">
+                      <span>Total Savings vs List Price</span>
+                      <span className="font-semibold">-₹{savings} ({summary.savingsPercent}% OFF)</span>
+                    </div>
+                  )}
+
                   <div className="flex justify-between">
                     <span>Delivery</span>
                     <span className="font-semibold text-emerald-600">Instant Digital Delivery (Free)</span>
                   </div>
+
                   <div className="flex justify-between text-sm font-bold text-gray-950 pt-2 border-t border-gray-200">
                     <span>Total Amount</span>
                     <span className="text-base font-black text-[#4029AB]">₹{subtotal}</span>

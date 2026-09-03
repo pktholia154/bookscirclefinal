@@ -57,6 +57,7 @@ interface CategoryPageClientProps {
   categoryTitle: string;
   categorySlug: string;
   categoryDescription?: string;
+  seoCat?: string;
   books: Book[];
   allCategories: Category[];
 }
@@ -65,6 +66,7 @@ export const CategoryPageClient: React.FC<CategoryPageClientProps> = ({
   categoryTitle,
   categorySlug,
   categoryDescription,
+  seoCat,
   books,
   allCategories,
 }) => {
@@ -72,27 +74,10 @@ export const CategoryPageClient: React.FC<CategoryPageClientProps> = ({
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'popular' | 'price-asc' | 'price-desc' | 'rating'>('popular');
-  const [wishlistIds, setWishlistIds] = useState<string[]>(() => {
-    if (typeof window === 'undefined') return [];
-    return getWishlistIdsFromLocal();
-  });
-  const [cart, setCart] = useState<CartItem[]>(() => {
-    if (typeof window === 'undefined') return [];
-    return getCartFromLocal();
-  });
-  const [purchasedBookIds, setPurchasedBookIds] = useState<string[]>(() => {
-    if (typeof window === 'undefined') return [];
-    return getPurchasedBookIdsFromLocal();
-  });
-  const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
-    if (typeof window === 'undefined') return null;
-    try {
-      const savedUser = localStorage.getItem('bookscircle_auth_user');
-      return savedUser ? JSON.parse(savedUser) : null;
-    } catch {
-      return null;
-    }
-  });
+  const [wishlistIds, setWishlistIds] = useState<string[]>([]);
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [purchasedBookIds, setPurchasedBookIds] = useState<string[]>([]);
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [activePdfBook, setActivePdfBook] = useState<{ book: Book; mode: 'sample' | 'full' } | null>(null);
@@ -103,6 +88,16 @@ export const CategoryPageClient: React.FC<CategoryPageClientProps> = ({
   };
 
   useEffect(() => {
+    try {
+      setWishlistIds(getWishlistIdsFromLocal());
+      setCart(getCartFromLocal());
+      setPurchasedBookIds(getPurchasedBookIdsFromLocal());
+      const savedUser = localStorage.getItem('bookscircle_auth_user');
+      if (savedUser) {
+        setCurrentUser(JSON.parse(savedUser));
+      }
+    } catch {}
+
     const unsubWishlist = subscribeToWishlistChanges((ids) => setWishlistIds(ids));
     const unsubCart = subscribeToCartChanges((items) => setCart(items));
 
@@ -312,25 +307,22 @@ export const CategoryPageClient: React.FC<CategoryPageClientProps> = ({
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 pt-5 space-y-6">
-        {/* 2. Category Title & SEO Description Banner */}
-        <section className="bg-gray-50/80 border border-gray-200/80 rounded-3xl p-5 sm:p-6 space-y-2 shadow-2xs">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-[#4029AB]/10 text-[#4029AB]">
-              Exam Category
-            </span>
-            <span className="text-xs font-bold text-gray-500">
-              {books.length} {books.length === 1 ? 'eBook' : 'eBooks'} available
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 pt-3 space-y-5">
+        {/* Category Title & SEO Metadata - Seamless layout directly on white canvas without card view */}
+        <section className="pt-1 space-y-1">
+          <div className="flex items-baseline justify-between gap-2">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-black text-gray-950 tracking-tight leading-snug">
+              {categoryTitle}
+            </h1>
+            <span className="text-xs font-bold text-gray-400 shrink-0">
+              {books.length} {books.length === 1 ? 'eBook' : 'eBooks'}
             </span>
           </div>
-          <h1 className="text-xl sm:text-2xl md:text-3xl font-black text-gray-950 tracking-tight leading-snug">
-            {categoryTitle}
-          </h1>
-          {categoryDescription && (
-            <p className="text-xs sm:text-sm text-gray-600 font-normal leading-relaxed max-w-3xl">
-              {categoryDescription}
+          {seoCat ? (
+            <p className="text-xs sm:text-sm text-gray-600 font-normal leading-relaxed max-w-3xl pt-0.5">
+              {seoCat}
             </p>
-          )}
+          ) : null}
         </section>
 
         {/* 3. Category Switcher Chips (Horizontal scrollable) */}

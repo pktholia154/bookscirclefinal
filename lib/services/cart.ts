@@ -1,7 +1,8 @@
 'use client';
 
-import { Book, CartItem } from '../types';
+import { Book, CartItem, CartTierDiscount } from '../types';
 import { getPurchasedBookIdsFromLocal } from '../offline-storage';
+import { evaluateCartTier, getCachedCartTierDiscountSync } from './discounts';
 
 export const CART_STORAGE_KEY = 'bookscircle_cart';
 export const CART_SYNC_EVENT = 'bookscircle:cart-sync';
@@ -232,30 +233,45 @@ export function clearCartAction(): CartItem[] {
 }
 
 /**
- * Calculate totals for cart items
+ * Calculate totals for cart items, with automatic cart-tier discount applied at checkout
  */
-export function calculateCartSummary(items: CartItem[]) {
-  const subtotal = items.reduce(
+export function calculateCartSummary(
+  items: CartItem[],
+  tierDiscountConfig?: CartTierDiscount | null
+) {
+  const totalListPrice = items.reduce(
+    (sum, item) => sum + (item.book.list_price || item.book.buy_price || 0),
+    0
+  );
+  const regularSubtotal = items.reduce(
     (sum, item) => sum + (item.book.buy_price || 0),
     0
   );
-  const totalListPrice = items.reduce(
-    (sum, item) =>
-      sum + (item.book.list_price || item.book.buy_price || 0),
-    0
-  );
-  const savings = Math.max(0, totalListPrice - subtotal);
+
+  const evaluation = evaluateCartTier(regularSubtotal, tierDiscountConfig);
+  const subtotal = evaluation.finalTotal;
+  const tierDiscountAmount = evaluation.discountAmount;
+  const totalSavings = Math.max(0, totalListPrice - subtotal);
   const savingsPercent =
-    totalListPrice > 0 ? Math.round((savings / totalListPrice) * 100) : 0;
+    totalListPrice > 0 ? Math.round((totalSavings / totalListPrice) * 100) : 0;
 
   return {
     subtotal,
+    regularSubtotal,
     totalListPrice,
-    savings,
+    savings: totalSavings,
     savingsPercent,
+    tierDiscountAmount,
+    applicable_discount_pct: evaluation.applicable_discount_pct,
+    activeTier: evaluation.activeTier,
+    nextTier: evaluation.nextTier,
+    amountNeededForNextTier: evaluation.amountNeededForNextTier,
+    nudgeMessage: evaluation.nudgeMessage,
+    progressPct: evaluation.progressPct,
     count: items.length,
   };
 }
+
 
 /**
  * Subscribes to real-time cart changes across the window and other browser tabs

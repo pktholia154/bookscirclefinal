@@ -52,6 +52,29 @@
         "isActive": { "type": "boolean", "description": "Whether book is active for sale" }
       },
       "required": ["id", "title", "buy_price", "category"]
+    },
+    "Discount": {
+      "title": "Discount",
+      "description": "Cart tier-based discount configuration",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "Title of the sale or offer" },
+        "is_active": { "type": "boolean", "description": "Whether offer is active" },
+        "tiers": {
+          "type": "array",
+          "description": "List of cart total discount tiers",
+          "items": {
+            "type": "object",
+            "properties": {
+              "min_total": { "type": "number", "description": "Minimum cart subtotal to qualify" },
+              "discount_pct": { "type": "number", "description": "Percentage discount to apply to cart" },
+              "label": { "type": "string", "description": "Display label for tier" }
+            },
+            "required": ["min_total", "discount_pct", "label"]
+          }
+        }
+      },
+      "required": ["title", "is_active", "tiers"]
     }
   },
   "firestore": {
@@ -66,6 +89,10 @@
     "/books/{bookId}": {
       "schema": "Book",
       "description": "Ebooks catalog"
+    },
+    "/discounts/{discountId}": {
+      "schema": "Discount",
+      "description": "Promotional discount codes and sales collection"
     }
   }
 }

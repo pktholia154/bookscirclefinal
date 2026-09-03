@@ -22,7 +22,7 @@ import { motion, AnimatePresence } from 'motion/react';
 function SearchPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const queryParam = searchParams.get('q') || '';
+  const queryParam = searchParams?.get('q') || '';
 
   const [books, setBooks] = useState<Book[]>(INITIAL_BOOKS);
   const [categories, setCategories] = useState<Category[]>(INITIAL_CATEGORIES);

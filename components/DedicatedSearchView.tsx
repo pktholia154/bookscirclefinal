@@ -70,9 +70,15 @@ export const DedicatedSearchView: React.FC<DedicatedSearchViewProps> = ({
   const [query, setQuery] = useState(initialQuery);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'relevance' | 'rating' | 'price_low' | 'price_high'>('relevance');
+  const [visibleCount, setVisibleCount] = useState<number>(12);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Reset visibleCount when search query, category or sort changes
+  useEffect(() => {
+    setVisibleCount(12);
+  }, [query, selectedCategory, sortBy]);
 
   // Focus input and load recent searches on mount
   useEffect(() => {
@@ -295,120 +301,136 @@ export const DedicatedSearchView: React.FC<DedicatedSearchViewProps> = ({
             </div>
           </div>
         ) : (
-          <div className="space-y-2.5">
-            {searchResults.map((book) => {
-              const inCart = cartBookIds.has(book.id);
-              const isOwned = purchasedBookIds.includes(book.id);
-              const discountPercent =
-                book.list_price && book.list_price > book.buy_price
-                  ? Math.round(((book.list_price - book.buy_price) / book.list_price) * 100)
-                  : 0;
+          <div className="space-y-3">
+            <div className="space-y-2.5">
+              {searchResults.slice(0, visibleCount).map((book) => {
+                const inCart = cartBookIds.has(book.id);
+                const isOwned = purchasedBookIds.includes(book.id);
+                const discountPercent =
+                  book.list_price && book.list_price > book.buy_price
+                    ? Math.round(((book.list_price - book.buy_price) / book.list_price) * 100)
+                    : 0;
 
-              return (
-                <div
-                  key={book.id}
-                  id={`search-item-${book.id}`}
-                  onClick={() => onSelectBook(book)}
-                  className="group flex items-start gap-3 p-3 rounded-2xl border border-gray-200 bg-white hover:border-[#4029AB]/40 hover:shadow-xs transition-all cursor-pointer active:scale-[0.99]"
-                >
-                  {/* Book Cover (Ratio 3:4, Sharp corners) */}
-                  <div className="relative w-14 sm:w-16 aspect-[3/4] rounded-none overflow-hidden shrink-0 self-start bg-gray-100 border border-gray-200 shadow-2xs">
-                    <Image
-                      src={book.cover || DEFAULT_BOOK_COVER}
-                      alt={book.title}
-                      fill
-                      unoptimized
-                      sizes="64px"
-                      className="object-cover rounded-none group-hover:scale-105 transition-transform duration-300"
-                      referrerPolicy="no-referrer"
-                    />
-                  </div>
-
-                  {/* Middle Book Details */}
-                  <div className="flex-1 min-w-0 pr-1">
-                    <h3 className="font-bold text-xs sm:text-sm text-gray-950 line-clamp-2 leading-snug group-hover:text-[#4029AB] transition-colors">
-                      {book.title}
-                    </h3>
-
-                    {/* Category, Language & Type in same row (display only field values, not field labels) */}
-                    <div className="flex items-center gap-1.5 text-[11px] text-gray-500 truncate mt-1">
-                      <span className="font-medium text-gray-600">{book.category || 'General'}</span>
-                      <span className="text-gray-300 text-[9px]">•</span>
-                      <span>{book.language || 'English'}</span>
-                      <span className="text-gray-300 text-[9px]">•</span>
-                      <span>{book.type || 'PDF Ebook'}</span>
+                return (
+                  <div
+                    key={book.id}
+                    id={`search-item-${book.id}`}
+                    onClick={() => onSelectBook(book)}
+                    className="group flex items-start gap-3 p-3 rounded-2xl border border-gray-200 bg-white hover:border-[#4029AB]/40 hover:shadow-xs transition-all cursor-pointer active:scale-[0.99]"
+                  >
+                    {/* Book Cover (Ratio 3:4, Sharp corners) */}
+                    <div className="relative w-14 sm:w-16 aspect-[3/4] rounded-none overflow-hidden shrink-0 self-start bg-gray-100 border border-gray-200 shadow-2xs">
+                      <Image
+                        src={book.cover || DEFAULT_BOOK_COVER}
+                        alt={book.title}
+                        fill
+                        unoptimized
+                        sizes="64px"
+                        className="object-cover rounded-none group-hover:scale-105 transition-transform duration-300"
+                        referrerPolicy="no-referrer"
+                      />
                     </div>
 
-                    {/* Publication below above row */}
-                    <p className="text-[11px] text-gray-400 truncate mt-0.5">
-                      {book.publisher || book.publication || 'Mocktime Publication'}
-                    </p>
+                    {/* Middle Book Details */}
+                    <div className="flex-1 min-w-0 pr-1">
+                      <h3 className="font-bold text-xs sm:text-sm text-gray-950 line-clamp-2 leading-snug group-hover:text-[#4029AB] transition-colors">
+                        {book.title}
+                      </h3>
 
-                    <div className="flex items-center gap-1 text-amber-500 mt-1">
-                      <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                      <span className="text-[10px] font-bold text-gray-700">
-                        {book.rating?.toFixed(1) || '4.7'}
-                      </span>
-                      <span className="text-[10px] text-gray-400">
-                        ({book.rating_count || 120} reviews)
-                      </span>
-                    </div>
-                  </div>
+                      {/* Category, Language & Type in same row (display only field values, not field labels) */}
+                      <div className="flex items-center gap-1.5 text-[11px] text-gray-500 truncate mt-1">
+                        <span className="font-medium text-gray-600">{book.category || 'General'}</span>
+                        <span className="text-gray-300 text-[9px]">•</span>
+                        <span>{book.language || 'English'}</span>
+                        <span className="text-gray-300 text-[9px]">•</span>
+                        <span>{book.type || 'PDF Ebook'}</span>
+                      </div>
 
-                  {/* Right Pricing & Quick Buy / Cart Actions */}
-                  <div className="text-right shrink-0 flex flex-col items-end justify-between self-stretch">
-                    <div>
-                      <p className="text-sm sm:text-base font-black text-[#4029AB] tracking-tight">
-                        ₹{book.buy_price}
+                      {/* Publication below above row */}
+                      <p className="text-[11px] text-gray-400 truncate mt-0.5">
+                        {book.publisher || book.publication || 'Mocktime Publication'}
                       </p>
-                      {book.list_price && book.list_price > book.buy_price && (
-                        <p className="text-[10px] text-gray-400 line-through">
-                          ₹{book.list_price}
-                        </p>
-                      )}
+
+                      <div className="flex items-center gap-1 text-amber-500 mt-1">
+                        <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                        <span className="text-[10px] font-bold text-gray-700">
+                          {book.rating?.toFixed(1) || '4.7'}
+                        </span>
+                        <span className="text-[10px] text-gray-400">
+                          ({book.rating_count || 120} reviews)
+                        </span>
+                      </div>
                     </div>
 
-                    <div className="flex items-center gap-1.5 mt-2">
-                      {isOwned ? (
-                        <span className="px-2.5 py-1 bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-bold rounded-lg flex items-center gap-1">
-                          <Check className="w-3 h-3" />
-                          <span>Owned</span>
-                        </span>
-                      ) : (
-                        <>
-                          <button
-                            id={`search-add-cart-${book.id}`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onAddToCart(book, e);
-                            }}
-                            className={`p-1.5 rounded-lg border transition-all active:scale-90 cursor-pointer ${
-                              inCart
-                                ? 'bg-[#4029AB] text-white border-[#4029AB]'
-                                : 'border-gray-200 text-gray-700 bg-white hover:border-[#4029AB] hover:text-[#4029AB]'
-                            }`}
-                            title={inCart ? 'In Cart' : 'Add to Cart'}
-                          >
-                            <ShoppingCart className="w-3.5 h-3.5 stroke-[2.2]" />
-                          </button>
+                    {/* Right Pricing & Quick Buy / Cart Actions */}
+                    <div className="text-right shrink-0 flex flex-col items-end justify-between self-stretch">
+                      <div>
+                        <p className="text-sm sm:text-base font-black text-[#4029AB] tracking-tight">
+                          ₹{book.buy_price}
+                        </p>
+                        {book.list_price && book.list_price > book.buy_price && (
+                          <p className="text-[10px] text-gray-400 line-through">
+                            ₹{book.list_price}
+                          </p>
+                        )}
+                      </div>
 
-                          <button
-                            id={`search-buy-now-${book.id}`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onBuyNow(book);
-                            }}
-                            className="px-2.5 sm:px-3 py-1 bg-[#4029AB] hover:bg-[#34208e] text-white text-[10px] rounded-lg font-bold uppercase tracking-wider active:scale-95 transition-all shadow-2xs cursor-pointer"
-                          >
-                            Buy
-                          </button>
-                        </>
-                      )}
+                      <div className="flex items-center gap-1.5 mt-2">
+                        {isOwned ? (
+                          <span className="px-2.5 py-1 bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-bold rounded-lg flex items-center gap-1">
+                            <Check className="w-3 h-3" />
+                            <span>Owned</span>
+                          </span>
+                        ) : (
+                          <>
+                            <button
+                              id={`search-add-cart-${book.id}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onAddToCart(book, e);
+                              }}
+                              className={`p-1.5 rounded-lg border transition-all active:scale-90 cursor-pointer ${
+                                inCart
+                                  ? 'bg-[#4029AB] text-white border-[#4029AB]'
+                                  : 'border-gray-200 text-gray-700 bg-white hover:border-[#4029AB] hover:text-[#4029AB]'
+                              }`}
+                              title={inCart ? 'In Cart' : 'Add to Cart'}
+                            >
+                              <ShoppingCart className="w-3.5 h-3.5 stroke-[2.2]" />
+                            </button>
+
+                            <button
+                              id={`search-buy-now-${book.id}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onBuyNow(book);
+                              }}
+                              className="px-2.5 sm:px-3 py-1 bg-[#4029AB] hover:bg-[#34208e] text-white text-[10px] rounded-lg font-bold uppercase tracking-wider active:scale-95 transition-all shadow-2xs cursor-pointer"
+                            >
+                              Buy
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
+
+            {/* Load more search results button */}
+            {searchResults.length > visibleCount && (
+              <div className="pt-2 flex justify-center">
+                <button
+                  id="btn-load-more-search"
+                  onClick={() => setVisibleCount((prev) => prev + 12)}
+                  className="px-6 py-2.5 rounded-xl bg-gray-50 border border-gray-200 hover:border-[#4029AB] text-gray-800 hover:text-[#4029AB] text-xs font-bold transition-all active:scale-95 shadow-2xs cursor-pointer flex items-center gap-2"
+                >
+                  <span>Load More Results ({searchResults.length - visibleCount} remaining)</span>
+                  <SlidersHorizontal className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
           </div>
         )}
       </main>

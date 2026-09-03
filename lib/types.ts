@@ -52,6 +52,7 @@ export interface Category {
   id: string;
   title: string;
   seolsug: string;
+  seoCat?: string;
   seo_description?: string;
   description?: string;
   slug?: string;
@@ -61,3 +62,21 @@ export interface CartItem {
   book: Book;
   quantity: number;
 }
+
+export interface DiscountTier {
+  discount_pct: number;
+  label: string;
+  min_total: number;
+}
+
+export interface CartTierDiscount {
+  id?: string;
+  title: string;
+  is_active: boolean;
+  tiers: DiscountTier[];
+  created_at?: string | any;
+}
+
+// Backward-compatibility alias
+export type Discount = CartTierDiscount;
+

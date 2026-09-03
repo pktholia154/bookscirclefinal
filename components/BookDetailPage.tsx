@@ -52,12 +52,23 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
 }) => {
   const [currentBook, setCurrentBook] = useState<Book>(initialBook);
   const [imgLoadFailed, setImgLoadFailed] = useState(false);
-  const [isWishlisted, setIsWishlisted] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
-    return getWishlistIdsFromLocal().includes(initialBook.id);
-  });
+  const [isWishlisted, setIsWishlisted] = useState<boolean>(false);
   const [activePdfReaderMode, setActivePdfReaderMode] = useState<'sample' | 'full' | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      setIsWishlisted(getWishlistIdsFromLocal().includes(initialBook.id));
+    } catch {}
+
+    const unsubWishlist = subscribeToWishlistChanges((ids) => {
+      setIsWishlisted(ids.includes(initialBook.id));
+    });
+
+    return () => {
+      unsubWishlist();
+    };
+  }, [initialBook.id]);
 
   // Update book if initialBook prop changes
   useEffect(() => {
@@ -296,12 +307,12 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
               <span className="text-xl sm:text-2xl font-black text-gray-950 tracking-tight">
                 ₹{book.buy_price}
               </span>
-              {book.list_price > book.buy_price && (
+              {book.list_price && book.list_price > book.buy_price && (
                 <span className="text-xs sm:text-sm text-gray-400 line-through font-medium">
                   ₹{book.list_price}
                 </span>
               )}
-              {book.list_price > book.buy_price && (
+              {book.list_price && book.list_price > book.buy_price && (
                 <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
                   {Math.round(((book.list_price - book.buy_price) / book.list_price) * 100)}% off
                 </span>

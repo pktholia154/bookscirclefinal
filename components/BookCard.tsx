@@ -41,11 +41,12 @@ export const BookCard: React.FC<BookCardProps> = ({
     }
   };
 
-  // Calculate discount percentage
-  const discountPercent =
-    book.list_price && book.list_price > book.buy_price
-      ? Math.round(((book.list_price - book.buy_price) / book.list_price) * 100)
-      : 20;
+  const displayPrice = book.buy_price;
+  const listPrice = book.list_price || 0;
+  const hasCatalogDiscount = listPrice > displayPrice;
+  const discountPercent = hasCatalogDiscount
+    ? Math.round(((listPrice - displayPrice) / listPrice) * 100)
+    : 0;
 
   const rating = book.rating || 4.7;
 
@@ -122,11 +123,16 @@ export const BookCard: React.FC<BookCardProps> = ({
         )}
       </div>
 
-      {/* Dominating Pricing & Discount Tag */}
+      {/* Dominating Pricing */}
       <div className="flex items-baseline gap-1 mt-1.5 min-w-0">
         <span className="font-black text-xs sm:text-sm md:text-base lg:text-lg text-gray-950 tracking-tight leading-none">
-          ₹{book.buy_price}
+          ₹{displayPrice}
         </span>
+        {hasCatalogDiscount && (
+          <span className="text-[9px] sm:text-[10px] md:text-xs text-gray-400 line-through leading-none">
+            ₹{listPrice}
+          </span>
+        )}
         {discountPercent > 0 && (
           <span className="text-[9px] sm:text-[10px] md:text-xs font-bold text-emerald-600 leading-none">
             {discountPercent}% OFF
@@ -134,7 +140,7 @@ export const BookCard: React.FC<BookCardProps> = ({
         )}
       </div>
 
-      {/* Book Title (Single row truncated, responsive font size, overflow guarded) */}
+      {/* Book Title */}
       <h3
         className="text-[11px] sm:text-xs md:text-sm font-bold text-gray-900 truncate leading-snug mt-1 group-hover:text-[#4029AB] transition-colors w-full min-w-0"
         title={book.title}

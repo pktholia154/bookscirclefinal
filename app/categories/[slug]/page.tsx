@@ -48,18 +48,18 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   const category = matchCategory(slug, categories);
   const title = category ? category.title : decodeURIComponent(slug);
-  const desc = category?.seo_description || category?.description || `Explore top competitive exam e-books, study guides, and test papers for ${title} on BooksCircle.`;
+  const seoCat = category?.seoCat || '';
   const url = `${SITE_URL}/categories/${encodeURIComponent(slug)}`;
 
   return {
     title: `${title} PDF E-Books & Study Material | ${SITE_NAME}`,
-    description: desc,
+    ...(seoCat ? { description: seoCat } : {}),
     alternates: {
       canonical: url,
     },
     openGraph: {
       title: `${title} E-Books & Exam Preparation PDF Library`,
-      description: desc,
+      ...(seoCat ? { description: seoCat } : {}),
       url: url,
       siteName: SITE_NAME,
       type: 'website',
@@ -87,7 +87,7 @@ export default async function CategoryPage({ params }: Props) {
 
   const category = matchCategory(slug, categories);
   const categoryTitle = category ? category.title : decodeURIComponent(slug);
-  const categoryDescription = category?.seo_description || category?.description || `Download and read official syllabus-aligned PDF e-books for ${categoryTitle}.`;
+  const seoCat = category?.seoCat || '';
 
   const categoryBooks = category
     ? filterBooksByCategory(category, books)
@@ -96,7 +96,7 @@ export default async function CategoryPage({ params }: Props) {
   const jsonLd = generateCategorySchema(
     categoryTitle,
     slug,
-    categoryDescription,
+    seoCat,
     categoryBooks.length > 0 ? categoryBooks : books.slice(0, 10)
   );
 
@@ -109,11 +109,10 @@ export default async function CategoryPage({ params }: Props) {
       <CategoryPageClient
         categoryTitle={categoryTitle}
         categorySlug={slug}
-        categoryDescription={categoryDescription}
+        seoCat={seoCat}
         books={categoryBooks.length > 0 ? categoryBooks : books}
         allCategories={categories}
       />
     </>
   );
 }
-

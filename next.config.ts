@@ -1,8 +1,10 @@
 import type {NextConfig} from 'next';
 
+import path from 'path';
+
 const nextConfig: NextConfig = {
-  output: 'standalone',
   reactStrictMode: true,
+  output: 'standalone',
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -79,32 +81,20 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  transpilePackages: ['motion'],
-  webpack: (config, {isServer, webpack}) => {
+  webpack: (config, { isServer, webpack }) => {
     if (!isServer) {
+      config.plugins = config.plugins || [];
       config.plugins.push(
         new webpack.NormalModuleReplacementPlugin(/^node:/, (resource: any) => {
-          resource.request = resource.request.replace(/^node:/, '');
+          if (resource.context && resource.context.includes('clawpdf')) {
+            resource.request = require('path').resolve(__dirname, 'lib/empty-shim.js');
+          }
         })
       );
-
-      config.resolve = config.resolve || {};
-      config.resolve.fallback = {
-        ...(config.resolve.fallback || {}),
-        fs: false,
-        'fs/promises': false,
-        module: false,
-        url: false,
-        zlib: false,
-        path: false,
-        crypto: false,
-        stream: false,
-        buffer: false,
-      };
     }
-
     return config;
   },
+  transpilePackages: ['motion'],
 };
 
 export default nextConfig;

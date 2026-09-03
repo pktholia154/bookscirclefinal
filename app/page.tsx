@@ -18,7 +18,8 @@ import { DedicatedSearchView } from '@/components/DedicatedSearchView';
 import { ProfileView } from '@/components/ProfileView';
 import { IOSInstallGuideModal } from '@/components/IOSInstallGuideModal';
 import { Footer } from '@/components/Footer';
-import { Book, Category, CartItem } from '@/lib/types';
+import { DiscountBanner } from '@/components/DiscountBanner';
+import { Book, Category, CartItem, CartTierDiscount } from '@/lib/types';
 import { DEFAULT_BOOK_COVER, INITIAL_BOOKS, INITIAL_CATEGORIES } from '@/lib/data';
 import {
   getBooksFromFirestore,
@@ -28,6 +29,12 @@ import {
   subscribeToFirestoreBooks,
   subscribeToFirestoreCategories,
 } from '@/lib/services/books';
+import {
+  subscribeToFirestoreDiscounts,
+  getCachedCartTierDiscountSync,
+  DEFAULT_CART_TIER_DISCOUNT,
+} from '@/lib/services/discounts';
+
 import { getPurchasedBookIdsFromLocal, savePurchasedBookIds } from '@/lib/offline-storage';
 import { recordUserPurchaseInFirestore, syncUserPurchases, subscribeToUserPurchases } from '@/lib/services/purchases';
 import { syncUserProfileToFirestore } from '@/lib/services/users';
@@ -49,7 +56,8 @@ import {
 import { auth, signOutUser, signInWithGoogle } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { usePWAInstall } from '@/hooks/use-pwa-install';
-import { Check, ShoppingBag, RefreshCw, Lock, Trash2 } from 'lucide-react';
+import { triggerNativeLoading } from '@/components/NativePageLoadingIndicator';
+import { Check, ShoppingBag, RefreshCw, Lock, Trash2, Tag, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 const savePendingCheckoutSession = (items: CartItem[]) => {
@@ -94,7 +102,7 @@ export default function HomePage() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [activeTab, setActiveTab] = useState<TabKey>('home');
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [isGoogleModalOpen, setIsGoogleModalOpen] = useState<boolean>(false);
   const [loginModalConfig, setLoginModalConfig] = useState<{
@@ -110,9 +118,38 @@ export default function HomePage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [isCartTabCheckingOut, setIsCartTabCheckingOut] = useState<boolean>(false);
   const [, startTransition] = useTransition();
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Toast message helper with automatic clearing timer
+  const showToast = useCallback((msg: string | null, duration = 3000) => {
+    if (!msg) {
+      setToastMessage(null);
+      return;
+    }
+    setToastMessage(msg);
+    setTimeout(() => {
+      setToastMessage((curr) => (curr === msg ? null : curr));
+    }, duration);
+  }, []);
+
+  const [isCartTabCheckingOut, setIsCartTabCheckingOut] = useState<boolean>(false);
+
+  // Cart-Tier Automatic Discount State from Firestore
+  const [tierDiscount, setTierDiscount] = useState<CartTierDiscount | null>(null);
+
+  // Sync tier discount configuration from local cache and Firestore discounts collection
+  useEffect(() => {
+    setTierDiscount(getCachedCartTierDiscountSync());
+
+    const unsub = subscribeToFirestoreDiscounts((liveDiscount) => {
+      setTierDiscount(liveDiscount);
+    });
+
+    return () => {
+      unsub();
+    };
+  }, []);
 
   // PWA Install State & Handlers
   const {
@@ -125,6 +162,19 @@ export default function HomePage() {
   // Load client persisted data after initial mount
   useEffect(() => {
     const timer = setTimeout(() => {
+      try {
+        const cachedBooks = getCachedBooksSync();
+        if (cachedBooks && cachedBooks.length > 0) {
+          setBooks(cachedBooks);
+        }
+        const cachedCats = getCachedCategoriesSync();
+        if (cachedCats && cachedCats.length > 0) {
+          setCategories(cachedCats);
+        }
+      } catch (e) {
+        console.warn('Cache load note:', e);
+      }
+
       try {
         const savedUser = localStorage.getItem('bookscircle_auth_user');
         if (savedUser) {
@@ -225,18 +275,6 @@ export default function HomePage() {
     }
   }, [purchasedBookIds]);
 
-  // Toast message helper with automatic clearing timer
-  const showToast = useCallback((msg: string | null, duration = 3000) => {
-    if (!msg) {
-      setToastMessage(null);
-      return;
-    }
-    setToastMessage(msg);
-    setTimeout(() => {
-      setToastMessage((curr) => (curr === msg ? null : curr));
-    }, duration);
-  }, []);
-
   const handleSuccessfulCheckout = useCallback(
     async (
       purchasedItems: CartItem[],
@@ -316,7 +354,8 @@ export default function HomePage() {
       const userName = activeUser?.displayName || 'Reader';
       const userId = activeUser?.uid || 'guest_user';
 
-      const summary = calculateCartSummary(itemsToBuy);
+      const currentDiscount = getCachedCartTierDiscountSync();
+      const summary = calculateCartSummary(itemsToBuy, currentDiscount);
       const totalAmount = summary.subtotal;
       const bookIds = itemsToBuy.map((i) => i.book.id);
       const bookTitles = itemsToBuy.map((i) => i.book.title);
@@ -780,10 +819,10 @@ export default function HomePage() {
     return result;
   }, [books, selectedCategory, searchQuery]);
 
-  // Curated collections for Horizontal Carousel Sections
+  // Curated collections for Horizontal Carousel Sections - Enforced 12-item initial limit
   const featuredTrendingBooks = useMemo(() => {
     const featured = books.filter((b) => (b.rating && b.rating >= 4.6) || (b.tags && b.tags.includes('featured')));
-    return featured.length > 0 ? featured : books.slice(0, 10);
+    return (featured.length > 0 ? featured : books).slice(0, 12);
   }, [books]);
 
   const bestSellerBooks = useMemo(() => {
@@ -795,7 +834,7 @@ export default function HomePage() {
         (b.rating_count && b.rating_count >= 200) ||
         (b.rating && b.rating >= 4.7)
     );
-    return best.length > 0 ? best : books.slice(0, 8);
+    return (best.length > 0 ? best : books).slice(0, 12);
   }, [books]);
 
   // Top 3 categories with highest number of books
@@ -829,6 +868,7 @@ export default function HomePage() {
 
   // Switch tab with smooth scroll
   const handleTabChange = (tab: TabKey) => {
+    triggerNativeLoading(100);
     startTransition(() => {
       setSelectedBook(null);
       setActiveTab(tab);
@@ -853,7 +893,7 @@ export default function HomePage() {
   const activeEmail = currentUser?.email || '';
   const activeName = currentUser?.displayName || 'Reader';
 
-  const cartSummary = calculateCartSummary(cart);
+  const cartSummary = useMemo(() => calculateCartSummary(cart, tierDiscount), [cart, tierDiscount]);
 
   return (
     <div className="min-h-screen bg-white text-gray-900 pb-24 selection:bg-[#4029AB] selection:text-white">
@@ -918,13 +958,25 @@ export default function HomePage() {
                   onSelectCategory={(cat) => setSelectedCategory(cat)}
                 />
 
+                {/* Promotional Cart-Tier Discount Offer Banner below Categories */}
+                <div className="px-4 sm:px-6 md:px-8 max-w-7xl mx-auto pt-2 pb-1">
+                  <DiscountBanner
+                    discount={tierDiscount}
+                    cart={cart}
+                    onOpenCart={() => setIsCartOpen(true)}
+                  />
+                </div>
+
+
                 {isLoading ? (
                   <HomeShimmerSkeleton />
                 ) : searchQuery.trim() ? (
-                  /* Search Results */
+                  /* Search Results - Limited to 12 on initial view */
                   <div className="pt-2">
                     <BookListView
                       title={`Search Results (${filteredBooks.length})`}
+                      limit={12}
+                      viewAllHref={`/search?q=${encodeURIComponent(searchQuery)}`}
                       books={filteredBooks}
                       onSelectBook={(book) => router.push(`/book/${encodeURIComponent(book.seoslug || book.slug || book.id)}`)}
                       onAddToCart={handleAddToCart}
@@ -936,10 +988,12 @@ export default function HomePage() {
                     />
                   </div>
                 ) : selectedCategory !== 'all' ? (
-                  /* Category-Specific View */
+                  /* Category-Specific View - Limited to 12 */
                   <div className="pt-2">
                     <BookListView
                       title={`${selectedCategory} Books (${filteredBooks.length})`}
+                      limit={12}
+                      viewAllHref={`/category/${encodeURIComponent(selectedCategory)}`}
                       books={filteredBooks}
                       onSelectBook={(book) => router.push(`/book/${encodeURIComponent(book.seoslug || book.slug || book.id)}`)}
                       onAddToCart={handleAddToCart}
@@ -957,8 +1011,9 @@ export default function HomePage() {
                     <CarouselSection
                       title="Trending & Top Rated"
                       sectionId="trending-books"
+                      limit={12}
                       viewAllHref="/collection/trending"
-                      books={featuredTrendingBooks.length > 0 ? featuredTrendingBooks : books.slice(0, 8)}
+                      books={featuredTrendingBooks.length > 0 ? featuredTrendingBooks : books.slice(0, 12)}
                       onSelectBook={(book) => router.push(`/book/${encodeURIComponent(book.seoslug || book.slug || book.id)}`)}
                       onAddToCart={handleAddToCart}
                       onBuyNow={handleBuyNow}
@@ -973,6 +1028,7 @@ export default function HomePage() {
                       title="Best Sellers"
                       subtitle="Top-selling exam preparation e-books with proven student success"
                       badge="Hot"
+                      limit={12}
                       sectionId="bestseller-books"
                       viewAllHref="/collection/bestsellers"
                       books={bestSellerBooks}
@@ -991,6 +1047,7 @@ export default function HomePage() {
                         title={`${topCategoriesWithBooks[0].category.title} Guides`}
                         subtitle={topCategoriesWithBooks[0].category.seo_description || `Complete syllabus books and study material for ${topCategoriesWithBooks[0].category.title}`}
                         badge="Top Exam"
+                        limit={12}
                         sectionId={`category-${topCategoriesWithBooks[0].category.id}`}
                         viewAllHref={`/category/${encodeURIComponent(topCategoriesWithBooks[0].category.seolsug || topCategoriesWithBooks[0].category.id)}`}
                         books={topCategoriesWithBooks[0].books}
@@ -1010,6 +1067,7 @@ export default function HomePage() {
                         title={`${topCategoriesWithBooks[1].category.title} Prep`}
                         subtitle={topCategoriesWithBooks[1].category.seo_description || `Solved question banks and previous years papers for ${topCategoriesWithBooks[1].category.title}`}
                         badge="Popular"
+                        limit={12}
                         sectionId={`category-${topCategoriesWithBooks[1].category.id}`}
                         viewAllHref={`/category/${encodeURIComponent(topCategoriesWithBooks[1].category.seolsug || topCategoriesWithBooks[1].category.id)}`}
                         books={topCategoriesWithBooks[1].books}
@@ -1029,6 +1087,7 @@ export default function HomePage() {
                         title={`${topCategoriesWithBooks[2].category.title} Series`}
                         subtitle={topCategoriesWithBooks[2].category.seo_description || `Structured reference modules and practice sets for ${topCategoriesWithBooks[2].category.title}`}
                         badge="Curated"
+                        limit={12}
                         sectionId={`category-${topCategoriesWithBooks[2].category.id}`}
                         viewAllHref={`/category/${encodeURIComponent(topCategoriesWithBooks[2].category.seolsug || topCategoriesWithBooks[2].category.id)}`}
                         books={topCategoriesWithBooks[2].books}
@@ -1042,10 +1101,10 @@ export default function HomePage() {
                       />
                     )}
 
-                    {/* Standard List View: Complete Catalog - Limited to max 10 */}
+                    {/* Standard List View: Complete Catalog - Strictly limited to 12 */}
                     <BookListView
                       title="All Curated Study Materials & Guides"
-                      limit={10}
+                      limit={12}
                       viewAllHref="/collection/all"
                       books={books}
                       onSelectBook={(book) => router.push(`/book/${encodeURIComponent(book.seoslug || book.slug || book.id)}`)}
@@ -1121,66 +1180,129 @@ export default function HomePage() {
                   </div>
                 ) : (
                   <div className="space-y-4">
+                    {/* Cart Items List */}
                     <div className="space-y-3">
-                      {cart.map(({ book }) => (
-                        <div
-                          key={book.id}
-                          className="p-4 rounded-2xl border border-gray-200 bg-white flex items-center gap-3.5"
-                        >
-                          <div className="relative w-14 aspect-[3/4] rounded-none overflow-hidden shrink-0 bg-gray-100 border border-gray-200 shadow-2xs">
-                            <Image
-                              src={book.cover || DEFAULT_BOOK_COVER}
-                              alt={book.title}
-                              fill
-                              unoptimized
-                              sizes="56px"
-                              className="object-cover rounded-none"
-                              referrerPolicy="no-referrer"
-                            />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <span className="text-[9px] font-bold text-[#4029AB] bg-[#4029AB]/10 px-1.5 py-0.5 rounded uppercase">
-                              {book.category}
-                            </span>
-                            <h4 className="font-bold text-xs sm:text-sm text-gray-950 truncate mt-1">
-                              {book.title}
-                            </h4>
-                            <div className="flex items-center gap-2 mt-1">
-                              <span className="text-sm font-black text-gray-950">₹{book.buy_price}</span>
-                              {book.list_price && book.list_price > book.buy_price && (
-                                <span className="text-xs text-gray-400 line-through">₹{book.list_price}</span>
-                              )}
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => handleRemoveFromCart(book.id)}
-                            className="p-2 rounded-xl text-gray-400 hover:text-red-500 hover:bg-red-50 active:scale-90 transition-all cursor-pointer"
-                            title="Remove from Cart"
+                      {cart.map(({ book }) => {
+                        const discountPercent =
+                          book.list_price && book.list_price > book.buy_price
+                            ? Math.round(((book.list_price - book.buy_price) / book.list_price) * 100)
+                            : null;
+
+                        return (
+                          <div
+                            key={book.id}
+                            className="p-4 rounded-2xl border border-gray-200 bg-white flex items-center gap-3.5"
                           >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                            <div className="relative w-14 aspect-[3/4] rounded-none overflow-hidden shrink-0 bg-gray-100 border border-gray-200 shadow-2xs">
+                              <Image
+                                src={book.cover || DEFAULT_BOOK_COVER}
+                                alt={book.title}
+                                fill
+                                unoptimized
+                                sizes="56px"
+                                className="object-cover rounded-none"
+                                referrerPolicy="no-referrer"
+                              />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <span className="text-[9px] font-bold text-[#4029AB] bg-[#4029AB]/10 px-1.5 py-0.5 rounded uppercase">
+                                {book.category}
+                              </span>
+                              <h4 className="font-bold text-xs sm:text-sm text-gray-950 truncate mt-1">
+                                {book.title}
+                              </h4>
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className="text-sm font-black text-gray-950">₹{book.buy_price}</span>
+                                {book.list_price && book.list_price > book.buy_price && (
+                                  <span className="text-xs text-gray-400 line-through">₹{book.list_price}</span>
+                                )}
+                                {discountPercent && (
+                                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded">
+                                    {discountPercent}% OFF
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => handleRemoveFromCart(book.id)}
+                              className="p-2 rounded-xl text-gray-400 hover:text-red-500 hover:bg-red-50 active:scale-90 transition-all cursor-pointer"
+                              title="Remove from Cart"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Tier Discount Section in Cart Tab */}
+                    <div className="p-4 rounded-2xl bg-gradient-to-r from-[#4029AB]/10 via-[#4029AB]/5 to-indigo-50/70 border border-[#4029AB]/20 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Sparkles className="w-4 h-4 text-[#4029AB]" />
+                          <span className="text-xs font-bold text-gray-900">{tierDiscount?.title || 'Mega Diwali Sale'}</span>
                         </div>
-                      ))}
+                        {cartSummary.applicable_discount_pct > 0 ? (
+                          <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                            {cartSummary.applicable_discount_pct}% OFF UNLOCKED
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold text-[#4029AB] bg-white px-2 py-0.5 rounded-full border border-[#4029AB]/20">
+                            Automatic Cart Discount
+                          </span>
+                        )}
+                      </div>
+
+                      <p className="text-xs font-bold text-gray-900">
+                        {cartSummary.nudgeMessage}
+                      </p>
+
+                      {cartSummary.nextTier && (
+                        <div className="w-full bg-gray-200/80 rounded-full h-1.5 overflow-hidden">
+                          <motion.div
+                            className="bg-[#4029AB] h-full rounded-full transition-all duration-500"
+                            initial={{ width: 0 }}
+                            animate={{ width: `${Math.max(4, Math.min(100, cartSummary.progressPct))}%` }}
+                          />
+                        </div>
+                      )}
                     </div>
 
                     {/* Checkout Summary Box */}
                     <div className="p-5 rounded-3xl bg-gray-50 border border-gray-200/80 space-y-3">
                       <div className="flex justify-between text-xs text-gray-600">
-                        <span>Subtotal ({cart.length} {cart.length === 1 ? 'eBook' : 'eBooks'})</span>
-                        <span className="font-bold text-gray-900">
-                          ₹{cartSummary.subtotal}
+                        <span>Original Catalog Price ({cart.length} {cart.length === 1 ? 'eBook' : 'eBooks'})</span>
+                        <span className="font-semibold text-gray-400 line-through">
+                          ₹{cartSummary.totalListPrice}
                         </span>
                       </div>
-                      {cartSummary.savings > 0 && (
-                        <div className="flex justify-between text-xs text-emerald-600">
-                          <span>Total Savings ({cartSummary.savingsPercent}% OFF)</span>
-                          <span className="font-semibold">-₹{cartSummary.savings}</span>
+
+                      <div className="flex justify-between text-xs text-gray-600">
+                        <span>Cart Subtotal</span>
+                        <span className="font-semibold text-gray-900">
+                          ₹{cartSummary.regularSubtotal}
+                        </span>
+                      </div>
+
+                      {cartSummary.tierDiscountAmount > 0 && (
+                        <div className="flex justify-between text-xs text-emerald-700 font-bold bg-emerald-50/70 p-2 rounded-lg border border-emerald-100">
+                          <span>Tier Discount ({cartSummary.applicable_discount_pct}% OFF)</span>
+                          <span>-₹{cartSummary.tierDiscountAmount}</span>
                         </div>
                       )}
+
+                      {cartSummary.savings > 0 && (
+                        <div className="flex justify-between text-xs text-emerald-600">
+                          <span>Total Savings vs List Price</span>
+                          <span className="font-semibold">-₹{cartSummary.savings} ({cartSummary.savingsPercent}% OFF)</span>
+                        </div>
+                      )}
+
                       <div className="flex justify-between text-xs text-gray-600">
                         <span>Instant Digital Delivery</span>
                         <span className="font-bold text-emerald-600">Free</span>
                       </div>
+
                       <div className="border-t border-gray-200 pt-3 flex justify-between text-sm font-black text-gray-950">
                         <span>Total Amount</span>
                         <span className="text-base text-[#4029AB]">

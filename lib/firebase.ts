@@ -11,7 +11,11 @@ import {
   onAuthStateChanged,
   User,
 } from 'firebase/auth';
-import { getFirestore, Firestore } from 'firebase/firestore';
+import {
+  initializeFirestore,
+  getFirestore,
+  Firestore,
+} from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: "AIzaSyB0unAiOkII7OK44Kx_oaJ6C68ey-javnk",
@@ -138,7 +142,26 @@ export async function ensureFirebaseAuth(): Promise<User | null> {
   }
 }
 
-// Initialize Firestore explicitly connected to the user's 'bookscircle' database
-export const db: Firestore = getFirestore(app, 'bookscircle');
-export const defaultDb: Firestore = db;
+/**
+ * Initialize Firestore explicitly connected to the user's 'bookscircle' database.
+ * Using experimentalAutoDetectLongPolling ensures the client switches transport immediately
+ * if streaming or WebChannel is hindered by network firewalls or reverse proxies, preventing
+ * the 10-second timeout disconnect.
+ */
+function createFirestoreInstance(): Firestore {
+  try {
+    return initializeFirestore(app, {
+      experimentalAutoDetectLongPolling: true,
+      ignoreUndefinedProperties: true,
+    }, 'bookscircle');
+  } catch (err) {
+    try {
+      return getFirestore(app, 'bookscircle');
+    } catch {
+      return getFirestore(app);
+    }
+  }
+}
 
+export const db: Firestore = createFirestoreInstance();
+export const defaultDb: Firestore = db;

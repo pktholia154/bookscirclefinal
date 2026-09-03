@@ -37,6 +37,8 @@ import { getPurchasedBookIdsFromLocal, savePurchasedBookIds } from '@/lib/offlin
 import { addToCartAction, getCartFromLocal, subscribeToCartChanges } from '@/lib/services/cart';
 import { getWishlistIdsFromLocal, toggleWishlistAction, subscribeToWishlistChanges } from '@/lib/services/wishlist';
 import { subscribeToFirestoreBook } from '@/lib/services/books';
+import { getCachedCartTierDiscountSync } from '@/lib/services/discounts';
+import { calculateCartSummary } from '@/lib/services/cart';
 import { auth, signInWithGoogle } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import Markdown from 'react-markdown';
@@ -274,7 +276,9 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
     const userEmail = activeUser?.email || '';
     const userName = activeUser?.displayName || 'Reader';
     const userId = activeUser?.uid || 'guest_user';
-    const totalAmount = itemsToBuy.reduce((sum, item) => sum + item.book.buy_price * item.quantity, 0);
+    const currentDiscount = getCachedCartTierDiscountSync();
+    const summary = calculateCartSummary(itemsToBuy, currentDiscount);
+    const totalAmount = summary.subtotal;
 
     showToast('Opening Razorpay Secure Gateway...', 2500);
     try {
@@ -526,14 +530,14 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
               <span className="text-2xl sm:text-3xl font-black text-gray-950 tracking-tight">
                 ₹{book.buy_price}
               </span>
-              {book.list_price > book.buy_price && (
+              {book.list_price && book.list_price > book.buy_price && (
                 <span className="text-xs sm:text-sm text-gray-400 line-through font-medium">
                   ₹{book.list_price}
                 </span>
               )}
-              {discountPercent > 0 && (
+              {book.list_price && book.list_price > book.buy_price && (
                 <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">
-                  {discountPercent}% OFF
+                  {Math.round(((book.list_price - book.buy_price) / book.list_price) * 100)}% OFF
                 </span>
               )}
             </div>

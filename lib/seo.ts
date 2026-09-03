@@ -234,7 +234,7 @@ export function generateBookSchema(book: Book) {
 export function generateCategorySchema(
   categoryTitle: string,
   categorySlug: string,
-  categoryDescription: string,
+  seoCat: string,
   books: Book[]
 ) {
   const categoryUrl = `${SITE_URL}/category/${encodeURIComponent(categorySlug)}`;
@@ -271,7 +271,7 @@ export function generateCategorySchema(
         '@id': `${categoryUrl}#webpage`,
         url: categoryUrl,
         name: `${categoryTitle} PDF E-Books & Study Material | BooksCircle`,
-        description: categoryDescription,
+        ...(seoCat ? { description: seoCat } : {}),
         isPartOf: {
           '@id': `${SITE_URL}/#website`,
         },

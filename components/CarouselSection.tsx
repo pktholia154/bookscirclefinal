@@ -50,7 +50,7 @@ export const CarouselSection: React.FC<CarouselSectionProps> = ({
     }
   };
 
-  const displayBooks = limit && limit > 0 ? books.slice(0, limit) : books;
+  const displayBooks = limit && limit > 0 ? books.slice(0, limit) : books.slice(0, 12);
 
   if (!displayBooks || displayBooks.length === 0) return null;
 
