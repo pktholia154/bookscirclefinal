@@ -3,7 +3,7 @@
 # ==============================================================================
 # Base Image: Lightweight Node.js Alpine with libc6 compatibility
 # ==============================================================================
-FROM node:20-alpine AS base
+FROM node:22-alpine AS base
 WORKDIR /app
 RUN apk add --no-cache libc6-compat
 
@@ -34,7 +34,7 @@ RUN npm run build
 # ==============================================================================
 # Runner Stage: Minimal production image optimized for Google Cloud Run / GCP
 # ==============================================================================
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
