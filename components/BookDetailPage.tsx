@@ -394,14 +394,27 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
 
         {/* 4. Action Buttons (Sample & Buy) */}
         <section className="grid grid-cols-2 gap-3 pt-1">
-          <button
+          <motion.button
             id="book-detail-free-sample-btn"
             onClick={() => setActivePdfReaderMode('sample')}
-            className="w-full py-2.5 px-4 rounded-lg border border-gray-300 hover:border-gray-400 hover:bg-gray-50 text-xs sm:text-sm font-bold text-[#4029AB] bg-white transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+            animate={{
+              scale: [1, 1.025, 1],
+              boxShadow: [
+                '0 1px 3px rgba(64, 41, 171, 0.2)',
+                '0 4px 14px rgba(64, 41, 171, 0.35)',
+                '0 1px 3px rgba(64, 41, 171, 0.2)',
+              ],
+            }}
+            transition={{
+              repeat: Infinity,
+              duration: 2.4,
+              ease: 'easeInOut',
+            }}
+            className="w-full py-2.5 px-4 rounded-lg bg-[#4029AB] hover:bg-[#34208e] text-white border border-[#4029AB] text-xs sm:text-sm font-bold transition-colors active:scale-[0.98] flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
           >
-            <Eye className="w-4 h-4 text-[#4029AB]" />
+            <Eye className="w-4 h-4 text-white" />
             <span>Sample</span>
-          </button>
+          </motion.button>
 
           {isPurchased ? (
             <button
@@ -418,9 +431,9 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
               onMouseEnter={() => loadRazorpayScript()}
               onTouchStart={() => loadRazorpayScript()}
               onClick={() => onBuyNow(book)}
-              className="w-full py-2.5 px-4 rounded-lg bg-[#4029AB] hover:bg-[#34208e] text-white text-xs sm:text-sm font-bold transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+              className="w-full py-2.5 px-4 rounded-lg bg-white hover:bg-[#4029AB]/5 text-[#4029AB] border-2 border-[#4029AB] text-xs sm:text-sm font-bold transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
             >
-              <Zap className="w-4 h-4 fill-white" />
+              <Zap className="w-4 h-4 text-[#4029AB] fill-[#4029AB]" />
               <span>Buy (₹{book.buy_price})</span>
             </button>
           )}

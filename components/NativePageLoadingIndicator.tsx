@@ -112,8 +112,11 @@ export const NativePageLoadingProvider: React.FC<{ children: React.ReactNode }> 
       const target = event.target as HTMLElement | null;
       if (!target) return;
 
-      // 0. Exclude simple immediate actions like Add to Cart or Wishlist to prevent blocking loader
-      const isCartOrWishlistBtn = target.closest('[id*="cart"], [id*="wishlist"]');
+      // 0. Exclude simple immediate micro-actions (Add to Cart, Wishlist, counter buttons, close buttons)
+      // Cart toggle is instantaneous and should NEVER trigger the page loading circular indicator HUD
+      const isCartOrWishlistBtn = target.closest(
+        '[id*="cart"], [id*="wishlist"], [aria-label*="cart" i], [aria-label*="wishlist" i], [title*="cart" i], [title*="wishlist" i], button[id*="close"], [data-no-loader="true"]'
+      );
       if (isCartOrWishlistBtn) {
         return;
       }
@@ -154,9 +157,10 @@ export const NativePageLoadingProvider: React.FC<{ children: React.ReactNode }> 
         return;
       }
 
-      // 3. Other interactive buttons (Buy now, load more, checkout)
+      // 3. Other navigating/blocking action buttons (Buy now, load more, checkout)
+      // Exclude cart buttons explicitly
       const actionItem = target.closest(
-        'button[id^="btn-"], button[id^="card-"], button[id^="list-"], button[id*="buy-now"], button[id*="load-more"]'
+        'button[id*="buy-now"], button[id*="load-more"], button[id*="checkout"], button[id^="btn-login"]'
       ) as HTMLElement | null;
 
       if (actionItem) {

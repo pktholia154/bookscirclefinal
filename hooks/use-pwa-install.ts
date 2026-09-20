@@ -60,6 +60,18 @@ export function usePWAInstall() {
     return null;
   });
   const [isIOSPromptOpen, setIsIOSPromptOpen] = useState<boolean>(false);
+  const [isInstallSuccessOpen, setIsInstallSuccessOpen] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const justInstalled = localStorage.getItem('bookscircle_just_installed');
+        const acknowledged = localStorage.getItem('bookscircle_install_ack');
+        if (justInstalled === 'true' && acknowledged !== 'true') {
+          return true;
+        }
+      } catch {}
+    }
+    return false;
+  });
   const [hasPromptReceived, setHasPromptReceived] = useState<boolean>(() => {
     if (typeof window !== 'undefined' && window.__pwaInstallPrompt) {
       return true;
@@ -90,9 +102,13 @@ export function usePWAInstall() {
     const handleAppInstalled = () => {
       if (typeof window !== 'undefined') {
         window.__pwaInstallPrompt = null;
+        try {
+          localStorage.setItem('bookscircle_just_installed', 'true');
+        } catch {}
       }
       setDeferredPrompt(null);
       setHasPromptReceived(false);
+      setIsInstallSuccessOpen(true);
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
@@ -121,7 +137,11 @@ export function usePWAInstall() {
           setHasPromptReceived(false);
           if (typeof window !== 'undefined') {
             window.__pwaInstallPrompt = null;
+            try {
+              localStorage.setItem('bookscircle_just_installed', 'true');
+            } catch {}
           }
+          setIsInstallSuccessOpen(true);
         }
         setDeferredPrompt(null);
       } catch (err) {
@@ -136,12 +156,24 @@ export function usePWAInstall() {
     setIsIOSPromptOpen(false);
   }, []);
 
+  const closeInstallSuccess = useCallback(() => {
+    setIsInstallSuccessOpen(false);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('bookscircle_install_ack', 'true');
+        localStorage.removeItem('bookscircle_just_installed');
+      } catch {}
+    }
+  }, []);
+
   return {
     isInstallable,
     isInstalled: isStandalone,
     isIOS,
     isIOSPromptOpen,
+    isInstallSuccessOpen,
     promptInstall,
     closeIOSPrompt,
+    closeInstallSuccess,
   };
 }

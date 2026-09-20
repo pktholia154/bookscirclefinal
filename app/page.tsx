@@ -17,8 +17,10 @@ import { CategoriesView } from '@/components/CategoriesView';
 import { DedicatedSearchView } from '@/components/DedicatedSearchView';
 import { ProfileView } from '@/components/ProfileView';
 import { IOSInstallGuideModal } from '@/components/IOSInstallGuideModal';
+import { InstallSuccessModal } from '@/components/InstallSuccessModal';
 import { Footer } from '@/components/Footer';
 import { DiscountBanner } from '@/components/DiscountBanner';
+import { InstallAppBanner } from '@/components/InstallAppBanner';
 import { Book, Category, CartItem, CartTierDiscount } from '@/lib/types';
 import { DEFAULT_BOOK_COVER, INITIAL_BOOKS, INITIAL_CATEGORIES } from '@/lib/data';
 import {
@@ -157,6 +159,8 @@ export default function HomePage() {
     promptInstall,
     isIOSPromptOpen,
     closeIOSPrompt,
+    isInstallSuccessOpen,
+    closeInstallSuccess,
   } = usePWAInstall();
 
   // Load client persisted data after initial mount
@@ -951,6 +955,12 @@ export default function HomePage() {
             {/* TAB 1: HOME PAGE */}
             {activeTab === 'home' && (
               <>
+                {/* Full Banner Style Install App Banner */}
+                <InstallAppBanner
+                  onInstall={promptInstall}
+                  isInstallable={isInstallable}
+                />
+
                 {/* Flexible Category Chips */}
                 <CategoryChips
                   categories={categories}
@@ -1398,6 +1408,12 @@ export default function HomePage() {
       <IOSInstallGuideModal
         isOpen={isIOSPromptOpen}
         onClose={closeIOSPrompt}
+      />
+
+      {/* Proactive Install Success Notification Modal */}
+      <InstallSuccessModal
+        isOpen={isInstallSuccessOpen}
+        onClose={closeInstallSuccess}
       />
 
       {/* Fixed High Density Bottom Navigation */}

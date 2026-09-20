@@ -130,6 +130,14 @@ export default function RootLayout({
   return (
     <html lang="en" className={roboto.variable}>
       <head>
+        {/* Environment & 3rd-party script safeguard: Ensure window.fetch is writable and configurable */}
+        <script
+          id="fetch-patch-safeguard"
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{if(typeof window!=="undefined"&&window.fetch){var d=Object.getOwnPropertyDescriptor(window,"fetch");if(!d||!d.writable||!d.set){var orig=window.fetch;try{Object.defineProperty(window,"fetch",{value:orig,writable:true,configurable:true,enumerable:true});}catch(e){try{var current=orig;Object.defineProperty(window,"fetch",{get:function(){return current;},set:function(fn){current=fn;},configurable:true,enumerable:true});}catch(e2){}}}}}catch(err){}})();`,
+          }}
+        />
+
         {/* Preconnect & DNS-Prefetch to Razorpay for lightning-fast instant gateway launch */}
         <link rel="preconnect" href="https://checkout.razorpay.com" crossOrigin="anonymous" />
         <link rel="dns-prefetch" href="https://checkout.razorpay.com" />

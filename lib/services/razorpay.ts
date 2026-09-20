@@ -60,6 +60,36 @@ export const loadRazorpayScript = (): Promise<boolean> => {
       return;
     }
 
+    // Safeguard: make sure window.fetch has a setter if an SDK attempts assignment
+    try {
+      if (typeof window !== 'undefined' && window.fetch) {
+        const desc = Object.getOwnPropertyDescriptor(window, 'fetch');
+        if (!desc || !desc.writable || !desc.set) {
+          const originalFetch = window.fetch;
+          try {
+            Object.defineProperty(window, 'fetch', {
+              value: originalFetch,
+              writable: true,
+              configurable: true,
+              enumerable: true,
+            });
+          } catch {
+            let activeFetch = originalFetch;
+            Object.defineProperty(window, 'fetch', {
+              get: () => activeFetch,
+              set: (newFetch) => {
+                activeFetch = newFetch;
+              },
+              configurable: true,
+              enumerable: true,
+            });
+          }
+        }
+      }
+    } catch {
+      // Ignored
+    }
+
     const script = document.createElement('script');
     script.src = 'https://checkout.razorpay.com/v1/checkout.js';
     script.async = true;
@@ -78,15 +108,7 @@ export const loadRazorpayScript = (): Promise<boolean> => {
   return razorpayScriptPromise;
 };
 
-// Eagerly prewarm in browser environment
-if (typeof window !== 'undefined') {
-  if (document.readyState === 'complete' || document.readyState === 'interactive') {
-    loadRazorpayScript();
-  } else {
-    window.addEventListener('DOMContentLoaded', () => loadRazorpayScript(), { once: true });
-  }
-}
-
+// Lazy load Razorpay script on demand when checkout is actually initiated, avoiding unsolicited execution errors
 export async function processRazorpayPayment(options: RazorpayCheckoutOptions): Promise<void> {
   const {
     amountInRupees,
