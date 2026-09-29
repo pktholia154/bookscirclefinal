@@ -78,7 +78,7 @@ export const BookCard: React.FC<BookCardProps> = ({
         <button
           id={`card-wishlist-${book.id}`}
           onClick={handleWishlistClick}
-          className={`absolute top-1 right-1 sm:top-1.5 sm:right-1.5 md:top-2 md:right-2 w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 rounded-full flex items-center justify-center shadow-xs transition-all duration-200 active:scale-90 cursor-pointer z-10 ${
+          className={`absolute top-1 right-1 sm:top-1.5 sm:right-1.5 md:top-2 md:right-2 w-6 h-6 sm:w-6.5 sm:h-6.5 md:w-7 md:h-7 rounded-full flex items-center justify-center shadow-xs transition-all duration-200 active:scale-90 cursor-pointer z-10 ${
             isWishlisted
               ? 'bg-white text-rose-600 shadow-rose-200/50'
               : 'bg-white/90 text-gray-700 hover:bg-white hover:text-rose-600'
@@ -87,7 +87,7 @@ export const BookCard: React.FC<BookCardProps> = ({
           title={isWishlisted ? 'In Wishlist' : 'Add to Wishlist'}
         >
           <Heart
-            className={`w-2.5 h-2.5 sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 transition-colors ${
+            className={`w-3 h-3 sm:w-3.5 sm:h-3.5 transition-colors ${
               isWishlisted ? 'fill-rose-600 text-rose-600' : 'text-gray-700'
             }`}
           />
@@ -97,16 +97,16 @@ export const BookCard: React.FC<BookCardProps> = ({
         {isPurchased ? (
           <div
             id={`card-owned-badge-${book.id}`}
-            className="absolute bottom-1 right-1 sm:bottom-1.5 sm:right-1.5 md:bottom-2 md:right-2 w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 rounded-full flex items-center justify-center shadow-xs bg-emerald-600 text-white"
+            className="absolute bottom-1 right-1 sm:bottom-1.5 sm:right-1.5 md:bottom-2 md:right-2 w-6 h-6 sm:w-6.5 sm:h-6.5 md:w-7 md:h-7 rounded-full flex items-center justify-center shadow-xs bg-emerald-600 text-white"
             title="You own this eBook"
           >
-            <Check className="w-2.5 h-2.5 sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 stroke-[2.5]" />
+            <Check className="w-3 h-3 sm:w-3.5 sm:h-3.5 stroke-[2.5]" />
           </div>
         ) : (
           <button
             id={`card-add-cart-${book.id}`}
             onClick={(e) => onAddToCart(book, e)}
-            className={`absolute bottom-1 right-1 sm:bottom-1.5 sm:right-1.5 md:bottom-2 md:right-2 w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 rounded-full flex items-center justify-center shadow-xs transition-all duration-200 active:scale-90 cursor-pointer ${
+            className={`absolute bottom-1 right-1 sm:bottom-1.5 sm:right-1.5 md:bottom-2 md:right-2 w-6 h-6 sm:w-6.5 sm:h-6.5 md:w-7 md:h-7 rounded-full flex items-center justify-center shadow-xs transition-all duration-200 active:scale-90 cursor-pointer ${
               isInCart
                 ? 'bg-[#4029AB] text-white ring-2 ring-white'
                 : 'bg-white/95 text-gray-900 hover:bg-[#4029AB] hover:text-white'
@@ -115,26 +115,26 @@ export const BookCard: React.FC<BookCardProps> = ({
             title={isInCart ? 'In Cart (Click to toggle)' : 'Add to Cart'}
           >
             {isInCart ? (
-              <Check className="w-2.5 h-2.5 sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 stroke-[2.5]" />
+              <Check className="w-3 h-3 sm:w-3.5 sm:h-3.5 stroke-[2.5]" />
             ) : (
-              <ShoppingCart className="w-2.5 h-2.5 sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 stroke-[2.2]" />
+              <ShoppingCart className="w-3 h-3 sm:w-3.5 sm:h-3.5 stroke-[2.2]" />
             )}
           </button>
         )}
       </div>
 
       {/* Dominating Pricing */}
-      <div className="flex items-baseline gap-1 mt-1.5 min-w-0">
-        <span className="font-black text-xs sm:text-sm md:text-base lg:text-lg text-gray-950 tracking-tight leading-none">
+      <div className="flex items-baseline gap-1 mt-1.5 min-w-0 flex-wrap">
+        <span className="font-black text-sm sm:text-base md:text-lg lg:text-xl text-gray-950 tracking-tight leading-none">
           ₹{displayPrice}
         </span>
         {hasCatalogDiscount && (
-          <span className="text-[9px] sm:text-[10px] md:text-xs text-gray-400 line-through leading-none">
+          <span className="text-[11px] sm:text-xs text-gray-400 line-through leading-none">
             ₹{listPrice}
           </span>
         )}
         {discountPercent > 0 && (
-          <span className="text-[9px] sm:text-[10px] md:text-xs font-bold text-emerald-600 leading-none">
+          <span className="text-[11px] sm:text-xs font-bold text-emerald-600 leading-none">
             {discountPercent}% OFF
           </span>
         )}
@@ -142,24 +142,24 @@ export const BookCard: React.FC<BookCardProps> = ({
 
       {/* Book Title */}
       <h3
-        className="text-[11px] sm:text-xs md:text-sm font-bold text-gray-900 truncate leading-snug mt-1 group-hover:text-[#4029AB] transition-colors w-full min-w-0"
+        className="text-xs sm:text-sm md:text-base font-bold text-gray-900 truncate leading-snug mt-1 group-hover:text-[#4029AB] transition-colors w-full min-w-0"
         title={book.title}
       >
         {book.title}
       </h3>
 
       {/* Category Subtitle */}
-      <p className="text-[9px] sm:text-[10px] md:text-xs text-gray-400 font-medium truncate mt-0.5 w-full min-w-0">
+      <p className="text-[11px] sm:text-xs md:text-sm text-gray-500 font-medium truncate mt-0.5 w-full min-w-0">
         {book.category || 'Exam Guide'}
       </p>
 
       {/* Star Rating & Numeric Rating */}
-      <div className="flex items-center gap-0.5 sm:gap-1 mt-1 text-amber-500 min-w-0">
+      <div className="flex items-center gap-1 mt-1 text-amber-500 min-w-0">
         <div className="flex items-center">
           {[...Array(5)].map((_, i) => (
             <Star
               key={i}
-              className={`w-2 h-2 sm:w-2.5 sm:h-2.5 md:w-3 md:h-3 ${
+              className={`w-2.5 h-2.5 sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 ${
                 i < Math.floor(rating)
                   ? 'fill-amber-400 text-amber-400'
                   : 'fill-gray-200 text-gray-200'
@@ -167,7 +167,7 @@ export const BookCard: React.FC<BookCardProps> = ({
             />
           ))}
         </div>
-        <span className="text-[9px] sm:text-[10px] md:text-xs font-medium text-gray-400">
+        <span className="text-[11px] sm:text-xs font-semibold text-gray-500">
           {rating.toFixed(1)}
         </span>
       </div>

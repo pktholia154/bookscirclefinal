@@ -102,21 +102,21 @@ const BookListItem: React.FC<{
       {/* Middle Information Column */}
       <div className="flex-1 min-w-0 pr-1">
         {/* 2-row Title */}
-        <h3 className="font-bold text-xs sm:text-sm text-gray-900 line-clamp-2 leading-snug group-hover:text-[#4029AB] transition-colors">
+        <h3 className="font-bold text-sm sm:text-base text-gray-950 line-clamp-2 leading-snug group-hover:text-[#4029AB] transition-colors">
           {book.title}
         </h3>
 
         {/* Category, Language & Type in same row */}
-        <div className="flex items-center gap-1.5 text-[11px] text-gray-500 truncate mt-1">
-          <span className="font-medium text-gray-600">{book.category || 'General'}</span>
-          <span className="text-gray-300 text-[9px]">•</span>
+        <div className="flex items-center gap-1.5 text-xs sm:text-[13px] text-gray-600 truncate mt-1">
+          <span className="font-semibold text-gray-700">{book.category || 'General'}</span>
+          <span className="text-gray-300 text-[10px]">•</span>
           <span>{book.language || 'English'}</span>
-          <span className="text-gray-300 text-[9px]">•</span>
+          <span className="text-gray-300 text-[10px]">•</span>
           <span>{book.type || 'PDF Ebook'}</span>
         </div>
 
         {/* Publication below above row */}
-        <p className="text-[11px] text-gray-400 truncate mt-0.5">
+        <p className="text-xs text-gray-500 truncate mt-0.5">
           {book.publisher || book.publication || 'Exam Kart'}
         </p>
       </div>
@@ -124,11 +124,11 @@ const BookListItem: React.FC<{
       {/* Right Pricing & Buy / Cart Actions */}
       <div className="text-right shrink-0 flex flex-col items-end justify-between self-stretch">
         <div>
-          <p className="text-sm sm:text-base font-black text-[#4029AB] tracking-tight">
+          <p className="text-base sm:text-lg font-black text-[#4029AB] tracking-tight">
             ₹{book.buy_price}
           </p>
           {book.list_price && book.list_price > book.buy_price && (
-            <p className="text-[10px] text-gray-400 line-through">
+            <p className="text-xs text-gray-400 line-through">
               ₹{book.list_price}
             </p>
           )}
@@ -141,9 +141,9 @@ const BookListItem: React.FC<{
                 e.stopPropagation();
                 onSelectBook(book);
               }}
-              className="px-2.5 sm:px-3 py-1 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 text-[10px] font-bold rounded-lg flex items-center gap-1 cursor-pointer transition-all active:scale-95"
+              className="px-2.5 sm:px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 text-xs font-bold rounded-lg flex items-center gap-1 cursor-pointer transition-all active:scale-95"
             >
-              <Check className="w-3 h-3 text-emerald-600 stroke-[2.5]" />
+              <Check className="w-3.5 h-3.5 text-emerald-600 stroke-[2.5]" />
               <span>Owned</span>
             </button>
           ) : (
@@ -154,7 +154,7 @@ const BookListItem: React.FC<{
                   e.stopPropagation();
                   onAddToCart(book, e);
                 }}
-                className={`p-1.5 rounded-lg border transition-all active:scale-90 cursor-pointer ${
+                className={`p-1.5 sm:p-2 rounded-lg border transition-all active:scale-90 cursor-pointer ${
                   inCart
                     ? 'bg-[#4029AB] text-white border-[#4029AB]'
                     : 'border-gray-200 text-gray-700 bg-white hover:border-[#4029AB] hover:text-[#4029AB]'
@@ -178,7 +178,7 @@ const BookListItem: React.FC<{
                     onSelectBook(book);
                   }
                 }}
-                className="px-2.5 sm:px-3 py-1 bg-[#4029AB] text-white text-[9px] sm:text-[10px] rounded-lg font-bold uppercase tracking-wider hover:bg-[#32208a] active:scale-95 transition-all shadow-2xs cursor-pointer"
+                className="px-3 sm:px-3.5 py-1.5 bg-[#4029AB] text-white text-xs rounded-lg font-bold uppercase tracking-wider hover:bg-[#32208a] active:scale-95 transition-all shadow-2xs cursor-pointer"
               >
                 Buy Now
               </button>

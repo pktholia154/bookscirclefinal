@@ -41,10 +41,10 @@ export const CategoryChips: React.FC<CategoryChipsProps> = ({
         <Link
           id="chip-all"
           href="/"
-          className={`shrink-0 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all duration-200 active:scale-95 whitespace-nowrap cursor-pointer ${
+          className={`shrink-0 px-4 py-2 rounded-full text-sm sm:text-[15px] font-bold transition-all duration-200 active:scale-95 whitespace-nowrap cursor-pointer ${
             selectedCategory.toLowerCase() === 'all'
               ? 'bg-[#4029AB] text-white border border-[#4029AB] shadow-xs'
-              : 'bg-gray-100 text-gray-700 border border-transparent hover:bg-gray-200'
+              : 'bg-gray-100 text-gray-800 border border-transparent hover:bg-gray-200'
           }`}
         >
           All
@@ -60,10 +60,10 @@ export const CategoryChips: React.FC<CategoryChipsProps> = ({
               key={cat.id}
               id={`chip-${slug}`}
               href={`/category/${encodeURIComponent(slug)}`}
-              className={`shrink-0 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all duration-200 active:scale-95 whitespace-nowrap cursor-pointer ${
+              className={`shrink-0 px-4 py-2 rounded-full text-sm sm:text-[15px] font-bold transition-all duration-200 active:scale-95 whitespace-nowrap cursor-pointer ${
                 isSelected
                   ? 'bg-[#4029AB] text-white border border-[#4029AB] shadow-xs'
-                  : 'bg-gray-100 text-gray-700 border border-transparent hover:bg-gray-200'
+                  : 'bg-gray-100 text-gray-800 border border-transparent hover:bg-gray-200'
               }`}
             >
               {cat.title}
@@ -76,14 +76,14 @@ export const CategoryChips: React.FC<CategoryChipsProps> = ({
           <button
             id="chip-see-more-toggle"
             onClick={() => setIsExpanded((prev) => !prev)}
-            className="shrink-0 px-3 py-1.5 rounded-full text-xs font-bold text-[#4029AB] bg-[#4029AB]/10 hover:bg-[#4029AB]/15 border border-[#4029AB]/20 flex items-center gap-1 transition-all duration-200 active:scale-95 cursor-pointer"
+            className="shrink-0 px-4 py-2 rounded-full text-sm sm:text-[15px] font-bold text-[#4029AB] bg-[#4029AB]/10 hover:bg-[#4029AB]/15 border border-[#4029AB]/20 flex items-center gap-1.5 transition-all duration-200 active:scale-95 cursor-pointer"
             aria-label={isExpanded ? 'Show fewer categories' : 'See more categories'}
           >
             <span>{isExpanded ? 'Show less' : `See more (+${categories.length - initialVisibleCount})`}</span>
             {isExpanded ? (
-              <ChevronUp className="w-3.5 h-3.5" />
+              <ChevronUp className="w-4 h-4" />
             ) : (
-              <ChevronDown className="w-3.5 h-3.5" />
+              <ChevronDown className="w-4 h-4" />
             )}
           </button>
         )}
