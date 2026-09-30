@@ -108,6 +108,40 @@ export function resolveBookPdfUrl(pdfUrlOrPath?: string | null, bookId?: string)
 }
 
 /**
+ * Resolves the public sample Markdown URL accessible by visitors
+ */
+export function resolveBookMdSampleUrl(sampleMdUrlOrPath?: string | null, bookId?: string): string {
+  if (sampleMdUrlOrPath && sampleMdUrlOrPath.trim()) {
+    const trimmed = sampleMdUrlOrPath.trim();
+    if (trimmed.startsWith('https://') || trimmed.startsWith('http://')) {
+      return trimmed;
+    }
+    return formatFirebaseStorageUrl(trimmed);
+  }
+  if (bookId) {
+    return formatFirebaseStorageUrl(`public/samples/${bookId}.md`);
+  }
+  return '';
+}
+
+/**
+ * Resolves the direct, full Markdown file URL for books from Firebase Storage
+ */
+export function resolveBookMdUrl(mdUrlOrPath?: string | null, bookId?: string): string {
+  if (mdUrlOrPath && mdUrlOrPath.trim()) {
+    const trimmed = mdUrlOrPath.trim();
+    if (trimmed.startsWith('https://') || trimmed.startsWith('http://')) {
+      return trimmed;
+    }
+    return formatFirebaseStorageUrl(trimmed);
+  }
+  if (bookId) {
+    return formatFirebaseStorageUrl(`public/samples/${bookId}.md`);
+  }
+  return '';
+}
+
+/**
  * Resolves normalized storage path for books
  */
 export function resolveFullBookStoragePath(pdfStoragePathOrUrl?: string | null, bookId?: string): string {

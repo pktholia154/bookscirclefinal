@@ -30,6 +30,10 @@ export interface PurchaseItemDetail {
   category?: string;
   pdf_file?: string;
   pdfStoragePath?: string;
+  mdurl?: string;
+  mdsampleurl?: string;
+  md_file?: string;
+  cover?: string;
 }
 
 export interface PurchaseRecord {
@@ -108,6 +112,10 @@ export async function recordUserPurchaseInFirestore(
     category: item.book.category,
     pdf_file: item.book.pdf_file,
     pdfStoragePath: item.book.pdfStoragePath,
+    mdurl: item.book.mdurl || item.book.mdUrl,
+    mdsampleurl: item.book.mdsampleurl || item.book.mdSampleUrl,
+    md_file: item.book.md_file,
+    cover: item.book.cover,
   }));
 
   const effectiveUserId =

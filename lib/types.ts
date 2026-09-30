@@ -27,6 +27,14 @@ export interface Book {
   pdf_url?: string;
   pdfStoragePath?: string;
   hasFullPdf?: boolean;
+  mdurl?: string;
+  mdsampleurl?: string;
+  mdUrl?: string;
+  mdSampleUrl?: string;
+  md_file?: string;
+  md_url?: string;
+  md_sample_url?: string;
+  hasMd?: boolean;
   cover: string;
   imageUrl?: string;
   sample_file: string;

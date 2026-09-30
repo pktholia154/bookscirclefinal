@@ -49,6 +49,8 @@
         "list_price": { "type": "number", "description": "Original list price in INR" },
         "category": { "type": "string", "description": "Category name" },
         "cover": { "type": "string", "description": "Cover image URL" },
+        "mdurl": { "type": "string", "description": "Full Markdown file URL or storage path" },
+        "mdsampleurl": { "type": "string", "description": "Sample Markdown preview URL or storage path" },
         "isActive": { "type": "boolean", "description": "Whether book is active for sale" }
       },
       "required": ["id", "title", "buy_price", "category"]

@@ -45,13 +45,22 @@ interface BooksCircleDB extends DBSchema {
       savedAt: string;
     };
   };
+  offlineEpubs: {
+    key: string;
+    value: {
+      bookId: string;
+      content: string;
+      updatedAt: string;
+      sizeBytes?: number;
+    };
+  };
 }
 
 let dbPromise: Promise<IDBPDatabase<BooksCircleDB>> | null = null;
 
 function getDb(): Promise<IDBPDatabase<BooksCircleDB>> {
   if (!dbPromise) {
-    dbPromise = openDB<BooksCircleDB>('bookscircle-storage', 3, {
+    dbPromise = openDB<BooksCircleDB>('bookscircle-storage', 4, {
       upgrade(db, oldVersion) {
         if (!db.objectStoreNames.contains('purchases')) {
           db.createObjectStore('purchases', { keyPath: 'bookId' });
@@ -64,6 +73,9 @@ function getDb(): Promise<IDBPDatabase<BooksCircleDB>> {
         }
         if (!db.objectStoreNames.contains('offlineBooks')) {
           db.createObjectStore('offlineBooks', { keyPath: 'bookId' });
+        }
+        if (!db.objectStoreNames.contains('offlineEpubs')) {
+          db.createObjectStore('offlineEpubs', { keyPath: 'bookId' });
         }
       },
       blocked() {
@@ -357,6 +369,96 @@ export async function deleteOfflinePdf(bookId: string): Promise<void> {
   } catch {}
 }
 
+export async function saveEpubOffline(bookId: string, content: string, book?: Book): Promise<void> {
+  if (typeof window === 'undefined') return;
+  requestPersistentStorage().catch(() => {});
+
+  try {
+    const db = await getDb();
+    const sizeBytes = new Blob([content]).size;
+    await db.put('offlineEpubs', {
+      bookId,
+      content,
+      updatedAt: new Date().toISOString(),
+      sizeBytes,
+    });
+    if (book) {
+      await db.put('offlineBooks', {
+        bookId,
+        book,
+        savedAt: new Date().toISOString(),
+      });
+    }
+  } catch (e) {
+    console.warn('Failed to store offline ePub in IndexedDB:', e);
+  }
+
+  // Backup in localStorage
+  try {
+    localStorage.setItem(`bookscircle_offline_epub_${bookId}`, content);
+  } catch {}
+}
+
+export async function getEpubOffline(bookId: string): Promise<string | null> {
+  if (typeof window === 'undefined') return null;
+  try {
+    const db = await getDb();
+    const item = await db.get('offlineEpubs', bookId);
+    if (item && item.content) {
+      return item.content;
+    }
+  } catch (e) {
+    console.warn('IndexedDB ePub read failed, checking localStorage fallback:', e);
+  }
+
+  try {
+    const localContent = localStorage.getItem(`bookscircle_offline_epub_${bookId}`);
+    if (localContent) return localContent;
+  } catch {}
+
+  return null;
+}
+
+export async function isEpubOfflineAvailable(bookId: string): Promise<boolean> {
+  if (typeof window === 'undefined') return false;
+  try {
+    const db = await getDb();
+    const item = await db.get('offlineEpubs', bookId);
+    if (item && item.content) return true;
+  } catch {}
+
+  try {
+    if (localStorage.getItem(`bookscircle_offline_epub_${bookId}`)) return true;
+  } catch {}
+
+  return false;
+}
+
+export async function deleteOfflineEpub(bookId: string): Promise<void> {
+  if (typeof window === 'undefined') return;
+  try {
+    const db = await getDb();
+    await db.delete('offlineEpubs', bookId);
+  } catch (e) {
+    console.warn('Failed to delete offline ePub from IndexedDB:', e);
+  }
+
+  try {
+    localStorage.removeItem(`bookscircle_offline_epub_${bookId}`);
+  } catch {}
+}
+
+export async function getAllOfflineEpubIds(): Promise<string[]> {
+  if (typeof window === 'undefined') return [];
+  try {
+    const db = await getDb();
+    const keys = await db.getAllKeys('offlineEpubs');
+    return keys.map((k) => String(k));
+  } catch {
+    return [];
+  }
+}
+
 export async function getOfflineStorageStats(): Promise<{ count: number; totalBytes: number; isPersisted: boolean }> {
   if (typeof window === 'undefined') return { count: 0, totalBytes: 0, isPersisted: false };
   let isPersisted = false;
@@ -369,14 +471,22 @@ export async function getOfflineStorageStats(): Promise<{ count: number; totalBy
   try {
     const db = await getDb();
     const allPdfs = await db.getAll('offlinePdfs');
+    const allEpubs = await db.getAll('offlineEpubs');
     let totalBytes = 0;
     allPdfs.forEach((item) => {
       if (item.data) {
         totalBytes += item.data.byteLength;
       }
     });
+    allEpubs.forEach((item) => {
+      if (item.sizeBytes) {
+        totalBytes += item.sizeBytes;
+      } else if (item.content) {
+        totalBytes += item.content.length;
+      }
+    });
     return {
-      count: allPdfs.length,
+      count: allPdfs.length + allEpubs.length,
       totalBytes,
       isPersisted,
     };

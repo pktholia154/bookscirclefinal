@@ -23,11 +23,14 @@ import {
   Zap,
   HelpCircle,
   Heart,
+  FileCode,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Book, Review, CartItem } from '@/lib/types';
 import { DEFAULT_BOOK_COVER } from '@/lib/data';
 import { PDFReaderModal } from '@/components/PDFReaderModal';
+import { MarkdownReaderModal } from '@/components/MarkdownReaderModal';
+import { SampleSwitcher } from '@/components/SampleSwitcher';
 import { CartDrawer } from '@/components/CartDrawer';
 import { UserProfile } from '@/components/Header';
 import { processRazorpayPayment, loadRazorpayScript } from '@/lib/services/razorpay';
@@ -94,6 +97,7 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
   const [imgLoadFailed, setImgLoadFailed] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [activePdfReaderMode, setActivePdfReaderMode] = useState<'sample' | 'full' | null>(null);
+  const [activeMdReaderMode, setActiveMdReaderMode] = useState<'sample' | 'full' | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isGoogleModalOpen, setIsGoogleModalOpen] = useState(false);
@@ -615,51 +619,60 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
           </div>
         </section>
 
-        {/* Action Buttons (Sample & Buy) */}
-        <section className="grid grid-cols-2 gap-3 pt-1">
-          <motion.button
-            id="book-page-sample-btn"
-            onClick={() => setActivePdfReaderMode('sample')}
-            animate={{
-              scale: [1, 1.025, 1],
-              boxShadow: [
-                '0 1px 3px rgba(64, 41, 171, 0.2)',
-                '0 4px 14px rgba(64, 41, 171, 0.35)',
-                '0 1px 3px rgba(64, 41, 171, 0.2)',
-              ],
-            }}
-            transition={{
-              repeat: Infinity,
-              duration: 2.4,
-              ease: 'easeInOut',
-            }}
-            className="w-full py-3 px-4 rounded-xl bg-[#4029AB] hover:bg-[#34208e] text-white border border-[#4029AB] text-xs sm:text-sm font-bold transition-colors active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer shadow-xs"
-          >
-            <Eye className="w-4 h-4 text-white" />
-            <span>Sample</span>
-          </motion.button>
+        {/* Action Buttons (Sample Switcher & Buy / Read) */}
+        <section className="pt-1">
+          <div className="grid grid-cols-2 gap-3 items-stretch">
+            {/* Left: Attention-Catching Sample Switcher with Flashing Label and Split PDF / ePub buttons */}
+            <SampleSwitcher
+              onOpenPdf={() => setActivePdfReaderMode('sample')}
+              onOpenMd={() => setActiveMdReaderMode('sample')}
+            />
 
-          {isPurchased ? (
-            <button
-              id="book-page-read-full-btn"
-              onClick={() => setActivePdfReaderMode('full')}
-              className="w-full py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-bold transition-all active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer shadow-xs"
-            >
-              <BookOpen className="w-4 h-4 text-white" />
-              <span>Read Full PDF</span>
-            </button>
-          ) : (
-            <button
-              id="book-page-buy-now-btn"
-              onMouseEnter={() => loadRazorpayScript()}
-              onTouchStart={() => loadRazorpayScript()}
-              onClick={handleBuyNow}
-              className="w-full py-3 px-4 rounded-xl bg-white hover:bg-[#4029AB]/5 text-[#4029AB] border-2 border-[#4029AB] text-xs sm:text-sm font-bold transition-all active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
-            >
-              <Zap className="w-4 h-4 text-[#4029AB] fill-[#4029AB]" />
-              <span>Buy (₹{book.buy_price})</span>
-            </button>
-          )}
+            {/* Right: Full Edition (Buy Now or Read Full) */}
+            <div className="flex flex-col gap-1.5 w-full">
+              {/* Attached label at top left in simple text small font size */}
+              <div className="flex items-center justify-start px-0.5">
+                <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wide select-none">
+                  {isPurchased ? 'Unlocked' : 'Full edition'}
+                </span>
+              </div>
+
+              {/* Right Action Button */}
+              {isPurchased ? (
+                <div className="flex items-stretch rounded-full overflow-hidden border-2 border-emerald-600 shadow-xs h-10 w-full bg-emerald-600 p-[2px]">
+                  <button
+                    id="book-page-read-pdf-btn"
+                    onClick={() => setActivePdfReaderMode('full')}
+                    className="flex-1 rounded-l-full bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-1 transition-all cursor-pointer px-2 border-r border-white/25 select-none"
+                    title="Read Complete eBook in PDF format"
+                  >
+                    <BookOpen className="w-3.5 h-3.5 text-white" />
+                    <span>Full PDF</span>
+                  </button>
+                  <button
+                    id="book-page-read-md-btn"
+                    onClick={() => setActiveMdReaderMode('full')}
+                    className="flex-1 rounded-r-full bg-[#E8F805] hover:bg-[#d9e802] active:scale-95 text-slate-950 font-black text-xs sm:text-sm flex items-center justify-center gap-1 transition-all cursor-pointer px-2 select-none"
+                    title="Read Complete eBook in Markdown / ePub format"
+                  >
+                    <FileCode className="w-3.5 h-3.5 text-slate-950" />
+                    <span>Full epub</span>
+                  </button>
+                </div>
+              ) : (
+                <button
+                  id="book-page-buy-now-btn"
+                  onMouseEnter={() => loadRazorpayScript()}
+                  onTouchStart={() => loadRazorpayScript()}
+                  onClick={handleBuyNow}
+                  className="w-full h-10 rounded-full bg-white hover:bg-[#4029AB]/5 text-[#4029AB] border-2 border-[#4029AB] text-xs sm:text-sm font-black transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  <ShoppingBag className="w-4 h-4 text-[#4029AB]" />
+                  <span>Buy (₹{book.buy_price})</span>
+                </button>
+              )}
+            </div>
+          </div>
         </section>
 
         {/* Book Overview & Highlights */}
@@ -926,6 +939,20 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
           onClose={() => setActivePdfReaderMode(null)}
           onBuyNow={() => {
             setActivePdfReaderMode(null);
+            handleBuyNow();
+          }}
+          isPurchased={isPurchased}
+        />
+      )}
+
+      {/* Markdown / ePub Reader Modal */}
+      {activeMdReaderMode && (
+        <MarkdownReaderModal
+          book={book}
+          mode={activeMdReaderMode}
+          onClose={() => setActiveMdReaderMode(null)}
+          onBuyNow={(b) => {
+            setActiveMdReaderMode(null);
             handleBuyNow();
           }}
           isPurchased={isPurchased}

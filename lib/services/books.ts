@@ -15,6 +15,8 @@ import {
   resolveBookCoverUrl,
   resolveBookSampleUrl,
   resolveBookPdfUrl,
+  resolveBookMdSampleUrl,
+  resolveBookMdUrl,
 } from './storage';
 
 const LOCAL_STORAGE_BOOKS_KEY = 'bookscircle_live_books_cache';
@@ -88,6 +90,14 @@ export function parseBookDocument(docSnap: any): Book {
   const rawPdfStoragePath = data.pdfurl || data.pdfUrl || data.pdf_file || data.pdfFile || data.pdf_url || data.pdfStoragePath || data.pdf_storage_path || data.full_pdf_url || data.file_url || data.fileUrl || data.download_url || data.downloadUrl || data.book_file || data.full_file || data.url || data.pdf || '';
   const resolvedFullPdfUrl = resolveBookPdfUrl(rawPdfStoragePath, bookId);
 
+  // Markdown URLs
+  const rawMdSample = data.mdsampleurl || data.mdSampleUrl || data.md_sample_url || data.md_sample || data.sample_md || '';
+  const resolvedMdSample = resolveBookMdSampleUrl(rawMdSample, bookId);
+
+  const rawMdUrl = data.mdurl || data.mdUrl || data.md_url || data.md_file || data.full_md_url || data.md || '';
+  const resolvedMdUrl = resolveBookMdUrl(rawMdUrl, bookId);
+  const hasMd = Boolean(rawMdUrl || rawMdSample);
+
   const publisher = data.publisher || data.publication || 'Mocktime Publication';
   const language = data.language || 'English';
   const bookType = data.type || data.format || data.book_type || data.edition || 'Question Bank';
@@ -112,6 +122,14 @@ export function parseBookDocument(docSnap: any): Book {
     pdf_url: resolvedFullPdfUrl,
     pdfStoragePath: resolvedFullPdfUrl,
     hasFullPdf: data.hasFullPdf !== undefined ? Boolean(data.hasFullPdf) : true,
+    md_file: resolvedMdUrl,
+    mdurl: resolvedMdUrl,
+    mdUrl: resolvedMdUrl,
+    md_url: resolvedMdUrl,
+    mdsampleurl: resolvedMdSample,
+    mdSampleUrl: resolvedMdSample,
+    md_sample_url: resolvedMdSample,
+    hasMd: hasMd,
     cover: resolvedCover,
     imageUrl: resolvedCover,
     sample_file: resolvedSample,
