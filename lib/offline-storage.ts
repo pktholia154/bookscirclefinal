@@ -105,7 +105,7 @@ export async function requestPersistentStorage(): Promise<boolean> {
     const granted = await navigator.storage.persist();
     return granted;
   } catch (e) {
-    console.warn('Storage persist request failed:', e);
+    console.warn('Storage persist request failed:', (e as any)?.message || String(e));
     return false;
   }
 }
@@ -130,7 +130,7 @@ export async function savePurchasedBookIds(bookIds: string[]): Promise<void> {
     localStorage.setItem('bookscircle_purchased_books', JSON.stringify(combined));
     requestPersistentStorage().catch(() => {});
   } catch (e) {
-    console.warn('Failed to save purchased books to DB:', e);
+    console.warn('Failed to save purchased books to DB:', (e as any)?.message || String(e));
     try {
       const existing = getPurchasedBookIdsFromLocal();
       const combined = Array.from(new Set([...existing, ...bookIds]));
@@ -148,7 +148,7 @@ export function getPurchasedBookIdsFromLocal(): string[] {
       if (Array.isArray(parsed)) return parsed;
     }
   } catch (e) {
-    console.warn('Failed to read purchased books from localStorage:', e);
+    console.warn('Failed to read purchased books from localStorage:', (e as any)?.message || String(e));
   }
   return [];
 }
@@ -167,7 +167,7 @@ export async function getPdfOffline(bookId: string): Promise<ArrayBuffer | null>
       return item.data;
     }
   } catch (e) {
-    console.warn('IndexedDB read failed, attempting Cache Storage fallback:', e);
+    console.warn('IndexedDB read failed, attempting Cache Storage fallback:', (e as any)?.message || String(e));
   }
 
   // 2. Try Cache Storage API fallback
@@ -193,7 +193,7 @@ export async function getPdfOffline(bookId: string): Promise<ArrayBuffer | null>
       }
     }
   } catch (cacheErr) {
-    console.warn('Cache Storage fallback failed:', cacheErr);
+    console.warn('Cache Storage fallback failed:', (cacheErr as any)?.message || String(cacheErr));
   }
 
   return null;
@@ -229,7 +229,7 @@ export async function getAllOfflineBookIds(): Promise<string[]> {
     const keys = await db.getAllKeys('offlinePdfs');
     keys.forEach((k) => idSet.add(String(k)));
   } catch (e) {
-    console.warn('Failed to get offline book keys from IndexedDB:', e);
+    console.warn('Failed to get offline book keys from IndexedDB:', (e as any)?.message || String(e));
   }
 
   try {
@@ -275,7 +275,7 @@ export async function savePdfOffline(bookId: string, data: ArrayBuffer, book?: B
       });
     }
   } catch (e) {
-    console.warn('Failed to store offline PDF in IndexedDB:', e);
+    console.warn('Failed to store offline PDF in IndexedDB:', (e as any)?.message || String(e));
   }
 
   // 2. Store in Cache Storage API (dual persistence across PWA installs)
@@ -292,7 +292,7 @@ export async function savePdfOffline(bookId: string, data: ArrayBuffer, book?: B
       await cache.put(`/offline-pdf/${encodeURIComponent(bookId)}`, response);
     }
   } catch (cacheErr) {
-    console.warn('Failed to cache PDF in Cache Storage:', cacheErr);
+    console.warn('Failed to cache PDF in Cache Storage:', (cacheErr as any)?.message || String(cacheErr));
   }
 
   // 3. Keep book metadata in local storage backup
@@ -319,7 +319,7 @@ export async function getAllOfflineBooks(): Promise<Book[]> {
       if (r.book) books.push(r.book);
     });
   } catch (e) {
-    console.warn('Failed to read offline books from IndexedDB:', e);
+    console.warn('Failed to read offline books from IndexedDB:', (e as any)?.message || String(e));
   }
 
   // Merge with localStorage backup
@@ -352,7 +352,7 @@ export async function deleteOfflinePdf(bookId: string): Promise<void> {
     await db.delete('offlinePdfs', bookId);
     await db.delete('offlineBooks', bookId);
   } catch (e) {
-    console.warn('Failed to delete offline PDF from IndexedDB:', e);
+    console.warn('Failed to delete offline PDF from IndexedDB:', (e as any)?.message || String(e));
   }
 
   try {
@@ -390,7 +390,7 @@ export async function saveEpubOffline(bookId: string, content: string, book?: Bo
       });
     }
   } catch (e) {
-    console.warn('Failed to store offline ePub in IndexedDB:', e);
+    console.warn('Failed to store offline ePub in IndexedDB:', (e as any)?.message || String(e));
   }
 
   // Backup in localStorage
@@ -408,7 +408,7 @@ export async function getEpubOffline(bookId: string): Promise<string | null> {
       return item.content;
     }
   } catch (e) {
-    console.warn('IndexedDB ePub read failed, checking localStorage fallback:', e);
+    console.warn('IndexedDB ePub read failed, checking localStorage fallback:', (e as any)?.message || String(e));
   }
 
   try {
@@ -440,7 +440,7 @@ export async function deleteOfflineEpub(bookId: string): Promise<void> {
     const db = await getDb();
     await db.delete('offlineEpubs', bookId);
   } catch (e) {
-    console.warn('Failed to delete offline ePub from IndexedDB:', e);
+    console.warn('Failed to delete offline ePub from IndexedDB:', (e as any)?.message || String(e));
   }
 
   try {
@@ -491,7 +491,7 @@ export async function getOfflineStorageStats(): Promise<{ count: number; totalBy
       isPersisted,
     };
   } catch (e) {
-    console.warn('Failed to get offline stats:', e);
+    console.warn('Failed to get offline stats:', (e as any)?.message || String(e));
     return { count: 0, totalBytes: 0, isPersisted };
   }
 }
@@ -503,7 +503,7 @@ export async function clearAllOfflinePdfs(): Promise<void> {
     await db.clear('offlinePdfs');
     await db.clear('offlineBooks');
   } catch (e) {
-    console.warn('Failed to clear offline storage:', e);
+    console.warn('Failed to clear offline storage:', (e as any)?.message || String(e));
   }
 
   try {
@@ -535,7 +535,7 @@ export async function queuePendingPurchase(data: {
       createdAt: new Date().toISOString(),
     });
   } catch (e) {
-    console.warn('Failed to queue pending purchase in offline storage:', e);
+    console.warn('Failed to queue pending purchase in offline storage:', (e as any)?.message || String(e));
   }
 }
 
@@ -545,7 +545,7 @@ export async function getPendingPurchases(): Promise<any[]> {
     const db = await getDb();
     return await db.getAll('pendingPurchases');
   } catch (e) {
-    console.warn('Failed to retrieve pending purchases:', e);
+    console.warn('Failed to retrieve pending purchases:', (e as any)?.message || String(e));
     return [];
   }
 }
@@ -556,7 +556,7 @@ export async function removePendingPurchase(id: string): Promise<void> {
     const db = await getDb();
     await db.delete('pendingPurchases', id);
   } catch (e) {
-    console.warn('Failed to delete pending purchase:', e);
+    console.warn('Failed to delete pending purchase:', (e as any)?.message || String(e));
   }
 }
 

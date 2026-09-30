@@ -113,7 +113,7 @@ export async function syncUserProfileToFirestore(
 
     await setDoc(userRef, updateData, { merge: true });
   } catch (err) {
-    console.warn('Firestore user client write attempt note:', err);
+    console.warn('Firestore user client write attempt note:', (err as any)?.message || String(err));
   }
 
   return profilePayload as unknown as FirestoreUserProfile;
@@ -134,7 +134,7 @@ export async function getUserProfileFromFirestore(
       return snap.data() as FirestoreUserProfile;
     }
   } catch (err) {
-    console.warn('Error fetching user profile from Firestore:', err);
+    console.warn('Error fetching user profile from Firestore:', (err as any)?.message || String(err));
   }
   return null;
 }

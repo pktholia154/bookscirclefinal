@@ -296,7 +296,7 @@ export async function recordUserPurchaseInFirestore(
 
     recordedInCloud = true;
   } catch (err) {
-    console.warn('Firestore cloud purchase sync attempt error:', err);
+    console.warn('Firestore cloud purchase sync attempt error:', (err as any)?.message || String(err));
   }
 
   // 3. If offline or cloud write failed, queue for automated background sync
@@ -380,7 +380,7 @@ export async function syncUserPurchases(userId?: string, userEmail?: string): Pr
         } catch (eErr) {}
       }
     } catch (err) {
-      console.warn('Could not sync user purchases from cloud:', err);
+      console.warn('Could not sync user purchases from cloud:', (err as any)?.message || String(err));
     }
   }
 
@@ -421,7 +421,7 @@ export async function getUserPurchaseHistory(
       }
     });
   } catch (err) {
-    console.warn('Error fetching user purchase history from subcollection:', err);
+    console.warn('Error fetching user purchase history from subcollection:', (err as any)?.message || String(err));
   }
 
   // Sort by newest purchasedAt first
@@ -618,7 +618,7 @@ export function subscribeToUserPurchases(
           if (err?.code === 'not-found' || err?.message?.includes('NOT_FOUND') || err?.message?.includes('not-found')) {
             try { unsubProfile?.(); } catch {}
           } else {
-            console.warn('Realtime users doc sync note:', err?.message || err);
+            console.warn('Realtime users doc sync note:', (err as any)?.message || String(err));
           }
         }
       );
@@ -645,7 +645,7 @@ export function subscribeToUserPurchases(
           if (err?.code === 'not-found' || err?.message?.includes('NOT_FOUND') || err?.message?.includes('not-found')) {
             try { unsubSubCol?.(); } catch {}
           } else {
-            console.warn('Realtime subcollection purchases sync note:', err?.message || err);
+            console.warn('Realtime subcollection purchases sync note:', (err as any)?.message || String(err));
           }
         }
       );

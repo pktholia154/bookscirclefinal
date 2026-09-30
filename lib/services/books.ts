@@ -303,7 +303,7 @@ export function subscribeToFirestoreBooks(onUpdate: (books: Book[]) => void): ()
         }
       },
       (error) => {
-        console.warn('Firestore real-time books listener status:', error?.message || error);
+        console.warn('Firestore real-time books listener status:', error?.message || String(error));
       }
     );
     return unsubscribe;
@@ -326,7 +326,7 @@ export function subscribeToFirestoreBook(bookId: string, onUpdate: (book: Book |
         }
       },
       (error) => {
-        console.warn(`Firestore single book listener status for ${bookId}:`, error?.message || error);
+        console.warn(`Firestore single book listener status for ${bookId}:`, error?.message || String(error));
       }
     );
     return unsubscribe;
@@ -424,7 +424,7 @@ export function subscribeToFirestoreCategories(onUpdate: (categories: Category[]
         }
       },
       (error) => {
-        console.warn('Firestore real-time categories listener status:', error?.message || error);
+        console.warn('Firestore real-time categories listener status:', error?.message || String(error));
       }
     );
     return unsubscribe;

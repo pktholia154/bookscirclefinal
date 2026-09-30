@@ -130,11 +130,103 @@ export default function RootLayout({
   return (
     <html lang="en" className={roboto.variable}>
       <head>
-        {/* Environment & 3rd-party script safeguard: Ensure window.fetch is writable and configurable */}
+        {/* Environment, circular JSON & 3rd-party script safeguard */}
         <script
-          id="fetch-patch-safeguard"
+          id="runtime-safeguards"
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{if(typeof window!=="undefined"&&window.fetch){var d=Object.getOwnPropertyDescriptor(window,"fetch");if(!d||!d.writable||!d.set){var orig=window.fetch;try{Object.defineProperty(window,"fetch",{value:orig,writable:true,configurable:true,enumerable:true});}catch(e){try{var current=orig;Object.defineProperty(window,"fetch",{get:function(){return current;},set:function(fn){current=fn;},configurable:true,enumerable:true});}catch(e2){}}}}}catch(err){}})();`,
+            __html: `(function(){
+  try {
+    if (typeof window !== "undefined") {
+      // 1. Ensure window.fetch is writable and configurable
+      if (window.fetch) {
+        var d = Object.getOwnPropertyDescriptor(window, "fetch");
+        if (!d || !d.writable || !d.set) {
+          var origFetch = window.fetch;
+          try {
+            Object.defineProperty(window, "fetch", { value: origFetch, writable: true, configurable: true, enumerable: true });
+          } catch(e) {
+            try {
+              var currentFetch = origFetch;
+              Object.defineProperty(window, "fetch", {
+                get: function() { return currentFetch; },
+                set: function(fn) { currentFetch = fn; },
+                configurable: true,
+                enumerable: true
+              });
+            } catch(e2) {}
+          }
+        }
+      }
+
+      // 2. Global Circular Structure safeguard for JSON.stringify
+      if (typeof JSON !== "undefined" && JSON.stringify) {
+        var origStringify = JSON.stringify;
+        JSON.stringify = function(value, replacer, space) {
+          var seen = new WeakSet();
+          function circularSafe(key, val) {
+            if (typeof val === "object" && val !== null) {
+              if (seen.has(val)) {
+                return "[Circular]";
+              }
+              seen.add(val);
+            }
+            if (typeof replacer === "function") {
+              return replacer.call(this, key, val);
+            }
+            if (Array.isArray(replacer) && key !== "") {
+              if (replacer.indexOf(key) === -1) return undefined;
+            }
+            return val;
+          }
+          try {
+            return origStringify.call(JSON, value, circularSafe, space);
+          } catch (err) {
+            try {
+              var fallbackSeen = [];
+              return origStringify.call(JSON, value, function(k, v) {
+                if (typeof v === "object" && v !== null) {
+                  if (fallbackSeen.indexOf(v) !== -1) return "[Circular]";
+                  fallbackSeen.push(v);
+                }
+                return v;
+              }, space);
+            } catch (err2) {
+              return '"{}"';
+            }
+          }
+        };
+      }
+
+      // 3. Prevent unhandled circular error objects in console
+      if (typeof console !== "undefined") {
+        ['warn', 'error', 'log'].forEach(function(m) {
+          if (console[m]) {
+            var origMethod = console[m];
+            console[m] = function() {
+              var safeArgs = [];
+              for (var i = 0; i < arguments.length; i++) {
+                var arg = arguments[i];
+                if (arg instanceof Error) {
+                  safeArgs.push(arg.message || String(arg));
+                } else if (typeof arg === "object" && arg !== null) {
+                  try {
+                    JSON.stringify(arg);
+                    safeArgs.push(arg);
+                  } catch (e) {
+                    safeArgs.push(arg.message || arg.code || "[Object with circular structure]");
+                  }
+                } else {
+                  safeArgs.push(arg);
+                }
+              }
+              origMethod.apply(console, safeArgs);
+            };
+          }
+        });
+      }
+    }
+  } catch(err) {}
+})();`,
           }}
         />
 

@@ -563,8 +563,8 @@ export default function HomePage() {
       if (fetchedCats.length > 0) {
         setCategories(fetchedCats);
       }
-    } catch (err) {
-      console.error('Failed to load Firestore data:', err);
+    } catch (err: any) {
+      console.warn('Failed to load Firestore data:', err?.message || String(err));
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -587,8 +587,8 @@ export default function HomePage() {
         if (fetchedCats && fetchedCats.length > 0) {
           setCategories(fetchedCats);
         }
-      } catch (err) {
-        console.error('Failed to load Firestore data:', err);
+      } catch (err: any) {
+        console.warn('Failed to load Firestore data:', err?.message || String(err));
       } finally {
         if (isMounted) {
           setIsLoading(false);
@@ -683,7 +683,7 @@ export default function HomePage() {
       displayName: profile.displayName,
       photoURL: profile.photoURL,
       providerId: 'google.com',
-    }).catch((err) => console.warn('User profile sync in handleSelectUserProfile note:', err));
+    }).catch((err) => console.warn('User profile sync in handleSelectUserProfile note:', (err as any)?.message || String(err)));
 
     // Non-blocking cloud purchase sync
     syncUserPurchases(profile.uid, profile.email || undefined)
@@ -696,7 +696,7 @@ export default function HomePage() {
           });
         }
       })
-      .catch((e) => console.warn('User purchase cloud sync note:', e));
+      .catch((e) => console.warn('User purchase cloud sync note:', (e as any)?.message || String(e)));
 
     // Auto-resume pending checkout if stored in session
     const resumed = autoResumePendingCheckout(profile);
@@ -716,7 +716,7 @@ export default function HomePage() {
     try {
       await signOutUser();
     } catch (e) {
-      console.warn('Firebase signout note:', e);
+      console.warn('Firebase signout note:', (e as any)?.message || String(e));
     }
     if (typeof window !== 'undefined') {
       localStorage.removeItem('bookscircle_user_session');

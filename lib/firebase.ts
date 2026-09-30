@@ -52,7 +52,7 @@ export async function signInWithGoogle(): Promise<{ user: User | null; fallbackN
       // User simply closed the popup before completing login
       return { user: null, cancelled: true };
     }
-    console.warn('Google Sign-In note:', error?.message || error);
+    console.warn('Google Sign-In note:', error?.message || String(error));
     throw error;
   }
 }
@@ -69,7 +69,7 @@ export async function signInWithEmail(email: string, password: string): Promise<
           displayName: cred.user.displayName,
           photoURL: cred.user.photoURL,
           providerId: 'password',
-        }).catch((err) => console.warn('User profile sync on email sign in note:', err));
+        }).catch((err) => console.warn('User profile sync on email sign in note:', (err as any)?.message || String(err)));
       });
     }
     return cred.user;
@@ -86,7 +86,7 @@ export async function signInWithEmail(email: string, password: string): Promise<
               displayName: newCred.user.displayName || email.split('@')[0],
               photoURL: newCred.user.photoURL,
               providerId: 'password',
-            }).catch((err) => console.warn('User profile sync on new user note:', err));
+            }).catch((err) => console.warn('User profile sync on new user note:', (err as any)?.message || String(err)));
           });
         }
         return newCred.user;
@@ -112,7 +112,7 @@ export async function signUpWithEmail(email: string, password: string, displayNa
         displayName: displayName || cred.user.displayName || email.split('@')[0],
         photoURL: cred.user.photoURL,
         providerId: 'password',
-      }).catch((err) => console.warn('User profile sync on signup note:', err));
+      }).catch((err) => console.warn('User profile sync on signup note:', (err as any)?.message || String(err)));
     });
   }
   return cred.user;
@@ -123,7 +123,7 @@ export async function signOutUser(): Promise<void> {
   try {
     await signOut(auth);
   } catch (error) {
-    console.error('Sign Out Error:', error);
+    console.error('Sign Out Error:', (error as any)?.message || String(error));
     throw error;
   }
 }
@@ -137,7 +137,7 @@ export async function ensureFirebaseAuth(): Promise<User | null> {
     const cred = await signInAnonymously(auth);
     return cred.user;
   } catch (err) {
-    console.warn('Anonymous auth not enabled or failed:', err);
+    console.warn('Anonymous auth not enabled or failed:', (err as any)?.message || String(err));
     return null;
   }
 }
