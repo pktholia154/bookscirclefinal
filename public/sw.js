@@ -1,7 +1,6 @@
-// BooksCircle Service Worker
-const CACHE_NAME = 'bookscircle-v1';
+// BooksCircle Service Worker (Static Media Assets Only)
+const CACHE_NAME = 'bookscircle-v2';
 const STATIC_ASSETS = [
-  '/',
   '/manifest.json',
   '/logo.svg',
   '/logo.png',
@@ -9,6 +8,8 @@ const STATIC_ASSETS = [
   '/icon-512.png',
   '/apple-touch-icon.png',
   '/favicon.png',
+  '/favicon-32x32.png',
+  '/favicon-16x16.png',
 ];
 
 self.addEventListener('install', (event) => {
@@ -38,12 +39,14 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Only handle GET requests and non-API/Firebase/Next.js internal calls
+  // Never intercept POST/PUT/DELETE, API, Next.js internal chunks, or 3rd-party auth/payment
   const url = event.request.url;
   if (
     event.request.method !== 'GET' ||
     url.includes('/api/') ||
     url.includes('/_next/') ||
+    url.endsWith('.js') ||
+    url.endsWith('.mjs') ||
     url.includes('firestore.googleapis.com') ||
     url.includes('identitytoolkit.googleapis.com') ||
     url.includes('razorpay.com')
@@ -51,17 +54,18 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Only cache static assets (images, logos, fonts, icons)
-  const isStaticAsset =
+  // Only handle static media assets
+  const isStaticMedia =
     url.endsWith('.png') ||
     url.endsWith('.jpg') ||
     url.endsWith('.jpeg') ||
     url.endsWith('.svg') ||
     url.endsWith('.ico') ||
     url.endsWith('.woff2') ||
-    url.endsWith('.woff');
+    url.endsWith('.woff') ||
+    url.endsWith('/manifest.json');
 
-  if (!isStaticAsset) {
+  if (!isStaticMedia) {
     return;
   }
 

@@ -191,8 +191,12 @@ async function fetchBooksFromFirestoreRest(): Promise<Book[] | null> {
     const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/${FIRESTORE_DATABASE_ID}/documents/books?pageSize=100&key=${FIREBASE_API_KEY}`;
     const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) return null;
-    const json = await res.json();
-    if (Array.isArray(json.documents)) {
+    const contentType = res.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) return null;
+    const text = await res.text();
+    if (text.trim().startsWith('<')) return null;
+    const json = JSON.parse(text);
+    if (json && Array.isArray(json.documents)) {
       return json.documents.map((docObj: any) => {
         const parsed = parseFirestoreRestDocument(docObj);
         return parseBookDocument(parsed);
@@ -210,8 +214,12 @@ async function fetchCategoriesFromFirestoreRest(): Promise<Category[] | null> {
     const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/${FIRESTORE_DATABASE_ID}/documents/categories?pageSize=100&key=${FIREBASE_API_KEY}`;
     const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) return null;
-    const json = await res.json();
-    if (Array.isArray(json.documents)) {
+    const contentType = res.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) return null;
+    const text = await res.text();
+    if (text.trim().startsWith('<')) return null;
+    const json = JSON.parse(text);
+    if (json && Array.isArray(json.documents)) {
       return json.documents.map((docObj: any) => {
         const data = parseFirestoreRestDocument(docObj);
         const seoCatVal = data.seoCat || data.seocat || data.seo_cat || '';
@@ -468,10 +476,16 @@ export async function getFirestoreBookById(idOrSlug: string): Promise<Book | nul
       { cache: 'no-store' }
     );
     if (res.ok) {
-      const json = await res.json();
-      const parsed = parseFirestoreRestDocument(json);
-      if (parsed) {
-        return parseBookDocument(parsed);
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        const text = await res.text();
+        if (!text.trim().startsWith('<')) {
+          const json = JSON.parse(text);
+          const parsed = parseFirestoreRestDocument(json);
+          if (parsed) {
+            return parseBookDocument(parsed);
+          }
+        }
       }
     }
   } catch {}

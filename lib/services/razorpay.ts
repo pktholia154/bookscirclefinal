@@ -152,7 +152,16 @@ export async function processRazorpayPayment(options: RazorpayCheckoutOptions): 
       }),
     });
 
-    const orderData = await orderResponse.json();
+    let orderData: any = {};
+    try {
+      const orderText = await orderResponse.text();
+      if (!orderText.trim().startsWith('<')) {
+        orderData = JSON.parse(orderText);
+      }
+    } catch {
+      orderData = {};
+    }
+
     if (!orderResponse.ok || !orderData.order_id) {
       throw new Error(orderData.error || 'Failed to initialize payment order on server.');
     }
@@ -196,7 +205,16 @@ export async function processRazorpayPayment(options: RazorpayCheckoutOptions): 
             }),
           });
 
-          const verifyData = await verifyResponse.json();
+          let verifyData: any = {};
+          try {
+            const verifyText = await verifyResponse.text();
+            if (!verifyText.trim().startsWith('<')) {
+              verifyData = JSON.parse(verifyText);
+            }
+          } catch {
+            verifyData = {};
+          }
+
           if (verifyResponse.ok && verifyData.success) {
             onSuccess({
               order_id: response.razorpay_order_id,

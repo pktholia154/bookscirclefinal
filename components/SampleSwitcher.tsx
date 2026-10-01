@@ -17,7 +17,7 @@ interface SampleSwitcherProps {
  * 1. "Sample" acts as a prominent label pill that flashes a few times on load to catch visitor attention.
  * 2. Directly below, a split capsule with stable clickable "PDF" and "epub" (Markdown) buttons.
  * 3. Split buttons remain completely stable and tactile for immediate clicking.
- * 4. Compatible with single-token theme (#4029AB, white, slate) with vibrant ePub accent.
+ * 4. Compatible with single-token theme (#4029AB, white, slate).
  */
 export const SampleSwitcher: React.FC<SampleSwitcherProps> = ({
   onOpenPdf,
@@ -84,11 +84,11 @@ export const SampleSwitcher: React.FC<SampleSwitcherProps> = ({
           type="button"
           id="sample-btn-epub"
           onClick={onOpenMd}
-          className="flex-1 rounded-r-full bg-[#E8F805] hover:bg-[#d9e802] active:scale-95 text-slate-950 font-black text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer px-2.5 select-none"
+          className="flex-1 rounded-r-full bg-white hover:bg-gray-50 active:scale-95 text-[#4029AB] font-black text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer px-2.5 select-none"
           title="Read Free Sample in Markdown / ePub format (KaTeX math supported)"
           aria-label="Read Sample ePub / Markdown"
         >
-          <Sparkles className="w-3.5 h-3.5 text-slate-950 shrink-0" />
+          <Sparkles className="w-3.5 h-3.5 text-[#4029AB] shrink-0" />
           <span className="tracking-tight">epub</span>
         </button>
       </div>

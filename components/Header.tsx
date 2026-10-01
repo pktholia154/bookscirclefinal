@@ -75,7 +75,7 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="flex items-center justify-between px-4 sm:px-6 py-2 gap-2 sm:gap-3">
         {/* Brand Logo & Name */}
         <div onClick={onNavigateToProfile} className="flex items-center gap-2 cursor-pointer select-none group">
-          <div className="relative w-7 h-7 sm:w-8 sm:h-8 shrink-0 transition-transform group-hover:scale-105">
+          <div className="relative w-7 h-7 sm:w-8 sm:h-8 shrink-0 rounded-lg overflow-hidden shadow-xs transition-transform group-hover:scale-105">
             <Image
               src="/logo.svg"
               alt="BooksCircle Logo"

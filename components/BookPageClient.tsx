@@ -27,7 +27,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Book, Review, CartItem } from '@/lib/types';
-import { DEFAULT_BOOK_COVER } from '@/lib/data';
+import { DEFAULT_BOOK_COVER, BOOK_FAQS } from '@/lib/data';
 import { PDFReaderModal } from '@/components/PDFReaderModal';
 import { MarkdownReaderModal } from '@/components/MarkdownReaderModal';
 import { SampleSwitcher } from '@/components/SampleSwitcher';
@@ -652,7 +652,7 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
                   <button
                     id="book-page-read-md-btn"
                     onClick={() => setActiveMdReaderMode('full')}
-                    className="flex-1 rounded-r-full bg-[#E8F805] hover:bg-[#d9e802] active:scale-95 text-slate-950 font-black text-xs sm:text-sm flex items-center justify-center gap-1 transition-all cursor-pointer px-2 select-none"
+                    className="flex-1 rounded-r-full bg-[#FFFFFF] hover:bg-[#d9e802] active:scale-95 text-slate-950 font-black text-xs sm:text-sm flex items-center justify-center gap-1 transition-all cursor-pointer px-2 select-none"
                     title="Read Complete eBook in Markdown / ePub format"
                   >
                     <FileCode className="w-3.5 h-3.5 text-slate-950" />
@@ -764,24 +764,14 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
             <span>Frequently Asked Questions</span>
           </h2>
           <div className="space-y-2.5">
-            <div className="p-3.5 rounded-xl border border-gray-200/80 bg-gray-50/50 space-y-1">
-              <h3 className="text-xs font-bold text-gray-900">How is the digital PDF delivered?</h3>
-              <p className="text-[11px] text-gray-600 leading-relaxed">
-                Immediately after your payment is verified via Razorpay, the PDF is unlocked in your BooksCircle library. You can read online in the high-fidelity reader or view offline.
-              </p>
-            </div>
-            <div className="p-3.5 rounded-xl border border-gray-200/80 bg-gray-50/50 space-y-1">
-              <h3 className="text-xs font-bold text-gray-900">Can I view this e-book on mobile and tablets?</h3>
-              <p className="text-[11px] text-gray-600 leading-relaxed">
-                Yes, all e-books are formatted with responsive text and high-resolution vector diagrams compatible with iOS, Android, macOS, and Windows.
-              </p>
-            </div>
-            <div className="p-3.5 rounded-xl border border-gray-200/80 bg-gray-50/50 space-y-1">
-              <h3 className="text-xs font-bold text-gray-900">Is this updated for current exam notifications?</h3>
-              <p className="text-[11px] text-gray-600 leading-relaxed">
-                Yes, Exam Kart updates study modules systematically to incorporate the latest syllabus trends and previous year question papers.
-              </p>
-            </div>
+            {BOOK_FAQS.map((faq, index) => (
+              <div key={index} className="p-3.5 rounded-xl border border-gray-200/80 bg-gray-50/50 space-y-1">
+                <h3 className="text-xs font-bold text-gray-900">{faq.question}</h3>
+                <p className="text-[11px] text-gray-600 leading-relaxed">
+                  {faq.answer}
+                </p>
+              </div>
+            ))}
           </div>
         </section>
 

@@ -19,10 +19,11 @@ import {
   Heart,
   FileText,
   FileCode,
+  HelpCircle,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Book, Review } from '@/lib/types';
-import { DEFAULT_BOOK_COVER } from '@/lib/data';
+import { DEFAULT_BOOK_COVER, BOOK_FAQS } from '@/lib/data';
 import { PDFReaderModal } from '@/components/PDFReaderModal';
 import { MarkdownReaderModal } from '@/components/MarkdownReaderModal';
 import { SampleSwitcher } from '@/components/SampleSwitcher';
@@ -533,6 +534,24 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
                 ))}
               </div>
             </div>
+          </div>
+        </section>
+
+        {/* Frequently Asked Questions */}
+        <section className="space-y-3 pt-4 border-t border-gray-100">
+          <h2 className="text-base sm:text-lg font-bold text-gray-950 flex items-center gap-2">
+            <HelpCircle className="w-4 h-4 text-[#4029AB]" />
+            <span>Frequently Asked Questions</span>
+          </h2>
+          <div className="space-y-2.5">
+            {BOOK_FAQS.map((faq, index) => (
+              <div key={index} className="p-3.5 rounded-xl border border-gray-200/80 bg-gray-50/50 space-y-1">
+                <h3 className="text-xs font-bold text-gray-900">{faq.question}</h3>
+                <p className="text-[11px] text-gray-600 leading-relaxed">
+                  {faq.answer}
+                </p>
+              </div>
+            ))}
           </div>
         </section>
 

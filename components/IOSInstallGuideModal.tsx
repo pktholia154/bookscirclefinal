@@ -39,12 +39,12 @@ export const IOSInstallGuideModal: React.FC<IOSInstallGuideModalProps> = ({
           {/* Header & Close */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="relative w-11 h-11 rounded-2xl overflow-hidden shadow-xs border border-gray-100 shrink-0 bg-white">
+              <div className="relative w-11 h-11 rounded-xl overflow-hidden shadow-xs shrink-0">
                 <Image
                   src="/logo.svg"
                   alt="BooksCircle Logo"
                   fill
-                  className="object-contain p-1"
+                  className="object-contain"
                 />
               </div>
               <div>

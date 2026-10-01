@@ -1,4 +1,5 @@
 import { Book, Review } from './types';
+import { BOOK_FAQS } from './data';
 
 export const SITE_URL = 'https://bookscircle.org';
 export const SITE_NAME = 'BooksCircle';
@@ -80,32 +81,14 @@ export function generateBookSchema(book: Book) {
   const bookUrl = `${SITE_URL}/book/${encodeURIComponent(book.seoslug || book.slug || book.id)}`;
   const coverUrl = book.cover || `${SITE_URL}/cover-placeholder.jpg`;
 
-  const faqItems = [
-    {
-      '@type': 'Question',
-      name: `What format is "${book.title}" delivered in?`,
-      acceptedAnswer: {
-        '@type': 'Answer',
-        text: `"${book.title}" is delivered instantly in high-resolution, DRM-secured PDF e-book format, optimized for smartphones, tablets, laptops, and desktop PDF readers with offline reading support.`,
-      },
+  const faqItems = BOOK_FAQS.map((faq) => ({
+    '@type': 'Question',
+    name: faq.question,
+    acceptedAnswer: {
+      '@type': 'Answer',
+      text: faq.answer,
     },
-    {
-      '@type': 'Question',
-      name: `How do I access "${book.title}" after purchase?`,
-      acceptedAnswer: {
-        '@type': 'Answer',
-        text: `Upon completing secure Razorpay payment, your account is immediately granted access. You can read online using our vector PDF reader or download the PDF for offline exam preparation.`,
-      },
-    },
-    {
-      '@type': 'Question',
-      name: `Is "${book.title}" updated for the latest exam syllabus?`,
-      acceptedAnswer: {
-        '@type': 'Answer',
-        text: `Yes, all e-books and study materials in the ${book.category} section on BooksCircle are curated and updated regularly to align with the current syllabus and examination patterns.`,
-      },
-    },
-  ];
+  }));
 
   return {
     '@context': 'https://schema.org',
