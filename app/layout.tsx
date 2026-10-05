@@ -19,8 +19,8 @@ export const viewport: Viewport = {
   userScalable: false,
   viewportFit: 'cover',
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#4029AB' },
-    { media: '(prefers-color-scheme: dark)', color: '#4029AB' },
+    { media: '(prefers-color-scheme: light)', color: '#FFFFFF' },
+    { media: '(prefers-color-scheme: dark)', color: '#FFFFFF' },
   ],
 };
 
@@ -67,7 +67,7 @@ export const metadata: Metadata = {
       {
         rel: 'mask-icon',
         url: '/logo.svg',
-        color: '#4029AB',
+        color: '#5e17eb',
       },
     ],
   },
@@ -75,9 +75,9 @@ export const metadata: Metadata = {
     'mobile-web-app-capable': 'yes',
     'apple-mobile-web-app-capable': 'yes',
     'apple-mobile-web-app-status-bar-style': 'black-translucent',
-    'theme-color': '#4029AB',
-    'msapplication-navbutton-color': '#4029AB',
-    'msapplication-TileColor': '#4029AB',
+    'theme-color': '#5e17eb',
+    'msapplication-navbutton-color': '#5e17eb',
+    'msapplication-TileColor': '#5e17eb',
   },
   alternates: {
     canonical: SITE_URL,
@@ -280,7 +280,7 @@ export default function RootLayout({
         />
       </head>
       <body
-        className="bg-neutral-100/80 sm:bg-slate-100/70 text-gray-900 antialiased min-h-screen selection:bg-[#4029AB]/10 selection:text-[#4029AB] flex flex-col items-center justify-start"
+        className="bg-neutral-100/80 sm:bg-slate-100/70 text-gray-900 antialiased min-h-screen selection:bg-[#5e17eb]/10 selection:text-[#5e17eb] flex flex-col items-center justify-start"
         suppressHydrationWarning
       >
         {/* Standard Boxed Limits Container for PC/Desktop screens */}

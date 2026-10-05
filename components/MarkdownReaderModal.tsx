@@ -30,7 +30,7 @@ import 'katex/dist/katex.min.css';
 
 import { Book } from '@/lib/types';
 import { resolveBookMdSampleUrl, resolveBookMdUrl } from '@/lib/services/storage';
-import { getEpubOffline } from '@/lib/offline-storage';
+import { getEpubOffline, saveReadingProgress } from '@/lib/offline-storage';
 import {
   preprocessMarkdownMath,
   splitMarkdownByH1,
@@ -44,6 +44,7 @@ interface MarkdownReaderModalProps {
   onClose: () => void;
   onBuyNow?: (book: Book) => void;
   isPurchased?: boolean;
+  initialSectionIndex?: number;
 }
 
 export const MarkdownReaderModal: React.FC<MarkdownReaderModalProps> = ({
@@ -52,6 +53,7 @@ export const MarkdownReaderModal: React.FC<MarkdownReaderModalProps> = ({
   onClose,
   onBuyNow,
   isPurchased = false,
+  initialSectionIndex = 0,
 }) => {
   const [activeMode, setActiveMode] = useState<'sample' | 'full' | 'offline'>(initialMode);
   const [rawMarkdown, setRawMarkdown] = useState<string>('');
@@ -63,7 +65,7 @@ export const MarkdownReaderModal: React.FC<MarkdownReaderModalProps> = ({
 
   // Feature 2: Table of Contents drawer & Sectional H1 Navigation
   const [isTocDrawerOpen, setIsTocDrawerOpen] = useState<boolean>(false);
-  const [currentSectionIndex, setCurrentSectionIndex] = useState<number>(0);
+  const [currentSectionIndex, setCurrentSectionIndex] = useState<number>(initialSectionIndex || 0);
 
   // Feature 3: Reading progress indicator (0 - 100%) based on viewport scroll
   const [scrollProgress, setScrollProgress] = useState<number>(0);
@@ -207,6 +209,32 @@ export const MarkdownReaderModal: React.FC<MarkdownReaderModalProps> = ({
       el.removeEventListener('scroll', handleScroll);
     };
   }, [activeSection, isLoading, errorMessage, activeMode]);
+
+  // Persist reading progress to IndexedDB
+  useEffect(() => {
+    if (sections.length > 0 && book?.id && !isLoading && !errorMessage) {
+      const overallProgress = Math.min(
+        100,
+        Math.max(
+          1,
+          Math.round(
+            ((currentSectionIndex + (scrollProgress / 100)) / Math.max(1, sections.length)) * 100
+          )
+        )
+      );
+      saveReadingProgress({
+        bookId: book.id,
+        progressPercentage: overallProgress,
+        lastReadAt: new Date().toISOString(),
+        format: 'markdown',
+        sectionIndex: currentSectionIndex,
+        totalSections: sections.length,
+        scrollProgress: Math.round(scrollProgress),
+        mode: activeMode,
+        title: book.title,
+      });
+    }
+  }, [book?.id, book?.title, currentSectionIndex, scrollProgress, sections.length, activeMode, isLoading, errorMessage]);
 
   // Handle section selection
   const handleSelectSection = (index: number) => {

@@ -21,6 +21,7 @@ import { InstallSuccessModal } from '@/components/InstallSuccessModal';
 import { Footer } from '@/components/Footer';
 import { DiscountBanner } from '@/components/DiscountBanner';
 import { InstallAppBanner } from '@/components/InstallAppBanner';
+import { HomeHeroBanner } from '@/components/HomeHeroBanner';
 import { Book, Category, CartItem, CartTierDiscount } from '@/lib/types';
 import { DEFAULT_BOOK_COVER, INITIAL_BOOKS, INITIAL_CATEGORIES } from '@/lib/data';
 import {
@@ -900,26 +901,7 @@ export default function HomePage() {
   const cartSummary = useMemo(() => calculateCartSummary(cart, tierDiscount), [cart, tierDiscount]);
 
   return (
-    <div className="min-h-screen bg-white text-gray-900 pb-24 selection:bg-[#4029AB] selection:text-white">
-      {/* 1. Header with Search, Login, Cart and PWA Install (ONLY ON HOME PAGE) */}
-      {activeTab === 'home' && !selectedBook && (
-        <Header
-          cartCount={totalCartCount}
-          onOpenCart={() => setIsCartOpen(true)}
-          searchQuery={searchQuery}
-          onSearchChange={(q) => {
-            setSearchQuery(q);
-            setActiveTab('search');
-          }}
-          currentUser={currentUser}
-          onGoogleSignIn={handleOpenLogin}
-          onNavigateToProfile={() => handleTabChange('profile')}
-          onOpenDedicatedSearch={() => setActiveTab('search')}
-          isInstallable={isInstallable}
-          onInstall={promptInstall}
-        />
-      )}
-
+    <div className="min-h-screen bg-white text-gray-900 pb-24 selection:bg-[#5e17eb] selection:text-white">
       {/* 2. Main Content Views (Switched via BottomNav Tabs or Book Detail) */}
       <main className="w-full">
         {selectedBook ? (
@@ -955,27 +937,42 @@ export default function HomePage() {
             {/* TAB 1: HOME PAGE */}
             {activeTab === 'home' && (
               <>
-                {/* Full Banner Style Install App Banner */}
-                <InstallAppBanner
-                  onInstall={promptInstall}
+                {/* Top of Home Page: Look and feel matching uploaded image with inline SVG */}
+                <HomeHeroBanner
+                  searchQuery={searchQuery}
+                  onOpenSearch={() => setActiveTab('search')}
+                  currentUser={currentUser}
+                  onNavigateToProfile={() => handleTabChange('profile')}
+                  onGoogleSignIn={handleOpenLogin}
+                  onOpenCart={() => setIsCartOpen(true)}
+                  cartCount={totalCartCount}
+                  onStartReading={() => {
+                    const el = document.getElementById('category-chips-section') || document.getElementById('trending-books');
+                    if (el) el.scrollIntoView({ behavior: 'smooth' });
+                  }}
                   isInstallable={isInstallable}
+                  onInstall={promptInstall}
                 />
 
                 {/* Flexible Category Chips */}
-                <CategoryChips
-                  categories={categories}
-                  selectedCategory={selectedCategory}
-                  onSelectCategory={(cat) => setSelectedCategory(cat)}
-                />
-
-                {/* Promotional Cart-Tier Discount Offer Banner below Categories */}
-                <div className="px-4 sm:px-6 md:px-8 max-w-7xl mx-auto pt-2 pb-1">
-                  <DiscountBanner
-                    discount={tierDiscount}
-                    cart={cart}
-                    onOpenCart={() => setIsCartOpen(true)}
+                <div id="category-chips-section">
+                  <CategoryChips
+                    categories={categories}
+                    selectedCategory={selectedCategory}
+                    onSelectCategory={(cat) => setSelectedCategory(cat)}
                   />
                 </div>
+
+                {/* Promotional Cart-Tier Discount Offer Banner below Categories - Hidden completely when is_active is false */}
+                {tierDiscount && tierDiscount.is_active && (
+                  <div className="px-4 sm:px-6 md:px-8 max-w-7xl mx-auto pt-2 pb-1">
+                    <DiscountBanner
+                      discount={tierDiscount}
+                      cart={cart}
+                      onOpenCart={() => setIsCartOpen(true)}
+                    />
+                  </div>
+                )}
 
 
                 {isLoading ? (
@@ -1165,7 +1162,7 @@ export default function HomePage() {
                         Clear All
                       </button>
                     )}
-                    <span className="bg-[#4029AB] text-white text-xs font-bold px-3 py-1 rounded-full">
+                    <span className="bg-[#5e17eb] text-white text-xs font-bold px-3 py-1 rounded-full">
                       {totalCartCount} {totalCartCount === 1 ? 'item' : 'items'}
                     </span>
                   </div>
@@ -1182,7 +1179,7 @@ export default function HomePage() {
                     </div>
                     <button
                       onClick={() => handleTabChange('home')}
-                      className="px-5 py-2.5 bg-[#4029AB] text-white rounded-xl text-xs font-bold shadow-xs hover:bg-[#34208e] cursor-pointer inline-flex items-center gap-1.5 active:scale-95 transition-all"
+                      className="px-5 py-2.5 bg-[#5e17eb] text-white rounded-xl text-xs font-bold shadow-xs hover:bg-[#4d0ec5] cursor-pointer inline-flex items-center gap-1.5 active:scale-95 transition-all"
                     >
                       <ShoppingBag className="w-3.5 h-3.5" />
                       <span>Browse Catalog</span>
@@ -1215,7 +1212,7 @@ export default function HomePage() {
                               />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <span className="text-[9px] font-bold text-[#4029AB] bg-[#4029AB]/10 px-1.5 py-0.5 rounded uppercase">
+                              <span className="text-[9px] font-bold text-[#5e17eb] bg-[#5e17eb]/10 px-1.5 py-0.5 rounded uppercase">
                                 {book.category}
                               </span>
                               <h4 className="font-bold text-xs sm:text-sm text-gray-950 truncate mt-1">
@@ -1245,38 +1242,40 @@ export default function HomePage() {
                       })}
                     </div>
 
-                    {/* Tier Discount Section in Cart Tab */}
-                    <div className="p-4 rounded-2xl bg-gradient-to-r from-[#4029AB]/10 via-[#4029AB]/5 to-indigo-50/70 border border-[#4029AB]/20 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Sparkles className="w-4 h-4 text-[#4029AB]" />
-                          <span className="text-xs font-bold text-gray-900">{tierDiscount?.title || 'Mega Diwali Sale'}</span>
+                    {/* Tier Discount Section in Cart Tab - Only when is_active */}
+                    {tierDiscount && tierDiscount.is_active && (
+                      <div className="p-4 rounded-2xl bg-gradient-to-r from-[#5e17eb]/10 via-[#5e17eb]/5 to-indigo-50/70 border border-[#5e17eb]/20 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Sparkles className="w-4 h-4 text-[#5e17eb]" />
+                            <span className="text-xs font-bold text-gray-900">{tierDiscount?.title || 'Mega Diwali Sale'}</span>
+                          </div>
+                          {cartSummary.applicable_discount_pct > 0 ? (
+                            <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                              {cartSummary.applicable_discount_pct}% OFF UNLOCKED
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-bold text-[#5e17eb] bg-white px-2 py-0.5 rounded-full border border-[#5e17eb]/20">
+                              Automatic Cart Discount
+                            </span>
+                          )}
                         </div>
-                        {cartSummary.applicable_discount_pct > 0 ? (
-                          <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
-                            {cartSummary.applicable_discount_pct}% OFF UNLOCKED
-                          </span>
-                        ) : (
-                          <span className="text-[10px] font-bold text-[#4029AB] bg-white px-2 py-0.5 rounded-full border border-[#4029AB]/20">
-                            Automatic Cart Discount
-                          </span>
+
+                        <p className="text-xs font-bold text-gray-900">
+                          {cartSummary.nudgeMessage}
+                        </p>
+
+                        {cartSummary.nextTier && (
+                          <div className="w-full bg-gray-200/80 rounded-full h-1.5 overflow-hidden">
+                            <motion.div
+                              className="bg-[#5e17eb] h-full rounded-full transition-all duration-500"
+                              initial={{ width: 0 }}
+                              animate={{ width: `${Math.max(4, Math.min(100, cartSummary.progressPct))}%` }}
+                            />
+                          </div>
                         )}
                       </div>
-
-                      <p className="text-xs font-bold text-gray-900">
-                        {cartSummary.nudgeMessage}
-                      </p>
-
-                      {cartSummary.nextTier && (
-                        <div className="w-full bg-gray-200/80 rounded-full h-1.5 overflow-hidden">
-                          <motion.div
-                            className="bg-[#4029AB] h-full rounded-full transition-all duration-500"
-                            initial={{ width: 0 }}
-                            animate={{ width: `${Math.max(4, Math.min(100, cartSummary.progressPct))}%` }}
-                          />
-                        </div>
-                      )}
-                    </div>
+                    )}
 
                     {/* Checkout Summary Box */}
                     <div className="p-5 rounded-3xl bg-gray-50 border border-gray-200/80 space-y-3">
@@ -1315,7 +1314,7 @@ export default function HomePage() {
 
                       <div className="border-t border-gray-200 pt-3 flex justify-between text-sm font-black text-gray-950">
                         <span>Total Amount</span>
-                        <span className="text-base text-[#4029AB]">
+                        <span className="text-base text-[#5e17eb]">
                           ₹{cartSummary.subtotal}
                         </span>
                       </div>
@@ -1335,7 +1334,7 @@ export default function HomePage() {
                           executeRazorpayCheckout(cart, currentUser);
                         }}
                         id="cart-tab-checkout-btn"
-                        className="w-full py-3 bg-[#4029AB] hover:bg-[#34208e] text-white text-xs sm:text-sm font-bold rounded-2xl shadow-xs transition-all active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer mt-2 disabled:opacity-70"
+                        className="w-full py-3 bg-[#5e17eb] hover:bg-[#4d0ec5] text-white text-xs sm:text-sm font-bold rounded-2xl shadow-xs transition-all active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer mt-2 disabled:opacity-70"
                       >
                         {isCartTabCheckingOut ? (
                           <span className="flex items-center gap-2">

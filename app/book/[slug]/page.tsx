@@ -103,7 +103,7 @@ export default async function BookSSRPage({ params }: PageProps) {
   if (!book) {
     return (
       <div className="min-h-screen bg-white text-gray-900 flex flex-col items-center justify-center p-6 text-center space-y-4">
-        <div className="w-16 h-16 rounded-full bg-[#4029AB]/10 text-[#4029AB] flex items-center justify-center">
+        <div className="w-16 h-16 rounded-full bg-[#5e17eb]/10 text-[#5e17eb] flex items-center justify-center">
           <BookOpen className="w-8 h-8" />
         </div>
         <h1 className="text-xl font-bold text-gray-900">E-Book Not Found</h1>
@@ -112,7 +112,7 @@ export default async function BookSSRPage({ params }: PageProps) {
         </p>
         <Link
           href="/"
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#4029AB] text-white text-xs font-bold hover:bg-[#34208e] transition-all"
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#5e17eb] text-white text-xs font-bold hover:bg-[#4d0ec5] transition-all"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
           <span>Browse All Exam Guides</span>

@@ -10,6 +10,7 @@ import {
   ShoppingBag,
   WifiOff,
   Wifi,
+  Play,
 } from 'lucide-react';
 import { Book } from '@/lib/types';
 import { DEFAULT_BOOK_COVER } from '@/lib/data';
@@ -23,6 +24,8 @@ import {
   saveEpubOffline,
   deleteOfflineEpub,
   getAllOfflineEpubIds,
+  ReadingProgressRecord,
+  getAllReadingProgress,
 } from '@/lib/offline-storage';
 import { resolveBookPdfUrl, resolveBookSampleUrl, resolveBookMdUrl } from '@/lib/services/storage';
 import { PDFReaderModal } from '@/components/PDFReaderModal';
@@ -57,11 +60,16 @@ export const PurchasedView: React.FC<PurchasedViewProps> = ({
   const [offlineEpubMap, setOfflineEpubMap] = useState<Record<string, DownloadState>>({});
   const [offlineCachedBooks, setOfflineCachedBooks] = useState<Book[]>([]);
   const [filterMode, setFilterMode] = useState<'all' | 'offline_only'>('all');
+  const [readingProgressMap, setReadingProgressMap] = useState<Record<string, ReadingProgressRecord>>({});
   const [activeReader, setActiveReader] = useState<{
     book: Book;
     mode: 'full' | 'offline';
+    initialPage?: number;
   } | null>(null);
-  const [activeMdReader, setActiveMdReader] = useState<Book | null>(null);
+  const [activeMdReader, setActiveMdReader] = useState<{
+    book: Book;
+    initialSectionIndex?: number;
+  } | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [storageStats, setStorageStats] = useState<{ count: number; totalBytes: number; isPersisted: boolean }>({
     count: 0,
@@ -114,6 +122,42 @@ export const PurchasedView: React.FC<PurchasedViewProps> = ({
       console.warn('Failed to load offline keys:', e);
     }
   }, []);
+
+  // Hydrate reading progress from IndexedDB and listen to reactive events
+  useEffect(() => {
+    let active = true;
+    getAllReadingProgress().then((records) => {
+      if (active && records) {
+        setReadingProgressMap(records);
+      }
+    });
+
+    const handleProgressUpdate = (e: Event) => {
+      const detail = (e as CustomEvent<ReadingProgressRecord>).detail;
+      if (detail && detail.bookId) {
+        setReadingProgressMap((prev) => ({
+          ...prev,
+          [detail.bookId]: detail,
+        }));
+      }
+    };
+
+    window.addEventListener('reading-progress-updated', handleProgressUpdate);
+    return () => {
+      active = false;
+      window.removeEventListener('reading-progress-updated', handleProgressUpdate);
+    };
+  }, []);
+
+  const handleResumeBook = (book: Book, progress: ReadingProgressRecord) => {
+    if (progress.format === 'pdf') {
+      const isPdfDownloaded = offlinePdfMap[book.id]?.status === 'downloaded';
+      const targetMode = progress.mode === 'offline' && isPdfDownloaded ? 'offline' : 'full';
+      setActiveReader({ book, mode: targetMode, initialPage: progress.page });
+    } else {
+      setActiveMdReader({ book, initialSectionIndex: progress.sectionIndex });
+    }
+  };
 
   // Initialize offline status on mount
   useEffect(() => {
@@ -522,6 +566,66 @@ export const PurchasedView: React.FC<PurchasedViewProps> = ({
                     </div>
                   </div>
 
+                  {/* Minimal Reading Progress & Resume Option */}
+                  {readingProgressMap[book.id] && readingProgressMap[book.id].progressPercentage > 0 && (
+                    <div className="pt-2 pb-0.5 border-t border-gray-100 flex flex-col gap-1.5">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <div className="flex items-center gap-1.5 min-w-0 text-gray-600">
+                          <span className="font-black text-[#5e17eb] shrink-0">
+                            {readingProgressMap[book.id].progressPercentage}% read
+                          </span>
+                          <span className="text-gray-300">•</span>
+                          <span className="text-gray-500 text-[10px] truncate">
+                            {readingProgressMap[book.id].format === 'pdf' && readingProgressMap[book.id].page
+                              ? `Page ${readingProgressMap[book.id].page}${
+                                  readingProgressMap[book.id].totalPdfPages
+                                    ? ` of ${readingProgressMap[book.id].totalPdfPages}`
+                                    : ''
+                                }`
+                              : readingProgressMap[book.id].sectionIndex !== undefined
+                              ? `Chapter ${(readingProgressMap[book.id].sectionIndex || 0) + 1}${
+                                  readingProgressMap[book.id].totalSections
+                                    ? ` of ${readingProgressMap[book.id].totalSections}`
+                                    : ''
+                                }`
+                              : `${readingProgressMap[book.id].progressPercentage}% completed`}
+                          </span>
+                        </div>
+                        <button
+                          id={`btn-resume-purchased-${book.id}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleResumeBook(book, readingProgressMap[book.id]);
+                          }}
+                          className="text-[11px] font-bold text-[#5e17eb] hover:text-[#4d0ec5] active:scale-95 inline-flex items-center gap-1 transition-all cursor-pointer py-0.5 px-2 rounded-md hover:bg-[#5e17eb]/10 shrink-0"
+                          title="Resume reading where you left off"
+                        >
+                          <Play className="w-2.5 h-2.5 fill-current" />
+                          <span>Resume</span>
+                        </button>
+                      </div>
+                      <div
+                        role="progressbar"
+                        aria-valuenow={readingProgressMap[book.id].progressPercentage}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-label={`Reading progress: ${readingProgressMap[book.id].progressPercentage}%`}
+                        className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden border border-gray-200/60"
+                      >
+                        <div
+                          style={{
+                            width: `${Math.min(100, Math.max(2, readingProgressMap[book.id].progressPercentage))}%`,
+                          }}
+                          className={`h-full rounded-full transition-all duration-300 ${
+                            readingProgressMap[book.id].progressPercentage >= 100
+                              ? 'bg-emerald-500'
+                              : 'bg-[#5e17eb]'
+                          }`}
+                        />
+                      </div>
+                    </div>
+                  )}
+
                   {/* Actions Section: buttons stay in the same row on mobile & tablet */}
                   <div className="pt-2 border-t border-gray-100 space-y-2">
                     {/* Row 1: PDF */}
@@ -603,7 +707,7 @@ export const PurchasedView: React.FC<PurchasedViewProps> = ({
                         {/* ePub Read Online */}
                         <button
                           id={`btn-read-epub-${book.id}`}
-                          onClick={() => setActiveMdReader(book)}
+                          onClick={() => setActiveMdReader({ book })}
                           className="rounded-full border-2 border-[#1c0ca3] text-[#1c0ca3] bg-white hover:bg-[#1c0ca3]/5 active:scale-95 transition-all text-[11px] sm:text-xs font-bold px-2.5 sm:px-4 py-1 sm:py-1.5 inline-flex items-center justify-center gap-1 cursor-pointer shadow-2xs select-none shrink-0 whitespace-nowrap"
                           title="Read ePub online"
                         >
@@ -616,7 +720,7 @@ export const PurchasedView: React.FC<PurchasedViewProps> = ({
                           <div className="inline-flex items-center gap-1 shrink-0 flex-nowrap">
                             <button
                               id={`btn-read-epub-offline-${book.id}`}
-                              onClick={() => setActiveMdReader(book)}
+                              onClick={() => setActiveMdReader({ book })}
                               className="rounded-full bg-emerald-600 hover:bg-emerald-700 text-white active:scale-95 transition-all text-[11px] sm:text-xs font-bold px-2.5 sm:px-4 py-1 sm:py-1.5 inline-flex items-center justify-center gap-1 cursor-pointer shadow-2xs select-none shrink-0 whitespace-nowrap"
                               title="Read saved offline ePub"
                             >
@@ -678,16 +782,18 @@ export const PurchasedView: React.FC<PurchasedViewProps> = ({
           mode={activeReader.mode}
           onClose={() => setActiveReader(null)}
           isPurchased={true}
+          initialPage={activeReader.initialPage}
         />
       )}
 
       {/* 4. Real-time In-App Markdown/ePub Reader Modal with sectional rendering & math */}
       {activeMdReader && (
         <MarkdownReaderModal
-          book={activeMdReader}
+          book={activeMdReader.book}
           mode="full"
           onClose={() => setActiveMdReader(null)}
           isPurchased={true}
+          initialSectionIndex={activeMdReader.initialSectionIndex}
         />
       )}
 

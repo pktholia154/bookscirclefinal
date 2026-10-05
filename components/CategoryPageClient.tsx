@@ -268,7 +268,7 @@ export const CategoryPageClient: React.FC<CategoryPageClientProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-white text-gray-900 pb-24 selection:bg-[#4029AB] selection:text-white">
+    <div className="min-h-screen bg-white text-gray-900 pb-24 selection:bg-[#5e17eb] selection:text-white">
       {/* 1. Category Header & Navigation Bar */}
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-gray-100 px-4 sm:px-6 py-3.5 flex items-center justify-between shadow-2xs">
         <div className="flex items-center gap-3 min-w-0">
@@ -280,7 +280,7 @@ export const CategoryPageClient: React.FC<CategoryPageClientProps> = ({
             <ArrowLeft className="w-4 h-4 text-gray-800" />
           </Link>
           <div className="flex items-center gap-1.5 text-xs text-gray-500 font-semibold truncate">
-            <Link href="/" className="hover:text-[#4029AB] transition-colors">
+            <Link href="/" className="hover:text-[#5e17eb] transition-colors">
               Home
             </Link>
             <ChevronRight className="w-3.5 h-3.5 text-gray-400 shrink-0" />
@@ -299,7 +299,7 @@ export const CategoryPageClient: React.FC<CategoryPageClientProps> = ({
           >
             <ShoppingCart className="w-4 h-4" />
             {cart.length > 0 && (
-              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-[#4029AB] text-white text-[10px] font-black rounded-full flex items-center justify-center px-1 ring-2 ring-white">
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-[#5e17eb] text-white text-[10px] font-black rounded-full flex items-center justify-center px-1 ring-2 ring-white">
                 {cart.length}
               </span>
             )}
@@ -346,7 +346,7 @@ export const CategoryPageClient: React.FC<CategoryPageClientProps> = ({
                     href={`/category/${cat.seolsug || cat.id}`}
                     className={`px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all ${
                       isSelected
-                        ? 'bg-[#4029AB] text-white shadow-xs'
+                        ? 'bg-[#5e17eb] text-white shadow-xs'
                         : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                     }`}
                   >
@@ -368,7 +368,7 @@ export const CategoryPageClient: React.FC<CategoryPageClientProps> = ({
               value={searchQuery}
               onChange={(e) => handleSearchChange(e.target.value)}
               placeholder={`Search in ${categoryTitle}...`}
-              className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs sm:text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#4029AB]/30 focus:border-[#4029AB] transition-all"
+              className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs sm:text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#5e17eb]/30 focus:border-[#5e17eb] transition-all"
             />
           </div>
 
@@ -394,7 +394,7 @@ export const CategoryPageClient: React.FC<CategoryPageClientProps> = ({
                 onClick={() => setViewMode('grid')}
                 className={`p-1.5 rounded-lg transition-all cursor-pointer ${
                   viewMode === 'grid'
-                    ? 'bg-white text-[#4029AB] shadow-2xs font-bold'
+                    ? 'bg-white text-[#5e17eb] shadow-2xs font-bold'
                     : 'text-gray-500 hover:text-gray-900'
                 }`}
                 title="Grid View"
@@ -406,7 +406,7 @@ export const CategoryPageClient: React.FC<CategoryPageClientProps> = ({
                 onClick={() => setViewMode('list')}
                 className={`p-1.5 rounded-lg transition-all cursor-pointer ${
                   viewMode === 'list'
-                    ? 'bg-white text-[#4029AB] shadow-2xs font-bold'
+                    ? 'bg-white text-[#5e17eb] shadow-2xs font-bold'
                     : 'text-gray-500 hover:text-gray-900'
                 }`}
                 title="List View"
@@ -430,7 +430,7 @@ export const CategoryPageClient: React.FC<CategoryPageClientProps> = ({
               {searchQuery && (
                 <button
                   onClick={() => handleSearchChange('')}
-                  className="px-4 py-2 bg-[#4029AB] text-white text-xs font-bold rounded-xl shadow-xs hover:bg-[#32208a] transition-all cursor-pointer"
+                  className="px-4 py-2 bg-[#5e17eb] text-white text-xs font-bold rounded-xl shadow-xs hover:bg-[#32208a] transition-all cursor-pointer"
                 >
                   Clear Search
                 </button>
@@ -518,7 +518,7 @@ export const CategoryPageClient: React.FC<CategoryPageClientProps> = ({
                             onClick={() => handlePageChange(pageNum)}
                             className={`w-7 h-8 sm:w-8 sm:h-8 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center ${
                               isActive
-                                ? 'bg-[#4029AB] text-white shadow-xs scale-105'
+                                ? 'bg-[#5e17eb] text-white shadow-xs scale-105'
                                 : 'bg-gray-100 hover:bg-gray-200 text-gray-700 active:scale-95'
                             }`}
                             aria-label={`Go to page ${pageNum}`}
@@ -537,7 +537,7 @@ export const CategoryPageClient: React.FC<CategoryPageClientProps> = ({
                       className={`flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                         activePage === totalPages
                           ? 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-50'
-                          : 'bg-[#4029AB] hover:bg-[#32208a] text-white shadow-xs active:scale-95'
+                          : 'bg-[#5e17eb] hover:bg-[#32208a] text-white shadow-xs active:scale-95'
                       }`}
                       aria-label="Next Page"
                     >

@@ -59,7 +59,7 @@ const CartItemRow: React.FC<{
 
       {/* Details */}
       <div className="flex-1 min-w-0">
-        <span className="text-[9px] font-bold uppercase tracking-wider text-[#4029AB] bg-[#4029AB]/10 px-1.5 py-0.5 rounded">
+        <span className="text-[9px] font-bold uppercase tracking-wider text-[#5e17eb] bg-[#5e17eb]/10 px-1.5 py-0.5 rounded">
           {item.book.category || 'eBook'}
         </span>
         <h4 className="text-xs sm:text-sm font-bold text-gray-950 line-clamp-1 leading-snug mt-1" title={item.book.title}>
@@ -242,7 +242,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
               <h2 className="text-base sm:text-lg font-bold text-gray-950">
                 Your eBook Cart
               </h2>
-              <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-[#4029AB]/10 text-[#4029AB]">
+              <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-[#5e17eb]/10 text-[#5e17eb]">
                 {items.length} {items.length === 1 ? 'item' : 'items'}
               </span>
             </div>
@@ -304,7 +304,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
               </p>
               <button
                 onClick={onClose}
-                className="px-5 py-2 rounded-full bg-[#4029AB] text-white text-xs font-bold active:scale-95 transition-all cursor-pointer"
+                className="px-5 py-2 rounded-full bg-[#5e17eb] text-white text-xs font-bold active:scale-95 transition-all cursor-pointer"
               >
                 Browse Books
               </button>
@@ -322,39 +322,41 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                 ))}
               </div>
 
-              {/* Tier Offer Banner inside Cart Drawer */}
-              <div className="px-4 py-2.5 bg-gradient-to-r from-[#4029AB]/10 via-[#4029AB]/5 to-indigo-50/70 border-t border-b border-gray-100 space-y-1.5">
-                <div className="flex items-center justify-between text-xs font-bold">
-                  <span className="flex items-center gap-1.5 text-gray-900">
-                    <Sparkles className="w-3.5 h-3.5 text-[#4029AB]" />
-                    <span>{tierDiscount?.title || 'Mega Diwali Sale'}</span>
-                  </span>
-                  {isDiscountEligible ? (
-                    <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full flex items-center gap-1">
-                      <Flame className="w-3 h-3 text-amber-500 fill-amber-500" />
-                      <span>{summary.applicable_discount_pct}% OFF UNLOCKED</span>
+              {/* Tier Offer Banner inside Cart Drawer - Only when is_active */}
+              {tierDiscount && tierDiscount.is_active && (
+                <div className="px-4 py-2.5 bg-gradient-to-r from-[#5e17eb]/10 via-[#5e17eb]/5 to-indigo-50/70 border-t border-b border-gray-100 space-y-1.5">
+                  <div className="flex items-center justify-between text-xs font-bold">
+                    <span className="flex items-center gap-1.5 text-gray-900">
+                      <Sparkles className="w-3.5 h-3.5 text-[#5e17eb]" />
+                      <span>{tierDiscount?.title || 'Mega Diwali Sale'}</span>
                     </span>
-                  ) : (
-                    <span className="text-[10px] font-bold text-[#4029AB] bg-white px-2 py-0.5 rounded-full border border-[#4029AB]/20">
-                      Tier Discounts Active
-                    </span>
+                    {isDiscountEligible ? (
+                      <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <Flame className="w-3 h-3 text-amber-500 fill-amber-500" />
+                        <span>{summary.applicable_discount_pct}% OFF UNLOCKED</span>
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-bold text-[#5e17eb] bg-white px-2 py-0.5 rounded-full border border-[#5e17eb]/20">
+                        Tier Discounts Active
+                      </span>
+                    )}
+                  </div>
+
+                  <p className="text-[11px] font-medium text-gray-700 leading-tight">
+                    {summary.nudgeMessage}
+                  </p>
+
+                  {summary.nextTier && (
+                    <div className="w-full bg-gray-200/80 rounded-full h-1.5 overflow-hidden mt-1">
+                      <motion.div
+                        className="bg-[#5e17eb] h-full rounded-full transition-all duration-500"
+                        initial={{ width: 0 }}
+                        animate={{ width: `${Math.max(4, Math.min(100, summary.progressPct))}%` }}
+                      />
+                    </div>
                   )}
                 </div>
-
-                <p className="text-[11px] font-medium text-gray-700 leading-tight">
-                  {summary.nudgeMessage}
-                </p>
-
-                {summary.nextTier && (
-                  <div className="w-full bg-gray-200/80 rounded-full h-1.5 overflow-hidden mt-1">
-                    <motion.div
-                      className="bg-[#4029AB] h-full rounded-full transition-all duration-500"
-                      initial={{ width: 0 }}
-                      animate={{ width: `${Math.max(4, Math.min(100, summary.progressPct))}%` }}
-                    />
-                  </div>
-                )}
-              </div>
+              )}
 
               {/* Price summary & Checkout footer */}
               <div className="p-4 bg-gray-50 space-y-3">
@@ -408,7 +410,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 
                   <div className="flex justify-between text-sm font-bold text-gray-950 pt-2 border-t border-gray-200">
                     <span>Total Amount</span>
-                    <span className="text-base font-black text-[#4029AB]">₹{subtotal}</span>
+                    <span className="text-base font-black text-[#5e17eb]">₹{subtotal}</span>
                   </div>
                 </div>
 
@@ -416,7 +418,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                 {currentUser && currentUser.email ? (
                   <div className="flex items-center justify-between p-2.5 rounded-xl bg-indigo-50/70 border border-indigo-100 text-xs">
                     <div className="flex items-center gap-2 min-w-0">
-                      <div className="w-6 h-6 rounded-full bg-[#4029AB] text-white flex items-center justify-center text-[10px] font-bold shrink-0">
+                      <div className="w-6 h-6 rounded-full bg-[#5e17eb] text-white flex items-center justify-center text-[10px] font-bold shrink-0">
                         {currentUser.displayName?.[0] || 'U'}
                       </div>
                       <div className="min-w-0">
@@ -444,7 +446,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                   id="checkout-btn"
                   onClick={() => handleCheckout()}
                   disabled={isCheckingOut}
-                  className="w-full py-3.5 px-4 rounded-xl font-bold text-sm bg-[#4029AB] text-white hover:bg-[#2E1B85] active:scale-98 shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70"
+                  className="w-full py-3.5 px-4 rounded-xl font-bold text-sm bg-[#5e17eb] text-white hover:bg-[#4910bc] active:scale-98 shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70"
                 >
                   {isCheckingOut ? (
                     <span className="flex items-center gap-2">

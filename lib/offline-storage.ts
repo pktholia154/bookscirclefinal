@@ -54,13 +54,31 @@ interface BooksCircleDB extends DBSchema {
       sizeBytes?: number;
     };
   };
+  readingProgress: {
+    key: string;
+    value: ReadingProgressRecord;
+  };
+}
+
+export interface ReadingProgressRecord {
+  bookId: string;
+  progressPercentage: number; // 0 to 100
+  lastReadAt: string; // ISO date string
+  format: 'pdf' | 'epub' | 'markdown';
+  page?: number;
+  totalPdfPages?: number;
+  sectionIndex?: number;
+  totalSections?: number;
+  scrollProgress?: number;
+  mode?: 'sample' | 'full' | 'offline';
+  title?: string;
 }
 
 let dbPromise: Promise<IDBPDatabase<BooksCircleDB>> | null = null;
 
 function getDb(): Promise<IDBPDatabase<BooksCircleDB>> {
   if (!dbPromise) {
-    dbPromise = openDB<BooksCircleDB>('bookscircle-storage', 4, {
+    dbPromise = openDB<BooksCircleDB>('bookscircle-storage', 5, {
       upgrade(db, oldVersion) {
         if (!db.objectStoreNames.contains('purchases')) {
           db.createObjectStore('purchases', { keyPath: 'bookId' });
@@ -76,6 +94,9 @@ function getDb(): Promise<IDBPDatabase<BooksCircleDB>> {
         }
         if (!db.objectStoreNames.contains('offlineEpubs')) {
           db.createObjectStore('offlineEpubs', { keyPath: 'bookId' });
+        }
+        if (!db.objectStoreNames.contains('readingProgress')) {
+          db.createObjectStore('readingProgress', { keyPath: 'bookId' });
         }
       },
       blocked() {
@@ -559,4 +580,115 @@ export async function removePendingPurchase(id: string): Promise<void> {
     console.warn('Failed to delete pending purchase:', (e as any)?.message || String(e));
   }
 }
+
+/**
+ * Save reading progress for a book into IndexedDB with instant localStorage fallback
+ */
+export async function saveReadingProgress(record: ReadingProgressRecord): Promise<void> {
+  if (typeof window === 'undefined') return;
+  const sanitizedRecord: ReadingProgressRecord = {
+    ...record,
+    lastReadAt: record.lastReadAt || new Date().toISOString(),
+    progressPercentage: Math.max(0, Math.min(100, Math.round(record.progressPercentage || 0))),
+  };
+
+  // 1. Instant synchronous localStorage cache
+  try {
+    const cacheKey = `bookscircle_reading_progress_${record.bookId}`;
+    localStorage.setItem(cacheKey, JSON.stringify(sanitizedRecord));
+    window.dispatchEvent(
+      new CustomEvent('reading-progress-updated', { detail: sanitizedRecord })
+    );
+  } catch {}
+
+  // 2. Persistent IndexedDB storage
+  try {
+    const db = await getDb();
+    await db.put('readingProgress', sanitizedRecord);
+  } catch (e) {
+    console.warn('Failed to save reading progress in indexedDB:', (e as any)?.message || String(e));
+  }
+}
+
+/**
+ * Get reading progress for a book from IndexedDB or localStorage cache
+ */
+export async function getReadingProgress(bookId: string): Promise<ReadingProgressRecord | null> {
+  if (typeof window === 'undefined' || !bookId) return null;
+
+  // Check localStorage first for instant response
+  let cached: ReadingProgressRecord | null = null;
+  try {
+    const raw = localStorage.getItem(`bookscircle_reading_progress_${bookId}`);
+    if (raw) cached = JSON.parse(raw);
+  } catch {}
+
+  try {
+    const db = await getDb();
+    const record = await db.get('readingProgress', bookId);
+    if (record) {
+      // Sync cache
+      try {
+        localStorage.setItem(`bookscircle_reading_progress_${bookId}`, JSON.stringify(record));
+      } catch {}
+      return record;
+    }
+    return cached;
+  } catch (e) {
+    console.warn('Failed to get reading progress from indexedDB:', (e as any)?.message || String(e));
+    return cached;
+  }
+}
+
+/**
+ * Synchronous reading progress retrieval from local cache for instant zero-layout-shift UI
+ */
+export function getReadingProgressSync(bookId: string): ReadingProgressRecord | null {
+  if (typeof window === 'undefined' || !bookId) return null;
+  try {
+    const raw = localStorage.getItem(`bookscircle_reading_progress_${bookId}`);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return null;
+}
+
+/**
+ * Get all reading progress records from IndexedDB
+ */
+export async function getAllReadingProgress(): Promise<Record<string, ReadingProgressRecord>> {
+  if (typeof window === 'undefined') return {};
+  const map: Record<string, ReadingProgressRecord> = {};
+  try {
+    const db = await getDb();
+    const records = await db.getAll('readingProgress');
+    for (const r of records) {
+      if (r && r.bookId) {
+        map[r.bookId] = r;
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to getAllReadingProgress from indexedDB:', (e as any)?.message || String(e));
+  }
+  return map;
+}
+
+/**
+ * Delete reading progress for a book
+ */
+export async function deleteReadingProgress(bookId: string): Promise<void> {
+  if (typeof window === 'undefined' || !bookId) return;
+  try {
+    localStorage.removeItem(`bookscircle_reading_progress_${bookId}`);
+    window.dispatchEvent(
+      new CustomEvent('reading-progress-updated', { detail: { bookId, progressPercentage: 0 } })
+    );
+  } catch {}
+  try {
+    const db = await getDb();
+    await db.delete('readingProgress', bookId);
+  } catch (e) {
+    console.warn('Failed to delete reading progress from indexedDB:', (e as any)?.message || String(e));
+  }
+}
+
 
