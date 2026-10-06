@@ -19,13 +19,13 @@ export default function TermsAndConditionsPage() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between">
           <Link
             href="/"
-            className="inline-flex items-center gap-2 text-xs font-bold text-[#5e17eb] hover:text-[#4d0ec5] transition-colors py-1.5 px-3 rounded-full bg-[#5e17eb]/10 hover:bg-[#5e17eb]/20"
+            className="inline-flex items-center gap-2 text-xs font-bold text-[#4029AB] hover:text-[#34208e] transition-colors py-1.5 px-3 rounded-full bg-[#4029AB]/10 hover:bg-[#4029AB]/20"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             <span>Back to BooksCircle</span>
           </Link>
           <div className="flex items-center gap-2">
-            <span className="text-sm font-black text-[#5e17eb]">Exam Kart</span>
+            <span className="text-sm font-black text-[#4029AB]">Exam Kart</span>
             <span className="text-[10px] text-gray-400 font-bold">•</span>
             <span className="text-xs text-gray-500 font-medium">Terms of Service</span>
           </div>
@@ -36,7 +36,7 @@ export default function TermsAndConditionsPage() {
       <main className="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12 flex-1 w-full space-y-8">
         {/* Title Header Card */}
         <div className="p-6 sm:p-8 rounded-3xl bg-gray-50 border border-gray-200/80 space-y-3">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#5e17eb]/10 text-[#5e17eb] text-xs font-bold">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#4029AB]/10 text-[#4029AB] text-xs font-bold">
             <Scale className="w-4 h-4" />
             <span>Official Razorpay Compliance Policy</span>
           </div>
@@ -44,7 +44,7 @@ export default function TermsAndConditionsPage() {
             Terms of Service & Conditions
           </h1>
           <p className="text-xs sm:text-sm text-gray-600 leading-relaxed">
-            Please review the terms governing your use of the <strong className="text-gray-900 font-bold">Exam Kart</strong> platform and digital e-book purchases on <a href="https://bookscircle.org/" className="text-[#5e17eb] font-bold hover:underline">https://bookscircle.org/</a>.
+            Please review the terms governing your use of the <strong className="text-gray-900 font-bold">Exam Kart</strong> platform and digital e-book purchases on <a href="https://bookscircle.org/" className="text-[#4029AB] font-bold hover:underline">https://bookscircle.org/</a>.
           </p>
           <p className="text-[11px] text-gray-400 font-medium pt-1">
             Last Updated: August 2026 • Governing Laws of India
@@ -57,18 +57,18 @@ export default function TermsAndConditionsPage() {
           {/* Section 1 */}
           <section className="p-5 sm:p-6 rounded-2xl border border-gray-200 bg-white space-y-3 shadow-2xs">
             <h2 className="text-base sm:text-lg font-bold text-gray-950 flex items-center gap-2">
-              <span className="w-6 h-6 rounded-full bg-[#5e17eb] text-white flex items-center justify-center text-xs font-bold">1</span>
+              <span className="w-6 h-6 rounded-full bg-[#4029AB] text-white flex items-center justify-center text-xs font-bold">1</span>
               <span>Agreement to Terms</span>
             </h2>
             <p className="text-xs sm:text-sm text-gray-600">
-              By accessing <a href="https://bookscircle.org/" className="text-[#5e17eb] font-semibold hover:underline">https://bookscircle.org/</a> or using our web application provided by brand <strong className="text-gray-900 font-bold">Exam Kart</strong> (Legal Name: <strong className="text-gray-900 font-bold">Pardeep Kumar</strong>), you agree to be bound by these Terms and Conditions.
+              By accessing <a href="https://bookscircle.org/" className="text-[#4029AB] font-semibold hover:underline">https://bookscircle.org/</a> or using our web application provided by brand <strong className="text-gray-900 font-bold">Exam Kart</strong> (Legal Name: <strong className="text-gray-900 font-bold">Pardeep Kumar</strong>), you agree to be bound by these Terms and Conditions.
             </p>
           </section>
 
           {/* Section 2 */}
           <section className="p-5 sm:p-6 rounded-2xl border border-gray-200 bg-white space-y-3 shadow-2xs">
             <h2 className="text-base sm:text-lg font-bold text-gray-950 flex items-center gap-2">
-              <span className="w-6 h-6 rounded-full bg-[#5e17eb] text-white flex items-center justify-center text-xs font-bold">2</span>
+              <span className="w-6 h-6 rounded-full bg-[#4029AB] text-white flex items-center justify-center text-xs font-bold">2</span>
               <span>Digital Product License</span>
             </h2>
             <p className="text-xs sm:text-sm text-gray-600 leading-relaxed">
@@ -79,7 +79,7 @@ export default function TermsAndConditionsPage() {
           {/* Section 3 */}
           <section className="p-5 sm:p-6 rounded-2xl border border-gray-200 bg-white space-y-3 shadow-2xs">
             <h2 className="text-base sm:text-lg font-bold text-gray-950 flex items-center gap-2">
-              <span className="w-6 h-6 rounded-full bg-[#5e17eb] text-white flex items-center justify-center text-xs font-bold">3</span>
+              <span className="w-6 h-6 rounded-full bg-[#4029AB] text-white flex items-center justify-center text-xs font-bold">3</span>
               <span>Intellectual Property Rights</span>
             </h2>
             <p className="text-xs sm:text-sm text-gray-600 leading-relaxed">
@@ -90,7 +90,7 @@ export default function TermsAndConditionsPage() {
           {/* Section 4 */}
           <section className="p-5 sm:p-6 rounded-2xl border border-gray-200 bg-white space-y-3 shadow-2xs">
             <h2 className="text-base sm:text-lg font-bold text-gray-950 flex items-center gap-2">
-              <span className="w-6 h-6 rounded-full bg-[#5e17eb] text-white flex items-center justify-center text-xs font-bold">4</span>
+              <span className="w-6 h-6 rounded-full bg-[#4029AB] text-white flex items-center justify-center text-xs font-bold">4</span>
               <span>Prohibited Activities</span>
             </h2>
             <p className="text-xs sm:text-sm text-gray-600">
@@ -115,7 +115,7 @@ export default function TermsAndConditionsPage() {
           {/* Section 5 */}
           <section className="p-5 sm:p-6 rounded-2xl border border-gray-200 bg-white space-y-3 shadow-2xs">
             <h2 className="text-base sm:text-lg font-bold text-gray-950 flex items-center gap-2">
-              <span className="w-6 h-6 rounded-full bg-[#5e17eb] text-white flex items-center justify-center text-xs font-bold">5</span>
+              <span className="w-6 h-6 rounded-full bg-[#4029AB] text-white flex items-center justify-center text-xs font-bold">5</span>
               <span>User Accounts</span>
             </h2>
             <p className="text-xs sm:text-sm text-gray-600 leading-relaxed">
@@ -126,7 +126,7 @@ export default function TermsAndConditionsPage() {
           {/* Section 6 */}
           <section className="p-5 sm:p-6 rounded-2xl border border-gray-200 bg-white space-y-3 shadow-2xs">
             <h2 className="text-base sm:text-lg font-bold text-gray-950 flex items-center gap-2">
-              <span className="w-6 h-6 rounded-full bg-[#5e17eb] text-white flex items-center justify-center text-xs font-bold">6</span>
+              <span className="w-6 h-6 rounded-full bg-[#4029AB] text-white flex items-center justify-center text-xs font-bold">6</span>
               <span>Disclaimers & Governing Law</span>
             </h2>
             <p className="text-xs sm:text-sm text-gray-600 leading-relaxed">
@@ -135,9 +135,9 @@ export default function TermsAndConditionsPage() {
           </section>
 
           {/* Section 7 */}
-          <section className="p-6 rounded-3xl border-2 border-[#5e17eb]/30 bg-gray-50/80 space-y-4 shadow-sm">
+          <section className="p-6 rounded-3xl border-2 border-[#4029AB]/30 bg-gray-50/80 space-y-4 shadow-sm">
             <h2 className="text-base sm:text-lg font-bold text-gray-950 flex items-center gap-2">
-              <span className="w-6 h-6 rounded-full bg-[#5e17eb] text-white flex items-center justify-center text-xs font-bold">7</span>
+              <span className="w-6 h-6 rounded-full bg-[#4029AB] text-white flex items-center justify-center text-xs font-bold">7</span>
               <span>Contact Information</span>
             </h2>
             <p className="text-xs sm:text-sm text-gray-600 leading-relaxed">
@@ -151,26 +151,26 @@ export default function TermsAndConditionsPage() {
               </div>
               <div className="p-3.5 rounded-xl bg-white border border-gray-200">
                 <p className="text-[10px] text-gray-500 font-bold uppercase">Brand Name</p>
-                <p className="font-bold text-[#5e17eb] text-sm">Exam Kart</p>
+                <p className="font-bold text-[#4029AB] text-sm">Exam Kart</p>
               </div>
               <div className="p-3.5 rounded-xl bg-white border border-gray-200">
                 <p className="text-[10px] text-gray-500 font-bold uppercase">Email Address</p>
-                <a href="mailto:support@exam-kart.com" className="font-bold text-gray-900 text-sm hover:text-[#5e17eb] hover:underline flex items-center gap-1.5 mt-0.5">
-                  <Mail className="w-3.5 h-3.5 text-[#5e17eb]" />
+                <a href="mailto:support@exam-kart.com" className="font-bold text-gray-900 text-sm hover:text-[#4029AB] hover:underline flex items-center gap-1.5 mt-0.5">
+                  <Mail className="w-3.5 h-3.5 text-[#4029AB]" />
                   <span>support@exam-kart.com</span>
                 </a>
               </div>
               <div className="p-3.5 rounded-xl bg-white border border-gray-200">
                 <p className="text-[10px] text-gray-500 font-bold uppercase">Official Website</p>
-                <a href="https://bookscircle.org/" target="_blank" rel="noopener noreferrer" className="font-bold text-[#5e17eb] text-sm hover:underline flex items-center gap-1.5 mt-0.5">
-                  <Globe className="w-3.5 h-3.5 text-[#5e17eb]" />
+                <a href="https://bookscircle.org/" target="_blank" rel="noopener noreferrer" className="font-bold text-[#4029AB] text-sm hover:underline flex items-center gap-1.5 mt-0.5">
+                  <Globe className="w-3.5 h-3.5 text-[#4029AB]" />
                   <span>https://bookscircle.org/</span>
                 </a>
               </div>
               <div className="p-3.5 rounded-xl bg-white border border-gray-200 sm:col-span-2">
                 <p className="text-[10px] text-gray-500 font-bold uppercase">Registered Office Address</p>
                 <p className="font-medium text-gray-800 text-xs sm:text-sm flex items-start gap-1.5 mt-0.5">
-                  <MapPin className="w-4 h-4 text-[#5e17eb] shrink-0 mt-0.5" />
+                  <MapPin className="w-4 h-4 text-[#4029AB] shrink-0 mt-0.5" />
                   <span>1st Floor, SCO-28, Sector 13, Bhiwani, Haryana 127021, India</span>
                 </p>
               </div>

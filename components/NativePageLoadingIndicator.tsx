@@ -222,7 +222,7 @@ export const NativePageLoadingProvider: React.FC<{ children: React.ReactNode }> 
                   cx="22"
                   cy="22"
                   r="18"
-                  stroke="#5e17eb"
+                  stroke="#4029AB"
                   strokeWidth="3.5"
                   strokeOpacity="0.15"
                   className="transition-colors"
@@ -231,7 +231,7 @@ export const NativePageLoadingProvider: React.FC<{ children: React.ReactNode }> 
                   cx="22"
                   cy="22"
                   r="18"
-                  stroke="#5e17eb"
+                  stroke="#4029AB"
                   strokeWidth="3.5"
                   strokeLinecap="round"
                   strokeDasharray="90 120"
@@ -244,7 +244,7 @@ export const NativePageLoadingProvider: React.FC<{ children: React.ReactNode }> 
               </svg>
 
               {/* Inner glowing center pulse */}
-              <div className="absolute w-2 h-2 rounded-full bg-[#5e17eb]/20 animate-ping" />
+              <div className="absolute w-2 h-2 rounded-full bg-[#4029AB]/20 animate-ping" />
             </div>
 
             {/* Native Micro Label */}
@@ -255,7 +255,7 @@ export const NativePageLoadingProvider: React.FC<{ children: React.ReactNode }> 
 
           {/* Micro Top Progress Bar for instant native feel */}
           <div className="fixed top-0 left-0 right-0 h-[2.5px] bg-transparent z-[10000] overflow-hidden">
-            <div className="h-full bg-gradient-to-r from-[#5e17eb] via-[#6348dd] to-[#5e17eb] animate-[progress_1s_ease-in-out_infinite] w-full" />
+            <div className="h-full bg-gradient-to-r from-[#4029AB] via-[#6348dd] to-[#4029AB] animate-[progress_1s_ease-in-out_infinite] w-full" />
           </div>
         </div>
       )}

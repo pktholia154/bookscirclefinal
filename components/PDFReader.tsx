@@ -532,7 +532,7 @@ export default function PDFReader() {
               disabled={isDownloading}
               className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
             >
-              <Download className="w-3.5 h-3.5 text-[#5e17eb]" />
+              <Download className="w-3.5 h-3.5 text-[#4029AB]" />
               <span className="hidden sm:inline">Download</span>
             </button>
           )}
@@ -558,7 +558,7 @@ export default function PDFReader() {
                 id="loading-spinner"
                 className="flex flex-col items-center justify-center h-full gap-4 text-slate-500"
               >
-                <Loader2 className="w-8 h-8 animate-spin text-[#5e17eb]" />
+                <Loader2 className="w-8 h-8 animate-spin text-[#4029AB]" />
                 <p className="text-xs font-semibold text-slate-700">
                   Initializing PDFium WASM Engine...
                 </p>
@@ -575,7 +575,7 @@ export default function PDFReader() {
             {/* End of sample preview CTA */}
             {readType === 'sample' && !isPurchased && !isLoading && numPages > 0 && (
               <div className="max-w-md mx-auto my-10 p-6 bg-white rounded-2xl border border-slate-200 text-center space-y-3.5 shadow-xl">
-                <div className="w-12 h-12 rounded-2xl bg-[#5e17eb]/10 text-[#5e17eb] flex items-center justify-center mx-auto">
+                <div className="w-12 h-12 rounded-2xl bg-[#4029AB]/10 text-[#4029AB] flex items-center justify-center mx-auto">
                   <Sparkles className="w-6 h-6" />
                 </div>
                 <div className="space-y-1">
@@ -587,7 +587,7 @@ export default function PDFReader() {
                 {bookData && (
                   <button
                     onClick={() => router.push(`/book/${encodeURIComponent(bookData.id)}`)}
-                    className="w-full py-3 rounded-xl bg-[#5e17eb] hover:bg-[#4d0ec5] text-white font-bold text-xs shadow-lg transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2"
+                    className="w-full py-3 rounded-xl bg-[#4029AB] hover:bg-[#34208e] text-white font-bold text-xs shadow-lg transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2"
                   >
                     <ShoppingBag className="w-4 h-4" />
                     <span>Purchase Complete eBook (₹{bookData.buy_price})</span>

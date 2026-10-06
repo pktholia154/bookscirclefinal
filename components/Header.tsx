@@ -23,7 +23,6 @@ interface HeaderProps {
   onOpenDedicatedSearch?: () => void;
   isInstallable?: boolean;
   onInstall?: () => void;
-  hideMobileSearch?: boolean;
 }
 
 const ANIMATED_PLACEHOLDERS = [
@@ -47,7 +46,6 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenDedicatedSearch,
   isInstallable = false,
   onInstall,
-  hideMobileSearch = false,
 }) => {
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
 
@@ -86,7 +84,7 @@ export const Header: React.FC<HeaderProps> = ({
               className="object-contain"
             />
           </div>
-          <h1 className="text-xl sm:text-2xl font-black tracking-tight text-[#5e17eb] leading-none">
+          <h1 className="text-xl sm:text-2xl font-black tracking-tight text-[#4029AB] leading-none">
             BooksCircle
           </h1>
         </div>
@@ -97,8 +95,8 @@ export const Header: React.FC<HeaderProps> = ({
             onClick={handleSearchClick}
             className="relative w-full group cursor-pointer"
           >
-            <div className="relative flex items-center w-full bg-white border-2 border-gray-300 group-hover:border-[#5e17eb]/70 rounded-xl px-3.5 py-2 transition-all shadow-sm">
-              <Search className="w-4 h-4 text-[#5e17eb] shrink-0 mr-2" />
+            <div className="relative flex items-center w-full bg-white border-2 border-gray-300 group-hover:border-[#4029AB]/70 rounded-xl px-3.5 py-2 transition-all shadow-sm">
+              <Search className="w-4 h-4 text-[#4029AB] shrink-0 mr-2" />
 
               <input
                 id="desktop-search-input"
@@ -150,10 +148,10 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               id="header-install-app-btn"
               onClick={onInstall}
-              className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs font-black text-[#5e17eb] bg-[#5e17eb]/10 hover:bg-[#5e17eb]/20 active:scale-95 transition-all shadow-2xs border border-[#5e17eb]/20 cursor-pointer"
+              className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs font-black text-[#4029AB] bg-[#4029AB]/10 hover:bg-[#4029AB]/20 active:scale-95 transition-all shadow-2xs border border-[#4029AB]/20 cursor-pointer"
               title="Add BooksCircle to Home Screen"
             >
-              <Download className="w-3.5 h-3.5 text-[#5e17eb] shrink-0 stroke-[2.5]" />
+              <Download className="w-3.5 h-3.5 text-[#4029AB] shrink-0 stroke-[2.5]" />
               <span className="leading-none">Install Now</span>
             </button>
           )}
@@ -163,7 +161,7 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               id="header-user-profile-btn"
               onClick={onNavigateToProfile}
-              className="flex items-center gap-1.5 pl-1 pr-2 py-1 rounded-full bg-gray-50 border border-gray-200 hover:border-[#5e17eb]/30 hover:bg-gray-100 transition-all cursor-pointer select-none group"
+              className="flex items-center gap-1.5 pl-1 pr-2 py-1 rounded-full bg-gray-50 border border-gray-200 hover:border-[#4029AB]/30 hover:bg-gray-100 transition-all cursor-pointer select-none group"
               title={`Logged in as ${currentUser.displayName || currentUser.email}`}
             >
               {currentUser.photoURL ? (
@@ -178,7 +176,7 @@ export const Header: React.FC<HeaderProps> = ({
                   />
                 </div>
               ) : (
-                <div className="w-6 h-6 rounded-full bg-[#5e17eb] text-white flex items-center justify-center text-[10px] font-black">
+                <div className="w-6 h-6 rounded-full bg-[#4029AB] text-white flex items-center justify-center text-[10px] font-black">
                   {userInitial}
                 </div>
               )}
@@ -190,7 +188,7 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               id="header-login-btn"
               onClick={onGoogleSignIn}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold text-white bg-[#5e17eb] hover:bg-[#4d0ec5] active:scale-95 transition-all shadow-xs cursor-pointer"
+              className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold text-white bg-[#4029AB] hover:bg-[#34208e] active:scale-95 transition-all shadow-xs cursor-pointer"
               title="Log in to BooksCircle"
             >
               <LogIn className="w-3 h-3 shrink-0" />
@@ -202,15 +200,15 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             id="header-cart-button"
             onClick={onOpenCart}
-            className="relative w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-900 hover:bg-[#5e17eb]/10 active:scale-95 transition-all cursor-pointer"
+            className="relative w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-900 hover:bg-[#4029AB]/10 active:scale-95 transition-all cursor-pointer"
             aria-label="View Shopping Cart"
           >
-            <ShoppingCart className="w-4 h-4 text-[#5e17eb]" />
+            <ShoppingCart className="w-4 h-4 text-[#4029AB]" />
             {cartCount > 0 && (
               <motion.span
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
-                className="absolute -top-1 -right-1 min-w-[16px] h-4 bg-[#5e17eb] text-white text-[9px] font-bold rounded-full flex items-center justify-center px-1 shadow-xs"
+                className="absolute -top-1 -right-1 min-w-[16px] h-4 bg-[#4029AB] text-white text-[9px] font-bold rounded-full flex items-center justify-center px-1 shadow-xs"
               >
                 {cartCount}
               </motion.span>
@@ -219,68 +217,66 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* Prominent Stylish Search Bar for Mobile (Hidden on home if hero banner has search) */}
-      {!hideMobileSearch && (
-        <div className="md:hidden px-4 pb-3.5 pt-1.5">
-          <div
-            onClick={handleSearchClick}
-            className="relative w-full cursor-pointer group"
-          >
-            <div className="relative flex items-center w-full bg-white hover:bg-gray-50 border-2 border-gray-300 group-hover:border-[#5e17eb]/70 rounded-xl px-4 py-3 transition-all shadow-sm">
-              {/* Search Icon with Animated Sparkle Accent */}
-              <div className="flex items-center gap-1 mr-2 shrink-0">
-                <Search className="w-4 h-4 text-[#5e17eb]" />
-              </div>
-
-              <input
-                id="mobile-search-input"
-                type="text"
-                value={searchQuery}
-                onChange={(e) => onSearchChange(e.target.value)}
-                onFocus={handleSearchClick}
-                placeholder="Search..."
-                className="w-full text-sm bg-transparent text-gray-950 font-medium focus:outline-none placeholder-transparent"
-              />
-
-              {/* Animated Floating Label inside Mobile Search Bar */}
-              {!searchQuery && (
-                <div className="absolute left-11 right-20 pointer-events-none flex items-center overflow-hidden h-5">
-                  <AnimatePresence mode="wait">
-                    <motion.span
-                      key={placeholderIndex}
-                      initial={{ y: 12, opacity: 0 }}
-                      animate={{ y: 0, opacity: 1 }}
-                      exit={{ y: -12, opacity: 0 }}
-                      transition={{ duration: 0.25, ease: 'easeOut' }}
-                      className="text-sm text-gray-400 font-normal truncate block"
-                    >
-                      {ANIMATED_PLACEHOLDERS[placeholderIndex]}
-                    </motion.span>
-                  </AnimatePresence>
-                </div>
-              )}
-
-              {/* Micro Explore / Search Pill Indicator */}
-              {!searchQuery ? (
-                <span className="shrink-0 text-[10px] font-bold text-[#5e17eb] bg-[#5e17eb]/10 px-2 py-0.5 rounded-full flex items-center gap-0.5">
-                  <Sparkles className="w-2.5 h-2.5" />
-                  <span>Explore</span>
-                </span>
-              ) : (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onSearchChange('');
-                  }}
-                  className="w-4 h-4 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-gray-600 transition-colors shrink-0"
-                >
-                  <X className="w-2.5 h-2.5" />
-                </button>
-              )}
+      {/* Prominent Stylish Search Bar for Mobile (Always Visible & Highly Enticing) */}
+      <div className="md:hidden px-4 pb-3.5 pt-1.5">
+        <div
+          onClick={handleSearchClick}
+          className="relative w-full cursor-pointer group"
+        >
+          <div className="relative flex items-center w-full bg-white hover:bg-gray-50 border-2 border-gray-300 group-hover:border-[#4029AB]/70 rounded-xl px-4 py-3 transition-all shadow-sm">
+            {/* Search Icon with Animated Sparkle Accent */}
+            <div className="flex items-center gap-1 mr-2 shrink-0">
+              <Search className="w-4 h-4 text-[#4029AB]" />
             </div>
+
+            <input
+              id="mobile-search-input"
+              type="text"
+              value={searchQuery}
+              onChange={(e) => onSearchChange(e.target.value)}
+              onFocus={handleSearchClick}
+              placeholder="Search..."
+              className="w-full text-sm bg-transparent text-gray-950 font-medium focus:outline-none placeholder-transparent"
+            />
+
+            {/* Animated Floating Label inside Mobile Search Bar */}
+            {!searchQuery && (
+              <div className="absolute left-11 right-20 pointer-events-none flex items-center overflow-hidden h-5">
+                <AnimatePresence mode="wait">
+                  <motion.span
+                    key={placeholderIndex}
+                    initial={{ y: 12, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    exit={{ y: -12, opacity: 0 }}
+                    transition={{ duration: 0.25, ease: 'easeOut' }}
+                    className="text-sm text-gray-400 font-normal truncate block"
+                  >
+                    {ANIMATED_PLACEHOLDERS[placeholderIndex]}
+                  </motion.span>
+                </AnimatePresence>
+              </div>
+            )}
+
+            {/* Micro Explore / Search Pill Indicator */}
+            {!searchQuery ? (
+              <span className="shrink-0 text-[10px] font-bold text-[#4029AB] bg-[#4029AB]/10 px-2 py-0.5 rounded-full flex items-center gap-0.5">
+                <Sparkles className="w-2.5 h-2.5" />
+                <span>Explore</span>
+              </span>
+            ) : (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSearchChange('');
+                }}
+                className="w-4 h-4 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-gray-600 transition-colors shrink-0"
+              >
+                <X className="w-2.5 h-2.5" />
+              </button>
+            )}
           </div>
         </div>
-      )}
+      </div>
     </header>
   );
 };

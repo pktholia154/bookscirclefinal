@@ -17,7 +17,7 @@ interface SampleSwitcherProps {
  * 1. "Sample" acts as a prominent label pill that flashes a few times on load to catch visitor attention.
  * 2. Directly below, a split capsule with stable clickable "PDF" and "epub" (Markdown) buttons.
  * 3. Split buttons remain completely stable and tactile for immediate clicking.
- * 4. Compatible with single-token theme (#5e17eb, white, slate).
+ * 4. Compatible with single-token theme (#4029AB, white, slate).
  */
 export const SampleSwitcher: React.FC<SampleSwitcherProps> = ({
   onOpenPdf,
@@ -46,7 +46,7 @@ export const SampleSwitcher: React.FC<SampleSwitcherProps> = ({
               ? { opacity: 1 }
               : {
                   opacity: [1, 0.2, 1, 0.2, 1, 0.4, 1],
-                  color: ['#5e17eb', '#9ca3af', '#5e17eb', '#9ca3af', '#5e17eb', '#6b7280', '#6b7280'],
+                  color: ['#4029AB', '#9ca3af', '#4029AB', '#9ca3af', '#4029AB', '#6b7280', '#6b7280'],
                 }
           }
           transition={{
@@ -64,14 +64,14 @@ export const SampleSwitcher: React.FC<SampleSwitcherProps> = ({
       {/* 2. Split Capsule with Clickable "PDF" and "epub" (Markdown) Buttons */}
       <div
         id="sample-split-capsule"
-        className="flex items-stretch rounded-full overflow-hidden border-2 border-[#5e17eb] shadow-xs h-10 w-full bg-[#5e17eb] p-[2px] transition-shadow hover:shadow-md"
+        className="flex items-stretch rounded-full overflow-hidden border-2 border-[#4029AB] shadow-xs h-10 w-full bg-[#4029AB] p-[2px] transition-shadow hover:shadow-md"
       >
         {/* Left Clickable Half: PDF */}
         <button
           type="button"
           id="sample-btn-pdf"
           onClick={onOpenPdf}
-          className="flex-1 rounded-l-full bg-[#5e17eb] hover:bg-[#4d0ec5] active:scale-95 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer px-2.5 border-r border-white/25 select-none"
+          className="flex-1 rounded-l-full bg-[#4029AB] hover:bg-[#34208e] active:scale-95 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer px-2.5 border-r border-white/25 select-none"
           title="Read Free Sample in PDF format"
           aria-label="Read Sample PDF"
         >
@@ -84,11 +84,11 @@ export const SampleSwitcher: React.FC<SampleSwitcherProps> = ({
           type="button"
           id="sample-btn-epub"
           onClick={onOpenMd}
-          className="flex-1 rounded-r-full bg-white hover:bg-gray-50 active:scale-95 text-[#5e17eb] font-black text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer px-2.5 select-none"
+          className="flex-1 rounded-r-full bg-white hover:bg-gray-50 active:scale-95 text-[#4029AB] font-black text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer px-2.5 select-none"
           title="Read Free Sample in Markdown / ePub format (KaTeX math supported)"
           aria-label="Read Sample ePub / Markdown"
         >
-          <Sparkles className="w-3.5 h-3.5 text-[#5e17eb] shrink-0" />
+          <Sparkles className="w-3.5 h-3.5 text-[#4029AB] shrink-0" />
           <span className="tracking-tight">epub</span>
         </button>
       </div>

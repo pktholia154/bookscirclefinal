@@ -51,13 +51,13 @@ export default function ContactPage() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between">
           <Link
             href="/"
-            className="inline-flex items-center gap-2 text-xs font-bold text-[#5e17eb] hover:text-[#4d0ec5] transition-colors py-1.5 px-3 rounded-full bg-[#5e17eb]/10 hover:bg-[#5e17eb]/20"
+            className="inline-flex items-center gap-2 text-xs font-bold text-[#4029AB] hover:text-[#34208e] transition-colors py-1.5 px-3 rounded-full bg-[#4029AB]/10 hover:bg-[#4029AB]/20"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             <span>Back to BooksCircle</span>
           </Link>
           <div className="flex items-center gap-2">
-            <span className="text-sm font-black text-[#5e17eb]">Exam Kart</span>
+            <span className="text-sm font-black text-[#4029AB]">Exam Kart</span>
             <span className="text-[10px] text-gray-400 font-bold">•</span>
             <span className="text-xs text-gray-500 font-medium">Customer Support</span>
           </div>
@@ -90,7 +90,7 @@ export default function ContactPage() {
           {/* Official Registered Entity Card */}
           <div className="p-6 rounded-3xl border border-gray-200 bg-white space-y-4 shadow-2xs">
             <h2 className="text-sm font-bold text-gray-950 uppercase tracking-wider flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-[#5e17eb]" />
+              <ShieldCheck className="w-4 h-4 text-[#4029AB]" />
               <span>Official Registered Entity</span>
             </h2>
 
@@ -102,7 +102,7 @@ export default function ContactPage() {
 
               <div className="p-3 rounded-2xl bg-gray-50 border border-gray-200/80">
                 <span className="text-[10px] text-gray-500 font-bold uppercase block">Brand Name</span>
-                <span className="font-bold text-[#5e17eb] text-sm">Exam Kart</span>
+                <span className="font-bold text-[#4029AB] text-sm">Exam Kart</span>
               </div>
 
               <div className="p-3 rounded-2xl bg-gray-50 border border-gray-200/80">
@@ -111,7 +111,7 @@ export default function ContactPage() {
                   href="https://bookscircle.org/"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="font-bold text-[#5e17eb] text-sm hover:underline flex items-center gap-1.5 mt-0.5"
+                  className="font-bold text-[#4029AB] text-sm hover:underline flex items-center gap-1.5 mt-0.5"
                 >
                   <Globe className="w-3.5 h-3.5" />
                   <span>https://bookscircle.org/</span>
@@ -124,7 +124,7 @@ export default function ContactPage() {
           {/* Direct Support & Office Address Card */}
           <div className="p-6 rounded-3xl border border-gray-200 bg-white space-y-4 shadow-2xs">
             <h2 className="text-sm font-bold text-gray-950 uppercase tracking-wider flex items-center gap-2">
-              <Mail className="w-4 h-4 text-[#5e17eb]" />
+              <Mail className="w-4 h-4 text-[#4029AB]" />
               <span>Support Channels</span>
             </h2>
 
@@ -134,9 +134,9 @@ export default function ContactPage() {
                 <div className="flex items-center justify-between gap-2 mt-1">
                   <a
                     href="mailto:support@exam-kart.com"
-                    className="font-bold text-gray-900 text-sm hover:text-[#5e17eb] hover:underline flex items-center gap-1.5"
+                    className="font-bold text-gray-900 text-sm hover:text-[#4029AB] hover:underline flex items-center gap-1.5"
                   >
-                    <Mail className="w-3.5 h-3.5 text-[#5e17eb]" />
+                    <Mail className="w-3.5 h-3.5 text-[#4029AB]" />
                     <span>support@exam-kart.com</span>
                   </a>
                   <button
@@ -152,7 +152,7 @@ export default function ContactPage() {
               <div className="p-3 rounded-2xl bg-gray-50 border border-gray-200/80">
                 <span className="text-[10px] text-gray-500 font-bold uppercase block">Office Address</span>
                 <p className="font-medium text-gray-800 text-xs mt-1 leading-snug flex items-start gap-1.5">
-                  <MapPin className="w-4 h-4 text-[#5e17eb] shrink-0 mt-0.5" />
+                  <MapPin className="w-4 h-4 text-[#4029AB] shrink-0 mt-0.5" />
                   <span>1st Floor, SCO-28, Sector 13, Bhiwani, Haryana 127021, India</span>
                 </p>
               </div>
@@ -176,7 +176,7 @@ export default function ContactPage() {
           <div className="flex items-center justify-between border-b border-gray-100 pb-3">
             <div>
               <h2 className="text-base sm:text-lg font-bold text-gray-950 flex items-center gap-2">
-                <MessageSquare className="w-4 h-4 text-[#5e17eb]" />
+                <MessageSquare className="w-4 h-4 text-[#4029AB]" />
                 <span>Submit a Support Request</span>
               </h2>
               <p className="text-xs text-gray-500 mt-0.5">
@@ -213,7 +213,7 @@ export default function ContactPage() {
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     placeholder="e.g. Rahul Sharma"
-                    className="w-full px-3.5 py-2.5 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-[#5e17eb] focus:bg-white text-gray-900 placeholder:text-gray-400"
+                    className="w-full px-3.5 py-2.5 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-[#4029AB] focus:bg-white text-gray-900 placeholder:text-gray-400"
                   />
                 </div>
 
@@ -225,7 +225,7 @@ export default function ContactPage() {
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     placeholder="e.g. rahul@example.com"
-                    className="w-full px-3.5 py-2.5 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-[#5e17eb] focus:bg-white text-gray-900 placeholder:text-gray-400"
+                    className="w-full px-3.5 py-2.5 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-[#4029AB] focus:bg-white text-gray-900 placeholder:text-gray-400"
                   />
                 </div>
               </div>
@@ -238,7 +238,7 @@ export default function ContactPage() {
                     value={formData.orderId}
                     onChange={(e) => setFormData({ ...formData, orderId: e.target.value })}
                     placeholder="e.g. order_Q123456789"
-                    className="w-full px-3.5 py-2.5 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-[#5e17eb] focus:bg-white text-gray-900 placeholder:text-gray-400"
+                    className="w-full px-3.5 py-2.5 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-[#4029AB] focus:bg-white text-gray-900 placeholder:text-gray-400"
                   />
                 </div>
 
@@ -247,7 +247,7 @@ export default function ContactPage() {
                   <select
                     value={formData.subject}
                     onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-                    className="w-full px-3.5 py-2.5 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-[#5e17eb] focus:bg-white text-gray-900"
+                    className="w-full px-3.5 py-2.5 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-[#4029AB] focus:bg-white text-gray-900"
                   >
                     <option value="eBook Access Support">eBook Access &amp; Digital Library Issue</option>
                     <option value="Payment Verification">Razorpay Payment &amp; Receipt Inquiries</option>
@@ -266,13 +266,13 @@ export default function ContactPage() {
                   value={formData.message}
                   onChange={(e) => setFormData({ ...formData, message: e.target.value })}
                   placeholder="Describe your question or transaction issue in detail..."
-                  className="w-full px-3.5 py-2.5 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-[#5e17eb] focus:bg-white text-gray-900 placeholder:text-gray-400 resize-none"
+                  className="w-full px-3.5 py-2.5 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-[#4029AB] focus:bg-white text-gray-900 placeholder:text-gray-400 resize-none"
                 />
               </div>
 
               <button
                 type="submit"
-                className="w-full sm:w-auto px-6 py-3 bg-[#5e17eb] hover:bg-[#4d0ec5] text-white text-xs font-bold rounded-2xl flex items-center justify-center gap-2 shadow-xs transition-all active:scale-95 cursor-pointer"
+                className="w-full sm:w-auto px-6 py-3 bg-[#4029AB] hover:bg-[#34208e] text-white text-xs font-bold rounded-2xl flex items-center justify-center gap-2 shadow-xs transition-all active:scale-95 cursor-pointer"
               >
                 <Send className="w-3.5 h-3.5" />
                 <span>Submit Support Inquiry</span>
@@ -284,7 +284,7 @@ export default function ContactPage() {
         {/* Quick FAQ Section */}
         <div className="p-6 sm:p-8 rounded-3xl border border-gray-200 bg-white space-y-4 shadow-2xs">
           <h2 className="text-base font-bold text-gray-950 flex items-center gap-2">
-            <FileQuestion className="w-4 h-4 text-[#5e17eb]" />
+            <FileQuestion className="w-4 h-4 text-[#4029AB]" />
             <span>Frequently Asked Support Questions</span>
           </h2>
 
@@ -299,7 +299,7 @@ export default function ContactPage() {
             <div className="p-4 rounded-2xl bg-gray-50 border border-gray-200/80">
               <h3 className="font-bold text-gray-900">My payment succeeded on Razorpay but the book didn&apos;t show immediately?</h3>
               <p className="text-gray-600 mt-1">
-                Simply click the <strong>Refresh</strong> button in the app or reload the page. If the issue persists, email <a href="mailto:support@exam-kart.com" className="text-[#5e17eb] font-bold">support@exam-kart.com</a> with your Razorpay payment ID and we will activate your library within minutes.
+                Simply click the <strong>Refresh</strong> button in the app or reload the page. If the issue persists, email <a href="mailto:support@exam-kart.com" className="text-[#4029AB] font-bold">support@exam-kart.com</a> with your Razorpay payment ID and we will activate your library within minutes.
               </p>
             </div>
 

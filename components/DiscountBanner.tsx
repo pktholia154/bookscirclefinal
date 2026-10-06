@@ -15,18 +15,13 @@ interface DiscountBannerProps {
 }
 
 export const DiscountBanner: React.FC<DiscountBannerProps> = ({
-  discount,
+  discount = DEFAULT_CART_TIER_DISCOUNT,
   cart = [],
   cartSubtotal,
   onOpenCart,
   className = '',
 }) => {
-  // Hide completely when discount is not provided or is inactive
-  if (!discount || !discount.is_active) {
-    return null;
-  }
-
-  const activeDiscountConfig = discount;
+  const activeDiscountConfig = discount || DEFAULT_CART_TIER_DISCOUNT;
   
   // Calculate subtotal from cart items if not explicitly provided
   const computedSubtotal =

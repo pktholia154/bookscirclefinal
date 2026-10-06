@@ -64,7 +64,7 @@ const BookListItem: React.FC<{
       onClick={() => onSelectBook(book)}
       onMouseEnter={handlePreload}
       onTouchStart={handlePreload}
-      className="group flex items-start gap-3.5 sm:gap-4 bg-transparent p-2 sm:p-3.5 rounded-2xl border border-gray-100 hover:border-[#5e17eb]/30 hover:bg-gray-50/50 cursor-pointer transition-all active:scale-[0.99]"
+      className="group flex items-start gap-3.5 sm:gap-4 bg-transparent p-2 sm:p-3.5 rounded-2xl border border-gray-100 hover:border-[#4029AB]/30 hover:bg-gray-50/50 cursor-pointer transition-all active:scale-[0.99]"
     >
       {/* Book Cover Thumbnail: Aligned to top, 3:4 ratio, sharp corners with Wishlist icon on top right */}
       <div className="relative w-14 sm:w-16 aspect-[3/4] rounded-none overflow-hidden shrink-0 self-start bg-gray-200 shadow-2xs border border-gray-200">
@@ -102,7 +102,7 @@ const BookListItem: React.FC<{
       {/* Middle Information Column */}
       <div className="flex-1 min-w-0 pr-1">
         {/* 2-row Title */}
-        <h3 className="font-bold text-sm sm:text-base text-gray-950 line-clamp-2 leading-snug group-hover:text-[#5e17eb] transition-colors">
+        <h3 className="font-bold text-sm sm:text-base text-gray-950 line-clamp-2 leading-snug group-hover:text-[#4029AB] transition-colors">
           {book.title}
         </h3>
 
@@ -124,7 +124,7 @@ const BookListItem: React.FC<{
       {/* Right Pricing & Buy / Cart Actions */}
       <div className="text-right shrink-0 flex flex-col items-end justify-between self-stretch">
         <div>
-          <p className="text-base sm:text-lg font-black text-[#5e17eb] tracking-tight">
+          <p className="text-base sm:text-lg font-black text-[#4029AB] tracking-tight">
             ₹{book.buy_price}
           </p>
           {book.list_price && book.list_price > book.buy_price && (
@@ -156,8 +156,8 @@ const BookListItem: React.FC<{
                 }}
                 className={`p-1.5 sm:p-2 rounded-lg border transition-all active:scale-90 cursor-pointer ${
                   inCart
-                    ? 'bg-[#5e17eb] text-white border-[#5e17eb]'
-                    : 'border-gray-200 text-gray-700 bg-white hover:border-[#5e17eb] hover:text-[#5e17eb]'
+                    ? 'bg-[#4029AB] text-white border-[#4029AB]'
+                    : 'border-gray-200 text-gray-700 bg-white hover:border-[#4029AB] hover:text-[#4029AB]'
                 }`}
                 title={inCart ? 'In Cart (Click to toggle)' : 'Add to Cart'}
               >
@@ -178,7 +178,7 @@ const BookListItem: React.FC<{
                     onSelectBook(book);
                   }
                 }}
-                className="px-3 sm:px-3.5 py-1.5 bg-[#5e17eb] text-white text-xs rounded-lg font-bold uppercase tracking-wider hover:bg-[#32208a] active:scale-95 transition-all shadow-2xs cursor-pointer"
+                className="px-3 sm:px-3.5 py-1.5 bg-[#4029AB] text-white text-xs rounded-lg font-bold uppercase tracking-wider hover:bg-[#32208a] active:scale-95 transition-all shadow-2xs cursor-pointer"
               >
                 Buy Now
               </button>
@@ -222,7 +222,7 @@ export const BookListView: React.FC<BookListViewProps> = ({
           {viewAllHref ? (
             <Link
               href={viewAllHref}
-              className="text-xs sm:text-sm font-semibold text-[#5e17eb] hover:text-[#4d0ec5] flex items-center gap-0.5 transition-colors py-1 pl-2"
+              className="text-xs sm:text-sm font-semibold text-[#4029AB] hover:text-[#34208e] flex items-center gap-0.5 transition-colors py-1 pl-2"
             >
               <span>View All</span>
               <ChevronRight className="w-3.5 h-3.5" />
@@ -230,7 +230,7 @@ export const BookListView: React.FC<BookListViewProps> = ({
           ) : onViewAll ? (
             <button
               onClick={onViewAll}
-              className="text-xs sm:text-sm font-semibold text-[#5e17eb] hover:text-[#4d0ec5] flex items-center gap-0.5 cursor-pointer transition-colors py-1 pl-2"
+              className="text-xs sm:text-sm font-semibold text-[#4029AB] hover:text-[#34208e] flex items-center gap-0.5 cursor-pointer transition-colors py-1 pl-2"
             >
               <span>View All</span>
               <ChevronRight className="w-3.5 h-3.5" />

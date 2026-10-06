@@ -108,8 +108,8 @@ export const BookCard: React.FC<BookCardProps> = ({
             onClick={(e) => onAddToCart(book, e)}
             className={`absolute bottom-1 right-1 sm:bottom-1.5 sm:right-1.5 md:bottom-2 md:right-2 w-6 h-6 sm:w-6.5 sm:h-6.5 md:w-7 md:h-7 rounded-full flex items-center justify-center shadow-xs transition-all duration-200 active:scale-90 cursor-pointer ${
               isInCart
-                ? 'bg-[#5e17eb] text-white ring-2 ring-white'
-                : 'bg-white/95 text-gray-900 hover:bg-[#5e17eb] hover:text-white'
+                ? 'bg-[#4029AB] text-white ring-2 ring-white'
+                : 'bg-white/95 text-gray-900 hover:bg-[#4029AB] hover:text-white'
             }`}
             aria-label={isInCart ? `Remove ${book.title} from cart` : `Add ${book.title} to cart`}
             title={isInCart ? 'In Cart (Click to toggle)' : 'Add to Cart'}
@@ -142,7 +142,7 @@ export const BookCard: React.FC<BookCardProps> = ({
 
       {/* Book Title */}
       <h3
-        className="text-xs sm:text-sm md:text-base font-bold text-gray-900 truncate leading-snug mt-1 group-hover:text-[#5e17eb] transition-colors w-full min-w-0"
+        className="text-xs sm:text-sm md:text-base font-bold text-gray-900 truncate leading-snug mt-1 group-hover:text-[#4029AB] transition-colors w-full min-w-0"
         title={book.title}
       >
         {book.title}

@@ -43,7 +43,7 @@ export const CategoryChips: React.FC<CategoryChipsProps> = ({
           href="/"
           className={`shrink-0 px-4 py-2 rounded-full text-sm sm:text-[15px] font-bold transition-all duration-200 active:scale-95 whitespace-nowrap cursor-pointer ${
             selectedCategory.toLowerCase() === 'all'
-              ? 'bg-[#5e17eb] text-white border border-[#5e17eb] shadow-xs'
+              ? 'bg-[#4029AB] text-white border border-[#4029AB] shadow-xs'
               : 'bg-gray-100 text-gray-800 border border-transparent hover:bg-gray-200'
           }`}
         >
@@ -62,7 +62,7 @@ export const CategoryChips: React.FC<CategoryChipsProps> = ({
               href={`/category/${encodeURIComponent(slug)}`}
               className={`shrink-0 px-4 py-2 rounded-full text-sm sm:text-[15px] font-bold transition-all duration-200 active:scale-95 whitespace-nowrap cursor-pointer ${
                 isSelected
-                  ? 'bg-[#5e17eb] text-white border border-[#5e17eb] shadow-xs'
+                  ? 'bg-[#4029AB] text-white border border-[#4029AB] shadow-xs'
                   : 'bg-gray-100 text-gray-800 border border-transparent hover:bg-gray-200'
               }`}
             >
@@ -76,7 +76,7 @@ export const CategoryChips: React.FC<CategoryChipsProps> = ({
           <button
             id="chip-see-more-toggle"
             onClick={() => setIsExpanded((prev) => !prev)}
-            className="shrink-0 px-4 py-2 rounded-full text-sm sm:text-[15px] font-bold text-[#5e17eb] bg-[#5e17eb]/10 hover:bg-[#5e17eb]/15 border border-[#5e17eb]/20 flex items-center gap-1.5 transition-all duration-200 active:scale-95 cursor-pointer"
+            className="shrink-0 px-4 py-2 rounded-full text-sm sm:text-[15px] font-bold text-[#4029AB] bg-[#4029AB]/10 hover:bg-[#4029AB]/15 border border-[#4029AB]/20 flex items-center gap-1.5 transition-all duration-200 active:scale-95 cursor-pointer"
             aria-label={isExpanded ? 'Show fewer categories' : 'See more categories'}
           >
             <span>{isExpanded ? 'Show less' : `See more (+${categories.length - initialVisibleCount})`}</span>

@@ -173,7 +173,7 @@ export const DedicatedSearchView: React.FC<DedicatedSearchViewProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-white text-gray-900 pb-24 selection:bg-[#5e17eb] selection:text-white">
+    <div className="min-h-screen bg-white text-gray-900 pb-24 selection:bg-[#4029AB] selection:text-white">
       {/* 1. Dedicated Sticky Top Search Bar Header */}
       <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-gray-100 px-3 sm:px-5 py-2.5 transition-all">
         <div className="flex items-center gap-2 sm:gap-3">
@@ -189,8 +189,8 @@ export const DedicatedSearchView: React.FC<DedicatedSearchViewProps> = ({
 
           {/* Stylish Search Bar Container with Glowing Focus & Animated Label */}
           <div className="relative flex-1 group">
-            <div className="relative flex items-center w-full bg-gray-50 border-2 border-gray-200 group-focus-within:border-[#5e17eb] group-focus-within:bg-white group-focus-within:shadow-md transition-all rounded-full overflow-hidden">
-              <Search className="w-4 h-4 text-[#5e17eb] ml-3.5 shrink-0" />
+            <div className="relative flex items-center w-full bg-gray-50 border-2 border-gray-200 group-focus-within:border-[#4029AB] group-focus-within:bg-white group-focus-within:shadow-md transition-all rounded-full overflow-hidden">
+              <Search className="w-4 h-4 text-[#4029AB] ml-3.5 shrink-0" />
 
               <input
                 ref={inputRef}
@@ -257,7 +257,7 @@ export const DedicatedSearchView: React.FC<DedicatedSearchViewProps> = ({
             <h2 className="text-sm sm:text-base font-black text-gray-950">
               {query ? `Search: "${query}"` : selectedCategory !== 'all' ? selectedCategory : 'All E-Books'}
             </h2>
-            <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-[#5e17eb]/10 text-[#5e17eb]">
+            <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-[#4029AB]/10 text-[#4029AB]">
               {searchResults.length} Books
             </span>
           </div>
@@ -293,7 +293,7 @@ export const DedicatedSearchView: React.FC<DedicatedSearchViewProps> = ({
                 <button
                   key={i}
                   onClick={() => handleExecuteSearch(tag)}
-                  className="px-3 py-1 rounded-full bg-white border border-gray-300 text-xs font-bold text-[#5e17eb] hover:bg-gray-50 cursor-pointer"
+                  className="px-3 py-1 rounded-full bg-white border border-gray-300 text-xs font-bold text-[#4029AB] hover:bg-gray-50 cursor-pointer"
                 >
                   {tag}
                 </button>
@@ -316,7 +316,7 @@ export const DedicatedSearchView: React.FC<DedicatedSearchViewProps> = ({
                     key={book.id}
                     id={`search-item-${book.id}`}
                     onClick={() => onSelectBook(book)}
-                    className="group flex items-start gap-3 p-3 rounded-2xl border border-gray-200 bg-white hover:border-[#5e17eb]/40 hover:shadow-xs transition-all cursor-pointer active:scale-[0.99]"
+                    className="group flex items-start gap-3 p-3 rounded-2xl border border-gray-200 bg-white hover:border-[#4029AB]/40 hover:shadow-xs transition-all cursor-pointer active:scale-[0.99]"
                   >
                     {/* Book Cover (Ratio 3:4, Sharp corners) */}
                     <div className="relative w-14 sm:w-16 aspect-[3/4] rounded-none overflow-hidden shrink-0 self-start bg-gray-100 border border-gray-200 shadow-2xs">
@@ -333,7 +333,7 @@ export const DedicatedSearchView: React.FC<DedicatedSearchViewProps> = ({
 
                     {/* Middle Book Details */}
                     <div className="flex-1 min-w-0 pr-1">
-                      <h3 className="font-bold text-sm sm:text-base text-gray-950 line-clamp-2 leading-snug group-hover:text-[#5e17eb] transition-colors">
+                      <h3 className="font-bold text-sm sm:text-base text-gray-950 line-clamp-2 leading-snug group-hover:text-[#4029AB] transition-colors">
                         {book.title}
                       </h3>
 
@@ -365,7 +365,7 @@ export const DedicatedSearchView: React.FC<DedicatedSearchViewProps> = ({
                     {/* Right Pricing & Quick Buy / Cart Actions */}
                     <div className="text-right shrink-0 flex flex-col items-end justify-between self-stretch">
                       <div>
-                        <p className="text-base sm:text-lg font-black text-[#5e17eb] tracking-tight">
+                        <p className="text-base sm:text-lg font-black text-[#4029AB] tracking-tight">
                           ₹{book.buy_price}
                         </p>
                         {book.list_price && book.list_price > book.buy_price && (
@@ -391,8 +391,8 @@ export const DedicatedSearchView: React.FC<DedicatedSearchViewProps> = ({
                               }}
                               className={`p-1.5 sm:p-2 rounded-lg border transition-all active:scale-90 cursor-pointer ${
                                 inCart
-                                  ? 'bg-[#5e17eb] text-white border-[#5e17eb]'
-                                  : 'border-gray-200 text-gray-700 bg-white hover:border-[#5e17eb] hover:text-[#5e17eb]'
+                                  ? 'bg-[#4029AB] text-white border-[#4029AB]'
+                                  : 'border-gray-200 text-gray-700 bg-white hover:border-[#4029AB] hover:text-[#4029AB]'
                               }`}
                               title={inCart ? 'In Cart' : 'Add to Cart'}
                             >
@@ -405,7 +405,7 @@ export const DedicatedSearchView: React.FC<DedicatedSearchViewProps> = ({
                                 e.stopPropagation();
                                 onBuyNow(book);
                               }}
-                              className="px-3 sm:px-3.5 py-1.5 bg-[#5e17eb] hover:bg-[#4d0ec5] text-white text-xs rounded-lg font-bold uppercase tracking-wider active:scale-95 transition-all shadow-2xs cursor-pointer"
+                              className="px-3 sm:px-3.5 py-1.5 bg-[#4029AB] hover:bg-[#34208e] text-white text-xs rounded-lg font-bold uppercase tracking-wider active:scale-95 transition-all shadow-2xs cursor-pointer"
                             >
                               Buy
                             </button>
@@ -424,7 +424,7 @@ export const DedicatedSearchView: React.FC<DedicatedSearchViewProps> = ({
                 <button
                   id="btn-load-more-search"
                   onClick={() => setVisibleCount((prev) => prev + 12)}
-                  className="px-6 py-2.5 rounded-xl bg-gray-50 border border-gray-200 hover:border-[#5e17eb] text-gray-800 hover:text-[#5e17eb] text-xs font-bold transition-all active:scale-95 shadow-2xs cursor-pointer flex items-center gap-2"
+                  className="px-6 py-2.5 rounded-xl bg-gray-50 border border-gray-200 hover:border-[#4029AB] text-gray-800 hover:text-[#4029AB] text-xs font-bold transition-all active:scale-95 shadow-2xs cursor-pointer flex items-center gap-2"
                 >
                   <span>Load More Results ({searchResults.length - visibleCount} remaining)</span>
                   <SlidersHorizontal className="w-3.5 h-3.5" />

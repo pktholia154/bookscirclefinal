@@ -19,13 +19,13 @@ export default function RefundPolicyPage() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between">
           <Link
             href="/"
-            className="inline-flex items-center gap-2 text-xs font-bold text-[#5e17eb] hover:text-[#4d0ec5] transition-colors py-1.5 px-3 rounded-full bg-[#5e17eb]/10 hover:bg-[#5e17eb]/20"
+            className="inline-flex items-center gap-2 text-xs font-bold text-[#4029AB] hover:text-[#34208e] transition-colors py-1.5 px-3 rounded-full bg-[#4029AB]/10 hover:bg-[#4029AB]/20"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             <span>Back to BooksCircle</span>
           </Link>
           <div className="flex items-center gap-2">
-            <span className="text-sm font-black text-[#5e17eb]">Exam Kart</span>
+            <span className="text-sm font-black text-[#4029AB]">Exam Kart</span>
             <span className="text-[10px] text-gray-400 font-bold">•</span>
             <span className="text-xs text-gray-500 font-medium">Refund Policy</span>
           </div>
@@ -36,7 +36,7 @@ export default function RefundPolicyPage() {
       <main className="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12 flex-1 w-full space-y-8">
         {/* Title Header Card */}
         <div className="p-6 sm:p-8 rounded-3xl bg-gray-50 border border-gray-200/80 space-y-3">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#5e17eb]/10 text-[#5e17eb] text-xs font-bold">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#4029AB]/10 text-[#4029AB] text-xs font-bold">
             <RefreshCw className="w-4 h-4" />
             <span>Official Razorpay Compliance Policy</span>
           </div>
@@ -47,7 +47,7 @@ export default function RefundPolicyPage() {
             Fair & Transparent Refunds
           </p>
           <p className="text-xs sm:text-sm text-gray-600 leading-relaxed">
-            Clear guidelines on cancellations, digital download delivery, and eligible refund requests for <strong className="text-gray-900 font-bold">Exam Kart</strong> (Legal entity: <strong className="text-gray-900 font-bold">Pardeep Kumar</strong>) purchases on <a href="https://bookscircle.org/" className="text-[#5e17eb] font-bold hover:underline">https://bookscircle.org/</a>.
+            Clear guidelines on cancellations, digital download delivery, and eligible refund requests for <strong className="text-gray-900 font-bold">Exam Kart</strong> (Legal entity: <strong className="text-gray-900 font-bold">Pardeep Kumar</strong>) purchases on <a href="https://bookscircle.org/" className="text-[#4029AB] font-bold hover:underline">https://bookscircle.org/</a>.
           </p>
           <p className="text-[11px] text-gray-400 font-medium pt-1">
             Last Updated: August 2026 • 5-7 Day Razorpay Refund Settlement
@@ -60,18 +60,18 @@ export default function RefundPolicyPage() {
           {/* Section 1 */}
           <section className="p-5 sm:p-6 rounded-2xl border border-gray-200 bg-white space-y-3 shadow-2xs">
             <h2 className="text-base sm:text-lg font-bold text-gray-950 flex items-center gap-2">
-              <span className="w-6 h-6 rounded-full bg-[#5e17eb] text-white flex items-center justify-center text-xs font-bold">1</span>
+              <span className="w-6 h-6 rounded-full bg-[#4029AB] text-white flex items-center justify-center text-xs font-bold">1</span>
               <span>Nature of Digital E-Books</span>
             </h2>
             <p className="text-xs sm:text-sm text-gray-600 leading-relaxed">
-              All products offered on Exam Kart (<a href="https://bookscircle.org/" className="text-[#5e17eb] font-semibold hover:underline">https://bookscircle.org/</a>) are instant digital PDF downloads and e-books. Once purchased, digital access is unlocked immediately in your digital library.
+              All products offered on Exam Kart (<a href="https://bookscircle.org/" className="text-[#4029AB] font-semibold hover:underline">https://bookscircle.org/</a>) are instant digital PDF downloads and e-books. Once purchased, digital access is unlocked immediately in your digital library.
             </p>
           </section>
 
           {/* Section 2 */}
           <section className="p-5 sm:p-6 rounded-2xl border border-gray-200 bg-white space-y-3 shadow-2xs">
             <h2 className="text-base sm:text-lg font-bold text-gray-950 flex items-center gap-2">
-              <span className="w-6 h-6 rounded-full bg-[#5e17eb] text-white flex items-center justify-center text-xs font-bold">2</span>
+              <span className="w-6 h-6 rounded-full bg-[#4029AB] text-white flex items-center justify-center text-xs font-bold">2</span>
               <span>Order Cancellation Policy</span>
             </h2>
             <p className="text-xs sm:text-sm text-gray-600 leading-relaxed">
@@ -82,7 +82,7 @@ export default function RefundPolicyPage() {
           {/* Section 3 */}
           <section className="p-5 sm:p-6 rounded-2xl border border-gray-200 bg-white space-y-3 shadow-2xs">
             <h2 className="text-base sm:text-lg font-bold text-gray-950 flex items-center gap-2">
-              <span className="w-6 h-6 rounded-full bg-[#5e17eb] text-white flex items-center justify-center text-xs font-bold">3</span>
+              <span className="w-6 h-6 rounded-full bg-[#4029AB] text-white flex items-center justify-center text-xs font-bold">3</span>
               <span>Eligible Refund Scenarios</span>
             </h2>
             <p className="text-xs sm:text-sm text-gray-600">
@@ -103,7 +103,7 @@ export default function RefundPolicyPage() {
           {/* Section 4 */}
           <section className="p-5 sm:p-6 rounded-2xl border border-gray-200 bg-white space-y-3 shadow-2xs">
             <h2 className="text-base sm:text-lg font-bold text-gray-950 flex items-center gap-2">
-              <span className="w-6 h-6 rounded-full bg-[#5e17eb] text-white flex items-center justify-center text-xs font-bold">4</span>
+              <span className="w-6 h-6 rounded-full bg-[#4029AB] text-white flex items-center justify-center text-xs font-bold">4</span>
               <span>How to Request a Refund</span>
             </h2>
             <p className="text-xs sm:text-sm text-gray-600">
@@ -112,7 +112,7 @@ export default function RefundPolicyPage() {
             <ol className="space-y-2.5 text-xs sm:text-sm text-gray-700 pt-1 pl-2">
               <li className="flex items-start gap-2">
                 <span className="w-5 h-5 rounded-full bg-gray-100 text-gray-800 flex items-center justify-center text-xs font-bold shrink-0">a</span>
-                <span>Send an email to <a href="mailto:support@exam-kart.com" className="text-[#5e17eb] font-bold hover:underline">support@exam-kart.com</a> within <strong>7 days</strong> of purchase.</span>
+                <span>Send an email to <a href="mailto:support@exam-kart.com" className="text-[#4029AB] font-bold hover:underline">support@exam-kart.com</a> within <strong>7 days</strong> of purchase.</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="w-5 h-5 rounded-full bg-gray-100 text-gray-800 flex items-center justify-center text-xs font-bold shrink-0">b</span>
@@ -128,7 +128,7 @@ export default function RefundPolicyPage() {
           {/* Section 5 */}
           <section className="p-5 sm:p-6 rounded-2xl border border-gray-200 bg-white space-y-3 shadow-2xs">
             <h2 className="text-base sm:text-lg font-bold text-gray-950 flex items-center gap-2">
-              <span className="w-6 h-6 rounded-full bg-[#5e17eb] text-white flex items-center justify-center text-xs font-bold">5</span>
+              <span className="w-6 h-6 rounded-full bg-[#4029AB] text-white flex items-center justify-center text-xs font-bold">5</span>
               <span>Processing Timelines</span>
             </h2>
             <div className="flex items-center gap-2 text-xs sm:text-sm text-emerald-800 bg-emerald-50 border border-emerald-200 p-3 rounded-xl">
@@ -138,9 +138,9 @@ export default function RefundPolicyPage() {
           </section>
 
           {/* Section 6 */}
-          <section className="p-6 rounded-3xl border-2 border-[#5e17eb]/30 bg-gray-50/80 space-y-4 shadow-sm">
+          <section className="p-6 rounded-3xl border-2 border-[#4029AB]/30 bg-gray-50/80 space-y-4 shadow-sm">
             <h2 className="text-base sm:text-lg font-bold text-gray-950 flex items-center gap-2">
-              <span className="w-6 h-6 rounded-full bg-[#5e17eb] text-white flex items-center justify-center text-xs font-bold">6</span>
+              <span className="w-6 h-6 rounded-full bg-[#4029AB] text-white flex items-center justify-center text-xs font-bold">6</span>
               <span>Contact for Refund Inquiries</span>
             </h2>
             <p className="text-xs sm:text-sm text-gray-600 leading-relaxed">
@@ -154,26 +154,26 @@ export default function RefundPolicyPage() {
               </div>
               <div className="p-3.5 rounded-xl bg-white border border-gray-200">
                 <p className="text-[10px] text-gray-500 font-bold uppercase">Brand Name</p>
-                <p className="font-bold text-[#5e17eb] text-sm">Exam Kart</p>
+                <p className="font-bold text-[#4029AB] text-sm">Exam Kart</p>
               </div>
               <div className="p-3.5 rounded-xl bg-white border border-gray-200">
                 <p className="text-[10px] text-gray-500 font-bold uppercase">Refund Support Email</p>
-                <a href="mailto:support@exam-kart.com" className="font-bold text-gray-900 text-sm hover:text-[#5e17eb] hover:underline flex items-center gap-1.5 mt-0.5">
-                  <Mail className="w-3.5 h-3.5 text-[#5e17eb]" />
+                <a href="mailto:support@exam-kart.com" className="font-bold text-gray-900 text-sm hover:text-[#4029AB] hover:underline flex items-center gap-1.5 mt-0.5">
+                  <Mail className="w-3.5 h-3.5 text-[#4029AB]" />
                   <span>support@exam-kart.com</span>
                 </a>
               </div>
               <div className="p-3.5 rounded-xl bg-white border border-gray-200">
                 <p className="text-[10px] text-gray-500 font-bold uppercase">Official Website</p>
-                <a href="https://bookscircle.org/" target="_blank" rel="noopener noreferrer" className="font-bold text-[#5e17eb] text-sm hover:underline flex items-center gap-1.5 mt-0.5">
-                  <Globe className="w-3.5 h-3.5 text-[#5e17eb]" />
+                <a href="https://bookscircle.org/" target="_blank" rel="noopener noreferrer" className="font-bold text-[#4029AB] text-sm hover:underline flex items-center gap-1.5 mt-0.5">
+                  <Globe className="w-3.5 h-3.5 text-[#4029AB]" />
                   <span>https://bookscircle.org/</span>
                 </a>
               </div>
               <div className="p-3.5 rounded-xl bg-white border border-gray-200 sm:col-span-2">
                 <p className="text-[10px] text-gray-500 font-bold uppercase">Office Address</p>
                 <p className="font-medium text-gray-800 text-xs sm:text-sm flex items-start gap-1.5 mt-0.5">
-                  <MapPin className="w-4 h-4 text-[#5e17eb] shrink-0 mt-0.5" />
+                  <MapPin className="w-4 h-4 text-[#4029AB] shrink-0 mt-0.5" />
                   <span>1st Floor, SCO-28, Sector 13, Bhiwani, Haryana 127021, India</span>
                 </p>
               </div>

@@ -64,7 +64,7 @@ export const CarouselSection: React.FC<CarouselSectionProps> = ({
               {title}
             </h2>
             {badge && (
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#5e17eb]/10 text-[#5e17eb] shrink-0">
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#4029AB]/10 text-[#4029AB] shrink-0">
                 {badge}
               </span>
             )}
@@ -78,14 +78,14 @@ export const CarouselSection: React.FC<CarouselSectionProps> = ({
           {viewAllHref ? (
             <Link
               href={viewAllHref}
-              className="text-xs sm:text-sm font-semibold text-[#5e17eb] hover:underline transition-colors"
+              className="text-xs sm:text-sm font-semibold text-[#4029AB] hover:underline transition-colors"
             >
               View All
             </Link>
           ) : onViewAll ? (
             <button
               onClick={onViewAll}
-              className="text-xs sm:text-sm font-semibold text-[#5e17eb] hover:underline cursor-pointer transition-colors"
+              className="text-xs sm:text-sm font-semibold text-[#4029AB] hover:underline cursor-pointer transition-colors"
             >
               View All
             </button>

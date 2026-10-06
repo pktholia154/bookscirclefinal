@@ -10,7 +10,7 @@ export const DISCOUNT_SYNC_EVENT = 'bookscircle:discount-sync';
 export const DEFAULT_CART_TIER_DISCOUNT: CartTierDiscount = {
   id: 'default-cart-tier',
   title: 'Mega Diwali Sale',
-  is_active: false,
+  is_active: true,
   tiers: [
     { discount_pct: 50, label: '50% OFF on ₹2000+', min_total: 2000 },
     { discount_pct: 40, label: '40% OFF on ₹1000+', min_total: 1000 },
@@ -42,8 +42,8 @@ export function parseCartTierDiscountDoc(id: string, data: any): CartTierDiscoun
   return {
     id,
     title: String(data.title || 'Special Discount Offer'),
-    // Strictly require is_active === true
-    is_active: Boolean(data.is_active === true),
+    // Consider active unless explicitly set to false
+    is_active: data.is_active !== false,
     tiers: tiers.length > 0 ? tiers : DEFAULT_CART_TIER_DISCOUNT.tiers,
     created_at: data.created_at,
   };
@@ -52,16 +52,15 @@ export function parseCartTierDiscountDoc(id: string, data: any): CartTierDiscoun
 /**
  * Reads cached CartTierDiscount from localStorage.
  */
-export function getCachedCartTierDiscountSync(): CartTierDiscount | null {
-  if (typeof window === 'undefined') return null;
+export function getCachedCartTierDiscountSync(): CartTierDiscount {
+  if (typeof window === 'undefined') return DEFAULT_CART_TIER_DISCOUNT;
   try {
     const raw = localStorage.getItem(CART_TIER_DISCOUNT_CACHE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (parsed) {
+      if (parsed && Array.isArray(parsed.tiers) && parsed.tiers.length > 0) {
         return {
           ...parsed,
-          is_active: Boolean(parsed.is_active === true),
           tiers: normalizeTiers(parsed.tiers),
         };
       }
@@ -69,7 +68,7 @@ export function getCachedCartTierDiscountSync(): CartTierDiscount | null {
   } catch (e) {
     console.warn('Failed to read cart tier discount cache:', e);
   }
-  return null;
+  return DEFAULT_CART_TIER_DISCOUNT;
 }
 
 /**
@@ -95,7 +94,7 @@ export function saveCartTierDiscountToCache(discount: CartTierDiscount): void {
 export function subscribeToFirestoreDiscounts(
   callback: (discount: CartTierDiscount | null) => void
 ): () => void {
-  // Emit cached value first if available
+  // Always emit cached value first
   callback(getCachedCartTierDiscountSync());
 
   try {
@@ -123,7 +122,7 @@ export function subscribeToFirestoreDiscounts(
           saveCartTierDiscountToCache(selectedDiscount);
           callback(selectedDiscount);
         } else {
-          callback(null);
+          callback(getCachedCartTierDiscountSync());
         }
       },
       (error) => {
@@ -160,25 +159,8 @@ export function evaluateCartTier(
   cartSubtotal: number,
   discountConfig?: CartTierDiscount | null
 ): CartTierEvaluation {
-  const config = discountConfig ?? getCachedCartTierDiscountSync();
-
-  // If discount config is null or explicitly inactive, NO discount is active
-  if (!config || !config.is_active) {
-    return {
-      subtotal: cartSubtotal,
-      activeTier: null,
-      nextTier: null,
-      applicable_discount_pct: 0,
-      discountAmount: 0,
-      finalTotal: cartSubtotal,
-      amountNeededForNextTier: 0,
-      nudgeMessage: '',
-      progressPct: 0,
-      isEligible: false,
-    };
-  }
-
-  const rawTiers = config.tiers || [];
+  const config = discountConfig || getCachedCartTierDiscountSync();
+  const rawTiers = config?.tiers || DEFAULT_CART_TIER_DISCOUNT.tiers;
   const tiers = [...rawTiers].sort((a, b) => b.min_total - a.min_total); // Descending (e.g. 2000, 1000, 500)
   const ascendingTiers = [...rawTiers].sort((a, b) => a.min_total - b.min_total); // Ascending (e.g. 500, 1000, 2000)
 

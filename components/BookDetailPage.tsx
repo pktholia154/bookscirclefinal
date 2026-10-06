@@ -27,15 +27,8 @@ import { DEFAULT_BOOK_COVER, BOOK_FAQS } from '@/lib/data';
 import { PDFReaderModal } from '@/components/PDFReaderModal';
 import { MarkdownReaderModal } from '@/components/MarkdownReaderModal';
 import { SampleSwitcher } from '@/components/SampleSwitcher';
-import { ReadingProgressCard } from '@/components/ReadingProgressCard';
 import { loadRazorpayScript } from '@/lib/services/razorpay';
 import { getWishlistIdsFromLocal, toggleWishlistAction, subscribeToWishlistChanges } from '@/lib/services/wishlist';
-import {
-  ReadingProgressRecord,
-  getReadingProgress,
-  getReadingProgressSync,
-  deleteReadingProgress,
-} from '@/lib/offline-storage';
 import { subscribeToFirestoreBook } from '@/lib/services/books';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -68,49 +61,6 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
   const [activePdfReaderMode, setActivePdfReaderMode] = useState<'sample' | 'full' | null>(null);
   const [activeMdReaderMode, setActiveMdReaderMode] = useState<'sample' | 'full' | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [readingProgress, setReadingProgress] = useState<ReadingProgressRecord | null>(() =>
-    getReadingProgressSync(initialBook.id)
-  );
-
-  // Load progress from IndexedDB and listen to reactive progress events
-  useEffect(() => {
-    let isMounted = true;
-    getReadingProgress(initialBook.id).then((rec) => {
-      if (isMounted && rec) {
-        setReadingProgress(rec);
-      }
-    });
-
-    const handleProgressUpdate = (e: Event) => {
-      const detail = (e as CustomEvent<ReadingProgressRecord>).detail;
-      if (detail && detail.bookId === initialBook.id) {
-        setReadingProgress(detail.progressPercentage > 0 ? detail : null);
-      }
-    };
-
-    window.addEventListener('reading-progress-updated', handleProgressUpdate);
-    return () => {
-      isMounted = false;
-      window.removeEventListener('reading-progress-updated', handleProgressUpdate);
-    };
-  }, [initialBook.id]);
-
-  const handleResumeReading = (progress: ReadingProgressRecord) => {
-    if (progress.format === 'pdf') {
-      const targetMode = progress.mode || (isPurchased ? 'full' : 'sample');
-      setActivePdfReaderMode(targetMode);
-    } else {
-      const targetMode = progress.mode || (isPurchased ? 'full' : 'sample');
-      setActiveMdReaderMode(targetMode);
-    }
-  };
-
-  const handleResetProgress = async () => {
-    await deleteReadingProgress(book.id);
-    setReadingProgress(null);
-    setToastMessage('Reading progress reset');
-    setTimeout(() => setToastMessage(null), 2500);
-  };
 
   useEffect(() => {
     try {
@@ -286,7 +236,7 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
   }, [rating]);
 
   return (
-    <div className="min-h-screen bg-white text-gray-900 pb-24 sm:pb-28 antialiased selection:bg-[#5e17eb] selection:text-white">
+    <div className="min-h-screen bg-white text-gray-900 pb-12 sm:pb-16 antialiased selection:bg-[#4029AB] selection:text-white">
       {/* 1. Dedicated Top Navigation Bar */}
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-gray-100 px-4 sm:px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3 min-w-0">
@@ -434,30 +384,19 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
               type="button"
               id="book-detail-cart-stat-btn"
               onClick={() => onAddToCart(book)}
-              className="flex flex-col items-center justify-center px-1 py-0.5 hover:bg-[#5e17eb]/5 transition-all active:scale-95 cursor-pointer"
+              className="flex flex-col items-center justify-center px-1 py-0.5 hover:bg-[#4029AB]/5 transition-all active:scale-95 cursor-pointer"
             >
               {isInCart ? (
-                <Check className="w-4 h-4 text-[#5e17eb]" />
+                <Check className="w-4 h-4 text-[#4029AB]" />
               ) : (
-                <ShoppingBag className="w-4 h-4 text-[#5e17eb]" />
+                <ShoppingBag className="w-4 h-4 text-[#4029AB]" />
               )}
-              <span className="text-[11px] font-bold text-[#5e17eb] mt-0.5 whitespace-nowrap">
+              <span className="text-[11px] font-bold text-[#4029AB] mt-0.5 whitespace-nowrap">
                 {isInCart ? 'In cart' : 'Add to cart'}
               </span>
             </button>
           </div>
         </section>
-
-        {/* Reading Progress Resume Card */}
-        {readingProgress && readingProgress.progressPercentage > 0 && (
-          <section className="pt-1">
-            <ReadingProgressCard
-              progress={readingProgress}
-              onResume={handleResumeReading}
-              onReset={handleResetProgress}
-            />
-          </section>
-        )}
 
         {/* 4. Action Buttons (Sample Switcher & Buy / Read) */}
         <section className="pt-1">
@@ -505,9 +444,9 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
                   onMouseEnter={() => loadRazorpayScript()}
                   onTouchStart={() => loadRazorpayScript()}
                   onClick={() => onBuyNow(book)}
-                  className="w-full h-10 rounded-full bg-white hover:bg-[#5e17eb]/5 text-[#5e17eb] border-2 border-[#5e17eb] text-xs sm:text-sm font-black transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                  className="w-full h-10 rounded-full bg-white hover:bg-[#4029AB]/5 text-[#4029AB] border-2 border-[#4029AB] text-xs sm:text-sm font-black transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
                 >
-                  <ShoppingBag className="w-4 h-4 text-[#5e17eb]" />
+                  <ShoppingBag className="w-4 h-4 text-[#4029AB]" />
                   <span>Buy (₹{book.buy_price})</span>
                 </button>
               )}
@@ -551,7 +490,7 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
                       strong: ({ children }) => <strong className="font-bold text-gray-950">{children}</strong>,
                       em: ({ children }) => <em className="italic text-gray-800">{children}</em>,
                       blockquote: ({ children }) => (
-                        <blockquote className="border-l-2 border-[#5e17eb] pl-3 italic text-gray-600 my-2">
+                        <blockquote className="border-l-2 border-[#4029AB] pl-3 italic text-gray-600 my-2">
                           {children}
                         </blockquote>
                       ),
@@ -561,7 +500,7 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
                         </code>
                       ),
                       a: ({ href, children }) => (
-                        <a href={href} className="text-[#5e17eb] underline font-medium hover:text-[#4d0ec5]">
+                        <a href={href} className="text-[#4029AB] underline font-medium hover:text-[#34208e]">
                           {children}
                         </a>
                       ),
@@ -601,7 +540,7 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
         {/* Frequently Asked Questions */}
         <section className="space-y-3 pt-4 border-t border-gray-100">
           <h2 className="text-base sm:text-lg font-bold text-gray-950 flex items-center gap-2">
-            <HelpCircle className="w-4 h-4 text-[#5e17eb]" />
+            <HelpCircle className="w-4 h-4 text-[#4029AB]" />
             <span>Frequently Asked Questions</span>
           </h2>
           <div className="space-y-2.5">
@@ -626,7 +565,7 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
 
             <button
               onClick={() => setShowReviewForm(!showReviewForm)}
-              className="text-xs font-bold text-[#5e17eb] hover:underline cursor-pointer"
+              className="text-xs font-bold text-[#4029AB] hover:underline cursor-pointer"
             >
               {showReviewForm ? 'Cancel' : 'Rate this book'}
             </button>
@@ -639,13 +578,13 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
               <span className="text-4xl sm:text-5xl font-black text-gray-950 tracking-tight leading-none">
                 {rating.toFixed(1)}
               </span>
-              <div className="flex items-center gap-0.5 mt-2 text-[#5e17eb]">
+              <div className="flex items-center gap-0.5 mt-2 text-[#4029AB]">
                 {[1, 2, 3, 4, 5].map((star) => (
                   <Star
                     key={star}
                     className={`w-3.5 h-3.5 ${
                       star <= Math.round(rating)
-                        ? 'fill-[#5e17eb] text-[#5e17eb]'
+                        ? 'fill-[#4029AB] text-[#4029AB]'
                         : 'text-gray-200 fill-gray-200'
                     }`}
                   />
@@ -665,7 +604,7 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
                   </span>
                   <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-[#5e17eb] rounded-full transition-all duration-500"
+                      className="h-full bg-[#4029AB] rounded-full transition-all duration-500"
                       style={{ width: `${bar.pct}%` }}
                     />
                   </div>
@@ -682,7 +621,7 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
                 onSubmit={handleAddReview}
-                className="p-4 rounded-xl border border-[#5e17eb]/20 bg-[#5e17eb]/5 space-y-3"
+                className="p-4 rounded-xl border border-[#4029AB]/20 bg-[#4029AB]/5 space-y-3"
               >
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-gray-900">Your Rating:</span>
@@ -711,7 +650,7 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
                   placeholder="Your Name (Optional)"
                   value={newReviewName}
                   onChange={(e) => setNewReviewName(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-lg border border-gray-200 bg-white focus:outline-none focus:border-[#5e17eb]"
+                  className="w-full px-3 py-2 text-xs rounded-lg border border-gray-200 bg-white focus:outline-none focus:border-[#4029AB]"
                 />
 
                 <textarea
@@ -720,12 +659,12 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
                   onChange={(e) => setNewReviewComment(e.target.value)}
                   rows={3}
                   required
-                  className="w-full px-3 py-2 text-xs rounded-lg border border-gray-200 bg-white focus:outline-none focus:border-[#5e17eb] resize-none"
+                  className="w-full px-3 py-2 text-xs rounded-lg border border-gray-200 bg-white focus:outline-none focus:border-[#4029AB] resize-none"
                 />
 
                 <button
                   type="submit"
-                  className="w-full py-2 rounded-lg bg-[#5e17eb] text-white text-xs font-bold hover:bg-[#4d0ec5] transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                  className="w-full py-2 rounded-lg bg-[#4029AB] text-white text-xs font-bold hover:bg-[#34208e] transition-all cursor-pointer flex items-center justify-center gap-1.5"
                 >
                   <Send className="w-3.5 h-3.5" />
                   <span>Post Review</span>
@@ -760,7 +699,7 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
                           />
                         </div>
                       ) : (
-                        <div className="w-8 h-8 rounded-full bg-[#5e17eb]/10 text-[#5e17eb] flex items-center justify-center font-bold text-xs shrink-0">
+                        <div className="w-8 h-8 rounded-full bg-[#4029AB]/10 text-[#4029AB] flex items-center justify-center font-bold text-xs shrink-0">
                           {rev.user.charAt(0).toUpperCase()}
                         </div>
                       )}
@@ -777,13 +716,13 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
 
                   {/* Rating Stars + Date */}
                   <div className="flex items-center gap-2 text-xs">
-                    <div className="flex items-center gap-0.5 text-[#5e17eb]">
+                    <div className="flex items-center gap-0.5 text-[#4029AB]">
                       {[1, 2, 3, 4, 5].map((s) => (
                         <Star
                           key={s}
                           className={`w-3 h-3 ${
                             s <= rev.rating
-                              ? 'fill-[#5e17eb] text-[#5e17eb]'
+                              ? 'fill-[#4029AB] text-[#4029AB]'
                               : 'text-gray-200 fill-gray-200'
                           }`}
                         />
@@ -828,7 +767,7 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
                       referrerPolicy="no-referrer"
                     />
                   </div>
-                  <h4 className="text-[11px] font-bold text-gray-900 truncate mt-1.5 group-hover:text-[#5e17eb]">
+                  <h4 className="text-[11px] font-bold text-gray-900 truncate mt-1.5 group-hover:text-[#4029AB]">
                     {relBook.title}
                   </h4>
                   <span className="text-[10px] text-gray-500 font-semibold">
@@ -852,7 +791,6 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
             onBuyNow(b);
           }}
           isPurchased={isPurchased}
-          initialPage={readingProgress?.page}
         />
       )}
 
@@ -867,7 +805,6 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
             onBuyNow(b);
           }}
           isPurchased={isPurchased}
-          initialSectionIndex={readingProgress?.sectionIndex}
         />
       )}
 

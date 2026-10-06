@@ -67,12 +67,12 @@ export const IOSInstallGuideModal: React.FC<IOSInstallGuideModalProps> = ({
           {/* Step by step guide */}
           <div className="space-y-3 pt-1">
             <div className="flex items-start gap-3 p-3 rounded-2xl bg-gray-50 border border-gray-100">
-              <div className="w-8 h-8 rounded-xl bg-[#5e17eb] text-white flex items-center justify-center font-bold text-xs shrink-0 mt-0.5 shadow-2xs">
+              <div className="w-8 h-8 rounded-xl bg-[#4029AB] text-white flex items-center justify-center font-bold text-xs shrink-0 mt-0.5 shadow-2xs">
                 1
               </div>
               <div className="flex-1 text-xs">
                 <p className="font-bold text-gray-900 flex items-center gap-1.5">
-                  Tap the Safari Share button <Share2 className="w-3.5 h-3.5 text-[#5e17eb]" />
+                  Tap the Safari Share button <Share2 className="w-3.5 h-3.5 text-[#4029AB]" />
                 </p>
                 <p className="text-gray-500 text-[11px] mt-0.5">
                   Located at the bottom of your Safari browser bar (or top right on iPad).
@@ -81,12 +81,12 @@ export const IOSInstallGuideModal: React.FC<IOSInstallGuideModalProps> = ({
             </div>
 
             <div className="flex items-start gap-3 p-3 rounded-2xl bg-gray-50 border border-gray-100">
-              <div className="w-8 h-8 rounded-xl bg-[#5e17eb] text-white flex items-center justify-center font-bold text-xs shrink-0 mt-0.5 shadow-2xs">
+              <div className="w-8 h-8 rounded-xl bg-[#4029AB] text-white flex items-center justify-center font-bold text-xs shrink-0 mt-0.5 shadow-2xs">
                 2
               </div>
               <div className="flex-1 text-xs">
                 <p className="font-bold text-gray-900 flex items-center gap-1.5">
-                  Select &quot;Add to Home Screen&quot; <PlusSquare className="w-3.5 h-3.5 text-[#5e17eb]" />
+                  Select &quot;Add to Home Screen&quot; <PlusSquare className="w-3.5 h-3.5 text-[#4029AB]" />
                 </p>
                 <p className="text-gray-500 text-[11px] mt-0.5">
                   Scroll down the share menu options and tap &quot;Add to Home Screen&quot;.
@@ -94,12 +94,12 @@ export const IOSInstallGuideModal: React.FC<IOSInstallGuideModalProps> = ({
               </div>
             </div>
 
-            <div className="flex items-start gap-3 p-3 rounded-2xl bg-[#5e17eb]/5 border border-[#5e17eb]/15">
-              <div className="w-8 h-8 rounded-xl bg-[#5e17eb] text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+            <div className="flex items-start gap-3 p-3 rounded-2xl bg-[#4029AB]/5 border border-[#4029AB]/15">
+              <div className="w-8 h-8 rounded-xl bg-[#4029AB] text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
                 <CheckCircle2 className="w-4 h-4" />
               </div>
               <div className="flex-1 text-xs">
-                <p className="font-bold text-[#5e17eb]">
+                <p className="font-bold text-[#4029AB]">
                   Launch Like a Native App
                 </p>
                 <p className="text-gray-600 text-[11px] mt-0.5">
@@ -111,7 +111,7 @@ export const IOSInstallGuideModal: React.FC<IOSInstallGuideModalProps> = ({
 
           <button
             onClick={onClose}
-            className="w-full py-3 bg-[#5e17eb] hover:bg-[#4d0ec5] active:scale-98 text-white rounded-2xl text-xs font-bold transition-all shadow-xs cursor-pointer text-center"
+            className="w-full py-3 bg-[#4029AB] hover:bg-[#34208e] active:scale-98 text-white rounded-2xl text-xs font-bold transition-all shadow-xs cursor-pointer text-center"
           >
             Got it, thanks!
           </button>

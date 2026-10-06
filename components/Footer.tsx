@@ -13,29 +13,29 @@ export const Footer: React.FC<FooterProps> = () => {
       <div className="max-w-5xl mx-auto px-4 sm:px-6 text-center sm:text-left space-y-3 text-xs leading-relaxed">
         {/* Navigation & Legal Links */}
         <div className="flex flex-wrap items-center justify-center sm:justify-start gap-x-4 gap-y-1.5 text-xs font-semibold text-gray-700">
-          <Link href="/privacy-policy" className="hover:text-[#5e17eb] transition-colors">
+          <Link href="/privacy-policy" className="hover:text-[#4029AB] transition-colors">
             Privacy Policy
           </Link>
           <span className="text-gray-300 select-none">•</span>
-          <Link href="/terms-and-conditions" className="hover:text-[#5e17eb] transition-colors">
+          <Link href="/terms-and-conditions" className="hover:text-[#4029AB] transition-colors">
             Terms of Service
           </Link>
           <span className="text-gray-300 select-none">•</span>
-          <Link href="/refund-policy" className="hover:text-[#5e17eb] transition-colors">
+          <Link href="/refund-policy" className="hover:text-[#4029AB] transition-colors">
             Refund & Cancellation Policy
           </Link>
           <span className="text-gray-300 select-none">•</span>
-          <Link href="/license-agreement" className="hover:text-[#5e17eb] transition-colors">
+          <Link href="/license-agreement" className="hover:text-[#4029AB] transition-colors">
             License Agreement
           </Link>
           <span className="text-gray-300 select-none">•</span>
-          <Link href="/contact" className="hover:text-[#5e17eb] transition-colors">
+          <Link href="/contact" className="hover:text-[#4029AB] transition-colors">
             Contact Us
           </Link>
           <span className="text-gray-300 select-none">•</span>
           <a
             href="mailto:support@exam-kart.com"
-            className="hover:text-[#5e17eb] transition-colors font-medium"
+            className="hover:text-[#4029AB] transition-colors font-medium"
           >
             support@exam-kart.com
           </a>

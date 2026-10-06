@@ -42,7 +42,7 @@ export function generateWebsiteSchema() {
         url: SITE_URL,
         logo: {
           '@type': 'ImageObject',
-          url: `${SITE_URL}/logo.png`,
+          url: `${SITE_URL}/icon.png`,
           caption: `${BRAND_NAME} - ${SITE_NAME}`,
         },
         contactPoint: {
