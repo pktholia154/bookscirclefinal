@@ -1,5 +1,5 @@
 // BooksCircle Service Worker (Static Media Assets Only)
-const CACHE_NAME = 'bookscircle-v5';
+const CACHE_NAME = 'bookscircle-v7';
 const STATIC_ASSETS = [
   '/manifest.json',
   '/logo.png',
@@ -68,12 +68,10 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Network-First strategy with cache fallback to guarantee fresh logos on publish
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
-      return fetch(event.request).then((networkResponse) => {
+    fetch(event.request)
+      .then((networkResponse) => {
         if (networkResponse && networkResponse.status === 200) {
           const responseToCache = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => {
@@ -81,7 +79,7 @@ self.addEventListener('fetch', (event) => {
           });
         }
         return networkResponse;
-      });
-    })
+      })
+      .catch(() => caches.match(event.request))
   );
 });

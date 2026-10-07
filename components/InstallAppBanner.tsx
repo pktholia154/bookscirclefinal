@@ -69,7 +69,7 @@ export const InstallAppBanner: React.FC<InstallAppBannerProps> = ({
             {/* App Icon */}
             <div className="relative w-11 h-11 sm:w-13 sm:h-13 rounded-xl sm:rounded-2xl overflow-hidden bg-transparent shadow-xs shrink-0 flex items-center justify-center">
               <Image
-                src="/booksCircle (2).png"
+                src="/logo.png"
                 alt="BooksCircle App Icon"
                 width={48}
                 height={48}
