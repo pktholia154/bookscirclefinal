@@ -7,7 +7,7 @@
   "display": "standalone",
   "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
   "background_color": "#FFFFFF",
-  "theme_color": "#4029AB",
+  "theme_color": "#5e17eb",
   "orientation": "portrait-primary",
   "scope": "/",
   "categories": ["education", "books", "shopping"],

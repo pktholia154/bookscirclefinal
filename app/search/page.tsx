@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { DedicatedSearchView } from '@/components/DedicatedSearchView';
 import { BookDetailPage } from '@/components/BookDetailPage';
 import { CartDrawer } from '@/components/CartDrawer';
-import { BottomNav } from '@/components/BottomNav';
+import { BottomNav, TabKey } from '@/components/BottomNav';
 import { GoogleSignInModal } from '@/components/GoogleSignInModal';
 import { Book, Category, CartItem } from '@/lib/types';
 import { INITIAL_BOOKS, INITIAL_CATEGORIES } from '@/lib/data';
@@ -183,17 +183,33 @@ function SearchPageContent() {
   const cartBookIds = new Set(cart.map((i) => i.book.id));
   const totalCartCount = cart.reduce((acc, i) => acc + i.quantity, 0);
 
+  const handleTabChange = (tab: TabKey) => {
+    if (tab === 'cart') {
+      setIsCartOpen(true);
+      return;
+    }
+    if (tab === 'home') {
+      router.push('/');
+      return;
+    }
+    if (tab === 'search') {
+      setSelectedBook(null);
+      return;
+    }
+    router.push(`/?tab=${tab}`);
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-white flex flex-col items-center justify-center gap-3">
-        <RefreshCw className="w-8 h-8 text-[#4029AB] animate-spin" />
+        <RefreshCw className="w-8 h-8 text-[#5e17eb] animate-spin" />
         <p className="text-xs font-bold text-gray-500">Loading BooksCircle Search...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-white text-gray-900 pb-20">
+    <div className="min-h-screen bg-white text-gray-900 pb-24 sm:pb-28">
       {selectedBook ? (
         <BookDetailPage
           book={selectedBook}
@@ -262,6 +278,13 @@ function SearchPageContent() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Fixed High Density Bottom Navigation */}
+      <BottomNav
+        activeTab={selectedBook ? 'book' : 'search'}
+        onTabChange={handleTabChange}
+        cartCount={totalCartCount}
+      />
     </div>
   );
 }
@@ -271,7 +294,7 @@ export default function SearchPage() {
     <Suspense
       fallback={
         <div className="min-h-screen bg-white flex items-center justify-center">
-          <RefreshCw className="w-8 h-8 text-[#4029AB] animate-spin" />
+          <RefreshCw className="w-8 h-8 text-[#5e17eb] animate-spin" />
         </div>
       }
     >

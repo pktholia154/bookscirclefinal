@@ -20,6 +20,7 @@ interface HeaderProps {
   currentUser: UserProfile | null;
   onGoogleSignIn: () => void;
   onNavigateToProfile: () => void;
+  onNavigateToHome?: () => void;
   onOpenDedicatedSearch?: () => void;
   isInstallable?: boolean;
   onInstall?: () => void;
@@ -43,6 +44,7 @@ export const Header: React.FC<HeaderProps> = ({
   currentUser,
   onGoogleSignIn,
   onNavigateToProfile,
+  onNavigateToHome,
   onOpenDedicatedSearch,
   isInstallable = false,
   onInstall,
@@ -74,8 +76,14 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Main Top Header Bar (Brand + Actions) */}
       <div className="flex items-center justify-between px-4 sm:px-6 py-2 gap-2 sm:gap-3">
         {/* Brand Logo & Name */}
-        <div onClick={onNavigateToProfile} className="flex items-center gap-2 cursor-pointer select-none group">
-          <div className="relative w-7 h-7 sm:w-8 sm:h-8 shrink-0 rounded-lg overflow-hidden shadow-xs transition-transform group-hover:scale-105">
+        <div
+          onClick={() => {
+            if (onNavigateToHome) onNavigateToHome();
+            else onNavigateToProfile();
+          }}
+          className="flex items-center gap-2.5 cursor-pointer select-none group"
+        >
+          <div className="relative w-8 h-8 sm:w-9 sm:h-9 shrink-0 transition-transform group-hover:scale-105">
             <Image
               src="/logo.svg"
               alt="BooksCircle Logo"

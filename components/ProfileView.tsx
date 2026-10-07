@@ -188,7 +188,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               </div>
             </div>
           ) : (
-            <div className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-[#4029AB] text-white flex items-center justify-center text-xl sm:text-2xl font-black shrink-0">
+            <div className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-[#5e17eb] text-white flex items-center justify-center text-xl sm:text-2xl font-black shrink-0">
               <span>{userInitial}</span>
               {currentUser && (
                 <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center border-2 border-white">
@@ -228,7 +228,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               id="profile-login-btn"
               onClick={handleGoogleAuth}
               disabled={isSigningIn}
-              className="px-4 py-2 bg-[#4029AB] hover:bg-[#34208e] text-white text-xs font-bold rounded-xl shadow-xs active:scale-95 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-60"
+              className="px-4 py-2 bg-[#5e17eb] hover:bg-[#4d0ec5] text-white text-xs font-bold rounded-xl shadow-xs active:scale-95 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-60"
             >
               {isSigningIn ? (
                 <RefreshCw className="w-3.5 h-3.5 animate-spin text-white" />
@@ -257,7 +257,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       <section id="profile-share-section" className="space-y-3 pb-6 border-b border-gray-100">
         <div>
           <h3 className="text-sm font-bold text-gray-950 flex items-center gap-1.5">
-            <Share2 className="w-4 h-4 text-[#4029AB]" />
+            <Share2 className="w-4 h-4 text-[#5e17eb]" />
             <span>Share BooksCircle App</span>
           </h3>
           <p className="text-xs text-gray-500 mt-0.5">
@@ -315,7 +315,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           {/* Top Row: Icon, Title & Number of Books */}
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <Heart className="w-4 h-4 text-[#4029AB] fill-[#4029AB]" />
+              <Heart className="w-4 h-4 text-[#5e17eb] fill-[#5e17eb]" />
               <h3 className="text-base font-bold text-gray-950">
                 My Saved Wishlist
               </h3>
@@ -361,10 +361,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
                 {/* Details */}
                 <div className="flex-1 min-w-0">
-                  <span className="text-[9px] font-bold text-[#4029AB] uppercase tracking-wider">
+                  <span className="text-[9px] font-bold text-[#5e17eb] uppercase tracking-wider">
                     {book.category}
                   </span>
-                  <h4 className="text-xs sm:text-sm font-bold text-gray-900 line-clamp-1 group-hover:text-[#4029AB] transition-colors">
+                  <h4 className="text-xs sm:text-sm font-bold text-gray-900 line-clamp-1 group-hover:text-[#5e17eb] transition-colors">
                     {book.title}
                   </h4>
                   <div className="flex items-baseline gap-1.5 mt-0.5">
@@ -389,8 +389,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                       }}
                       className={`p-2 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
                         cartBookIds.has(book.id)
-                          ? 'bg-[#4029AB] text-white border-[#4029AB]'
-                          : 'border-gray-200 text-gray-700 bg-white hover:border-[#4029AB] hover:text-[#4029AB]'
+                          ? 'bg-[#5e17eb] text-white border-[#5e17eb]'
+                          : 'border-gray-200 text-gray-700 bg-white hover:border-[#5e17eb] hover:text-[#5e17eb]'
                       }`}
                       title={cartBookIds.has(book.id) ? 'In Cart' : 'Add to Cart'}
                       aria-label="Add to cart"
@@ -405,7 +405,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                         e.stopPropagation();
                         onBuyNow(book);
                       }}
-                      className="px-2.5 py-1.5 bg-[#4029AB] hover:bg-[#34208e] text-white text-[10px] font-bold rounded-lg transition-all active:scale-95 cursor-pointer shadow-2xs"
+                      className="px-2.5 py-1.5 bg-[#5e17eb] hover:bg-[#4d0ec5] text-white text-[10px] font-bold rounded-lg transition-all active:scale-95 cursor-pointer shadow-2xs"
                     >
                       Buy Now
                     </button>

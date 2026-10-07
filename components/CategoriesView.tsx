@@ -75,7 +75,7 @@ export const CategoriesView: React.FC<CategoriesViewProps> = ({
           <h1 className="text-xl sm:text-2xl font-black text-gray-950 tracking-tight">
             Book Categories
           </h1>
-          <span className="bg-[#4029AB]/10 text-[#4029AB] text-[11px] font-bold px-2.5 py-0.5 rounded-full">
+          <span className="bg-[#5e17eb]/10 text-[#5e17eb] text-[11px] font-bold px-2.5 py-0.5 rounded-full">
             {categories.length} Categories
           </span>
         </div>
@@ -93,8 +93,8 @@ export const CategoriesView: React.FC<CategoriesViewProps> = ({
             onClick={() => handleSelectCat('all')}
             className={`px-4 py-2 rounded-full text-sm sm:text-[15px] font-bold transition-all duration-150 active:scale-95 flex items-center gap-1.5 cursor-pointer ${
               selectedCat === 'all'
-                ? 'bg-[#4029AB] text-white shadow-2xs'
-                : 'bg-transparent text-gray-800 hover:text-[#4029AB] hover:bg-gray-100/60 border border-gray-200/80'
+                ? 'bg-[#5e17eb] text-white shadow-2xs'
+                : 'bg-transparent text-gray-800 hover:text-[#5e17eb] hover:bg-gray-100/60 border border-gray-200/80'
             }`}
           >
             <Layers className="w-4 h-4" />
@@ -120,8 +120,8 @@ export const CategoriesView: React.FC<CategoriesViewProps> = ({
                 onClick={() => handleSelectCat(cat.title)}
                 className={`px-4 py-2 rounded-full text-sm sm:text-[15px] font-bold transition-all duration-150 active:scale-95 flex items-center gap-1.5 cursor-pointer ${
                   isSelected
-                    ? 'bg-[#4029AB] text-white shadow-2xs'
-                    : 'bg-transparent text-gray-800 hover:text-[#4029AB] hover:bg-gray-100/60 border border-gray-200/80'
+                    ? 'bg-[#5e17eb] text-white shadow-2xs'
+                    : 'bg-transparent text-gray-800 hover:text-[#5e17eb] hover:bg-gray-100/60 border border-gray-200/80'
                 }`}
               >
                 <span>{cat.title}</span>
@@ -159,7 +159,7 @@ export const CategoriesView: React.FC<CategoriesViewProps> = ({
                   categories.find((c) => c.title.toLowerCase() === selectedCat.toLowerCase())?.id ||
                   selectedCat
               )}`}
-              className="text-xs font-bold text-[#4029AB] hover:text-[#32208a] flex items-center gap-1 bg-[#4029AB]/10 hover:bg-[#4029AB]/15 px-3 py-1.5 rounded-full transition-all"
+              className="text-xs font-bold text-[#5e17eb] hover:text-[#32208a] flex items-center gap-1 bg-[#5e17eb]/10 hover:bg-[#5e17eb]/15 px-3 py-1.5 rounded-full transition-all"
             >
               <span>Dedicated Page</span>
               <ChevronRight className="w-3.5 h-3.5" />
@@ -173,7 +173,7 @@ export const CategoriesView: React.FC<CategoriesViewProps> = ({
             <p className="text-xs text-gray-600 font-bold">No books found in this category.</p>
             <button
               onClick={() => handleSelectCat('all')}
-              className="text-xs font-bold text-[#4029AB] hover:underline cursor-pointer"
+              className="text-xs font-bold text-[#5e17eb] hover:underline cursor-pointer"
             >
               Show all books
             </button>
@@ -189,7 +189,7 @@ export const CategoriesView: React.FC<CategoriesViewProps> = ({
                     key={book.id}
                     id={`cat-book-${book.id}`}
                     onClick={() => onSelectBook(book)}
-                    className="flex items-start gap-3 p-3 rounded-2xl border border-gray-200 bg-white hover:border-[#4029AB]/40 hover:shadow-xs cursor-pointer transition-all active:scale-[0.99] group"
+                    className="flex items-start gap-3 p-3 rounded-2xl border border-gray-200 bg-white hover:border-[#5e17eb]/40 hover:shadow-xs cursor-pointer transition-all active:scale-[0.99] group"
                   >
                     {/* Sharp 3:4 Cover (No price on cover) */}
                     <div className="relative w-14 sm:w-16 aspect-[3/4] rounded-none overflow-hidden shrink-0 self-start bg-gray-100 border border-gray-200 shadow-2xs">
@@ -208,7 +208,7 @@ export const CategoriesView: React.FC<CategoriesViewProps> = ({
                     <div className="flex-1 min-w-0 flex flex-col justify-between self-stretch">
                       <div>
                         <h4
-                          className="font-bold text-sm sm:text-base text-gray-950 truncate leading-snug group-hover:text-[#4029AB] transition-colors"
+                          className="font-bold text-sm sm:text-base text-gray-950 truncate leading-snug group-hover:text-[#5e17eb] transition-colors"
                           title={book.title}
                         >
                           {book.title}
@@ -255,8 +255,8 @@ export const CategoriesView: React.FC<CategoriesViewProps> = ({
                                 }}
                                 className={`p-1.5 sm:p-2 rounded-lg border transition-all active:scale-90 cursor-pointer ${
                                   inCart
-                                    ? 'bg-[#4029AB] text-white border-[#4029AB]'
-                                    : 'border-gray-200 text-gray-700 bg-white hover:border-[#4029AB] hover:text-[#4029AB]'
+                                    ? 'bg-[#5e17eb] text-white border-[#5e17eb]'
+                                    : 'border-gray-200 text-gray-700 bg-white hover:border-[#5e17eb] hover:text-[#5e17eb]'
                                 }`}
                                 title={inCart ? 'In Cart (Click to toggle)' : 'Add to Cart'}
                               >
@@ -274,7 +274,7 @@ export const CategoriesView: React.FC<CategoriesViewProps> = ({
                                     e.stopPropagation();
                                     onBuyNow(book);
                                   }}
-                                  className="px-3 sm:px-3.5 py-1.5 bg-[#4029AB] hover:bg-[#34208e] text-white text-xs rounded-lg font-bold uppercase tracking-wider active:scale-95 transition-all shadow-2xs cursor-pointer"
+                                  className="px-3 sm:px-3.5 py-1.5 bg-[#5e17eb] hover:bg-[#4d0ec5] text-white text-xs rounded-lg font-bold uppercase tracking-wider active:scale-95 transition-all shadow-2xs cursor-pointer"
                                 >
                                   Buy
                                 </button>
@@ -295,7 +295,7 @@ export const CategoriesView: React.FC<CategoriesViewProps> = ({
                 <button
                   id="btn-load-more-categories"
                   onClick={() => setVisibleCount((prev) => prev + 12)}
-                  className="px-6 py-2.5 rounded-xl bg-gray-50 border border-gray-200 hover:border-[#4029AB] text-gray-800 hover:text-[#4029AB] text-xs font-bold transition-all active:scale-95 shadow-2xs cursor-pointer flex items-center gap-2"
+                  className="px-6 py-2.5 rounded-xl bg-gray-50 border border-gray-200 hover:border-[#5e17eb] text-gray-800 hover:text-[#5e17eb] text-xs font-bold transition-all active:scale-95 shadow-2xs cursor-pointer flex items-center gap-2"
                 >
                   <span>Load More Books ({filteredBooks.length - visibleCount} remaining)</span>
                   <ChevronRight className="w-3.5 h-3.5" />

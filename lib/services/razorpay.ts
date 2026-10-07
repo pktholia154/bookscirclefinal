@@ -241,7 +241,7 @@ export async function processRazorpayPayment(options: RazorpayCheckoutOptions): 
         item_count: bookIds.length.toString(),
       },
       theme: {
-        color: '#4029AB', // BooksCircle theme purple
+        color: '#5e17eb', // BooksCircle theme vibrant purple
       },
       modal: {
         ondismiss: function () {

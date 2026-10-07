@@ -2,10 +2,10 @@
 
 @layer base {
   :root {
-    --primary-color: #4029AB;
-    --primary-color-light: #5238D1;
-    --primary-color-dark: #2E1B85;
-    --primary-color-subtle: #F3F1FD;
+    --primary-color: #5e17eb;
+    --primary-color-light: #7028FF;
+    --primary-color-dark: #4d0ec5;
+    --primary-color-subtle: #F5F0FF;
   }
 
   html, body {

@@ -27,6 +27,10 @@ import { DEFAULT_BOOK_COVER, BOOK_FAQS } from '@/lib/data';
 import { PDFReaderModal } from '@/components/PDFReaderModal';
 import { MarkdownReaderModal } from '@/components/MarkdownReaderModal';
 import { SampleSwitcher } from '@/components/SampleSwitcher';
+import { InstallAppBanner } from '@/components/InstallAppBanner';
+import { IOSInstallGuideModal } from '@/components/IOSInstallGuideModal';
+import { InstallSuccessModal } from '@/components/InstallSuccessModal';
+import { usePWAInstall } from '@/hooks/use-pwa-install';
 import { loadRazorpayScript } from '@/lib/services/razorpay';
 import { getWishlistIdsFromLocal, toggleWishlistAction, subscribeToWishlistChanges } from '@/lib/services/wishlist';
 import { subscribeToFirestoreBook } from '@/lib/services/books';
@@ -61,6 +65,16 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
   const [activePdfReaderMode, setActivePdfReaderMode] = useState<'sample' | 'full' | null>(null);
   const [activeMdReaderMode, setActiveMdReaderMode] = useState<'sample' | 'full' | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // PWA Install prompt handling
+  const {
+    isInstallable,
+    isIOSPromptOpen,
+    isInstallSuccessOpen,
+    promptInstall,
+    closeIOSPrompt,
+    closeInstallSuccess,
+  } = usePWAInstall();
 
   useEffect(() => {
     try {
@@ -408,11 +422,14 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
             />
 
             {/* Right: Full Edition (Buy Now or Read Full) */}
-            <div className="flex flex-col gap-1.5 w-full">
-              {/* Attached label at top left in simple text small font size */}
+            <div className="flex flex-col gap-1 w-full">
+              {/* Attached FULL EDITION tag text at top left corner in small light font */}
               <div className="flex items-center justify-start px-0.5">
-                <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wide select-none">
-                  {isPurchased ? 'Unlocked' : 'Full edition'}
+                <span
+                  id="full-edition-label-text"
+                  className="text-[10px] sm:text-[11px] font-medium text-gray-500 uppercase tracking-wider select-none"
+                >
+                  FULL EDITION
                 </span>
               </div>
 
@@ -453,6 +470,15 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
             </div>
           </div>
         </section>
+
+        {/* App Install Banner (Same as home page, below Sample and Buy/Full Edition button row) */}
+        <div className="pt-2">
+          <InstallAppBanner
+            onInstall={promptInstall}
+            isInstallable={isInstallable}
+            className="!px-0 !pt-0 !pb-0"
+          />
+        </div>
 
         {/* 5. "About this book" Section */}
         <section className="space-y-3.5 pt-2">
@@ -807,6 +833,18 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
           isPurchased={isPurchased}
         />
       )}
+
+      {/* iOS Install Guide Sheet */}
+      <IOSInstallGuideModal
+        isOpen={isIOSPromptOpen}
+        onClose={closeIOSPrompt}
+      />
+
+      {/* Install Success Modal */}
+      <InstallSuccessModal
+        isOpen={isInstallSuccessOpen}
+        onClose={closeInstallSuccess}
+      />
 
       {/* Toast Notification */}
       <AnimatePresence>

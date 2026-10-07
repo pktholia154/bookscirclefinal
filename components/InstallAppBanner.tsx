@@ -67,13 +67,13 @@ export const InstallAppBanner: React.FC<InstallAppBannerProps> = ({
           {/* Left: App Icon + App Meta */}
           <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0 flex-1">
             {/* App Icon */}
-            <div className="relative w-11 h-11 sm:w-13 sm:h-13 rounded-xl sm:rounded-2xl overflow-hidden bg-white border border-[#4029AB]/20 shadow-xs shrink-0 flex items-center justify-center p-1">
+            <div className="relative w-11 h-11 sm:w-13 sm:h-13 rounded-xl sm:rounded-2xl overflow-hidden bg-white border border-[#4029AB]/20 shadow-xs shrink-0 flex items-center justify-center p-1.5">
               <Image
-                src="/icon-192.png"
+                src="/logo.svg"
                 alt="BooksCircle App Icon"
                 width={48}
                 height={48}
-                className="object-contain rounded-lg"
+                className="object-contain"
                 priority
               />
             </div>

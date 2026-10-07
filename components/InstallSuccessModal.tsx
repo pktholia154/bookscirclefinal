@@ -46,13 +46,13 @@ export const InstallSuccessModal: React.FC<InstallSuccessModalProps> = ({
 
           {/* App Icon with Success Badge */}
           <div className="relative mt-1">
-            <div className="w-16 h-16 rounded-2xl overflow-hidden bg-white border border-[#4029AB]/20 shadow-md flex items-center justify-center p-1.5">
+            <div className="w-16 h-16 rounded-2xl overflow-hidden bg-white border border-[#4029AB]/20 shadow-md flex items-center justify-center p-2">
               <Image
-                src="/icon-192.png"
+                src="/logo.svg"
                 alt="BooksCircle"
                 width={56}
                 height={56}
-                className="object-contain rounded-xl"
+                className="object-contain"
                 priority
               />
             </div>

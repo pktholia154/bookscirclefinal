@@ -35,30 +35,15 @@ export const SampleSwitcher: React.FC<SampleSwitcherProps> = ({
   }, []);
 
   return (
-    <div className={`flex flex-col gap-1.5 w-full ${className}`}>
-      {/* Attached label at top left in simple text small font size */}
+    <div className={`flex flex-col gap-1 w-full ${className}`}>
+      {/* Attached SAMPLE tag text at top left corner in small light font */}
       <div className="flex items-center justify-start px-0.5">
-        <motion.span
+        <span
           id="sample-label-text"
-          initial={hasAnimated ? false : { opacity: 0.6 }}
-          animate={
-            hasAnimated
-              ? { opacity: 1 }
-              : {
-                  opacity: [1, 0.2, 1, 0.2, 1, 0.4, 1],
-                  color: ['#4029AB', '#9ca3af', '#4029AB', '#9ca3af', '#4029AB', '#6b7280', '#6b7280'],
-                }
-          }
-          transition={{
-            duration: 2.2,
-            times: [0, 0.16, 0.33, 0.5, 0.66, 0.83, 1],
-            ease: 'easeInOut',
-            repeat: 0,
-          }}
-          className="text-[11px] font-bold text-gray-500 uppercase tracking-wide select-none"
+          className="text-[10px] sm:text-[11px] font-medium text-gray-500 uppercase tracking-wider select-none"
         >
-          Sample
-        </motion.span>
+          SAMPLE
+        </span>
       </div>
 
       {/* 2. Split Capsule with Clickable "PDF" and "epub" (Markdown) Buttons */}

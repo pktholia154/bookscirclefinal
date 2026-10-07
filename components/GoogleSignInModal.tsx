@@ -135,10 +135,10 @@ export const GoogleSignInModal: React.FC<LoginModalProps> = ({
                 id="modal-dominating-google-btn"
                 onClick={handleGoogleDirect}
                 disabled={isSubmittingGoogle}
-                className="w-full py-3.5 px-4 rounded-2xl bg-white hover:bg-gray-50 border-2 border-gray-200 hover:border-[#4029AB] text-gray-900 text-sm font-bold flex items-center justify-center gap-3 shadow-xs hover:shadow-md transition-all active:scale-98 cursor-pointer disabled:opacity-60 group"
+                className="w-full py-3.5 px-4 rounded-2xl bg-white hover:bg-gray-50 border-2 border-gray-200 hover:border-[#5e17eb] text-gray-900 text-sm font-bold flex items-center justify-center gap-3 shadow-xs hover:shadow-md transition-all active:scale-98 cursor-pointer disabled:opacity-60 group"
               >
                 {isSubmittingGoogle ? (
-                  <RefreshCw className="w-5 h-5 animate-spin text-[#4029AB]" />
+                  <RefreshCw className="w-5 h-5 animate-spin text-[#5e17eb]" />
                 ) : (
                   <GoogleIcon className="w-5 h-5 shrink-0 group-hover:scale-105 transition-transform" />
                 )}
