@@ -1,5 +1,6 @@
 import { Metadata } from 'next';
 import { getBooksFromFirestore, getCategoriesFromFirestore } from '@/lib/services/books';
+import { fetchTotalSalesCountMap } from '@/lib/services/purchases';
 import { INITIAL_BOOKS, INITIAL_CATEGORIES } from '@/lib/data';
 import { Book, Category } from '@/lib/types';
 import { generateCategorySchema, SITE_URL, SITE_NAME } from '@/lib/seo';
@@ -93,8 +94,23 @@ export default async function CollectionPage({ params }: Props) {
   } else if (colKey === 'top-rated') {
     collectionBooks.sort((a, b) => (b.rating || 0) - (a.rating || 0));
   } else if (colKey === 'best-sellers' || colKey === 'bestsellers') {
-    collectionBooks = collectionBooks.filter((b) => b.is_bestseller || b.badge === 'Bestseller' || (b.rating_count || 0) > 200);
-    if (collectionBooks.length === 0) collectionBooks = books;
+    let salesMap: Record<string, number> = {};
+    try {
+      salesMap = await fetchTotalSalesCountMap();
+    } catch {}
+    const withSales = collectionBooks
+      .map((b) => ({
+        ...b,
+        sold_count:
+          salesMap[b.id] ||
+          salesMap[b.slug] ||
+          salesMap[b.seoslug || ''] ||
+          b.sold_count ||
+          0,
+      }))
+      .filter((b) => (b.sold_count || 0) > 0)
+      .sort((a, b) => (b.sold_count || 0) - (a.sold_count || 0));
+    collectionBooks = withSales.length > 0 ? withSales : collectionBooks;
   }
 
   const jsonLd = generateCategorySchema(

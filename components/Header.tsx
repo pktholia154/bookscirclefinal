@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
-import { Search, ShoppingCart, X, LogIn, Sparkles, Download } from 'lucide-react';
+import { Search, ShoppingCart, X, LogIn, Sparkles, Download, Upload } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 export interface UserProfile {
@@ -71,28 +71,120 @@ export const Header: React.FC<HeaderProps> = ({
     }
   };
 
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [logoTimestamp, setLogoTimestamp] = useState<number | null>(null);
+  const [isDragOver, setIsDragOver] = useState<boolean>(false);
+
+  const uploadLogoFile = async (file: File) => {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/upload-logo', {
+        method: 'POST',
+        body: formData,
+      });
+      if (res.ok) {
+        setLogoTimestamp(Date.now());
+      }
+    } catch (e) {
+      console.warn('Upload logo error:', e);
+    }
+  };
+
+  const handleLogoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      uploadLogoFile(file);
+    }
+  };
+
+  useEffect(() => {
+    const handleDragOver = (e: DragEvent) => {
+      e.preventDefault();
+      setIsDragOver(true);
+    };
+    const handleDragLeave = (e: DragEvent) => {
+      e.preventDefault();
+      setIsDragOver(false);
+    };
+    const handleDrop = (e: DragEvent) => {
+      e.preventDefault();
+      setIsDragOver(false);
+      const file = e.dataTransfer?.files?.[0];
+      if (file && file.type.startsWith('image/')) {
+        uploadLogoFile(file);
+      }
+    };
+
+    window.addEventListener('dragover', handleDragOver);
+    window.addEventListener('dragleave', handleDragLeave);
+    window.addEventListener('drop', handleDrop);
+    return () => {
+      window.removeEventListener('dragover', handleDragOver);
+      window.removeEventListener('dragleave', handleDragLeave);
+      window.removeEventListener('drop', handleDrop);
+    };
+  }, []);
+
   return (
     <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-gray-100 transition-all">
+      {isDragOver && (
+        <div className="fixed inset-0 z-50 bg-[#4029AB]/80 backdrop-blur-xs flex items-center justify-center p-6 pointer-events-none">
+          <div className="bg-white rounded-2xl p-6 text-center max-w-sm shadow-2xl flex flex-col items-center gap-3">
+            <Upload className="w-10 h-10 text-[#4029AB] animate-bounce" />
+            <h3 className="font-bold text-gray-900 text-lg">Drop your logo file here</h3>
+            <p className="text-xs text-gray-500">Drop booksCircle (2).png to update the logo directly.</p>
+          </div>
+        </div>
+      )}
+
       {/* Main Top Header Bar (Brand + Actions) */}
       <div className="flex items-center justify-between px-4 sm:px-6 py-2 gap-2 sm:gap-3">
         {/* Brand Logo & Name */}
-        <div
-          onClick={() => {
-            if (onNavigateToHome) onNavigateToHome();
-            else onNavigateToProfile();
-          }}
-          className="flex items-center gap-2.5 cursor-pointer select-none group"
-        >
-          <div className="relative w-8 h-8 sm:w-9 sm:h-9 shrink-0 transition-transform group-hover:scale-105">
+        <div className="flex items-center gap-2 select-none group">
+          <div
+            onClick={() => {
+              if (onNavigateToHome) onNavigateToHome();
+              else onNavigateToProfile();
+            }}
+            className="relative w-8 h-8 sm:w-9 sm:h-9 shrink-0 transition-transform group-hover:scale-105 cursor-pointer"
+          >
             <Image
-              src="/logo.svg"
+              src={logoTimestamp ? `/booksCircle (2).png?v=${logoTimestamp}` : '/booksCircle (2).png'}
               alt="BooksCircle Logo"
               fill
               priority
-              className="object-contain"
+              unoptimized
+              className="object-contain rounded-md"
             />
           </div>
-          <h1 className="text-xl sm:text-2xl font-black tracking-tight text-[#4029AB] leading-none">
+
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              fileInputRef.current?.click();
+            }}
+            title="Upload exact logo file directly"
+            className="p-1 rounded-full text-gray-400 hover:text-[#4029AB] hover:bg-gray-100 transition-colors"
+          >
+            <Upload className="w-3.5 h-3.5" />
+          </button>
+          <input
+            type="file"
+            ref={fileInputRef}
+            accept="image/png,image/jpeg,image/webp"
+            className="hidden"
+            onChange={handleLogoFileChange}
+          />
+
+          <h1
+            onClick={() => {
+              if (onNavigateToHome) onNavigateToHome();
+              else onNavigateToProfile();
+            }}
+            className="text-xl sm:text-2xl font-black tracking-tight text-[#4029AB] leading-none cursor-pointer"
+          >
             BooksCircle
           </h1>
         </div>

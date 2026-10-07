@@ -145,6 +145,7 @@ export function parseBookDocument(docSnap: any): Book {
     language: language,
     type: bookType,
     file_size: data.fileSizeInMB ? `${data.fileSizeInMB} MB` : (data.file_size || '14.5 MB'),
+    sold_count: Number(data.sold_count ?? data.soldCount ?? data.total_sold ?? data.sales ?? data.sales_count ?? 0),
     topics: Array.isArray(data.topics) ? data.topics : (Array.isArray(data.features) ? data.features : []),
     reviews: Array.isArray(data.reviews) ? data.reviews : [],
   };
@@ -523,4 +524,155 @@ export async function getFirestoreBookById(idOrSlug: string): Promise<Book | nul
       b.title.toLowerCase() === target
   );
   return fallbackMatch || null;
+}
+
+export const LOCAL_STORAGE_SOLD_COUNTS_KEY = 'bookscircle_sold_counts_cache';
+
+// Helper to normalize slug/ID for robust matching against order/purchase records
+function normalizeSlugKey(s: string): string {
+  if (!s) return '';
+  return s
+    .toLowerCase()
+    .replace(/-bk\d+$/i, '')
+    .replace(/-[a-f0-9]{6}$/i, '')
+    .replace(/-plus-/g, '-')
+    .replace(/-and-/g, '-')
+    .replace(/[^a-z0-9]/g, '');
+}
+
+/**
+ * Synchronous getter for cached book sales count map (0ms instant render)
+ */
+export function getCachedSoldCountsSync(): Record<string, number> {
+  if (typeof window !== 'undefined') {
+    try {
+      const cached = localStorage.getItem(LOCAL_STORAGE_SOLD_COUNTS_KEY);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed && typeof parsed === 'object') {
+          return parsed;
+        }
+      }
+    } catch {}
+  }
+  return {};
+}
+
+/**
+ * Real-time listener and aggregator for actual sold book items.
+ * Strictly computes sales numbers from verified purchases (/purchases, /orders, and /book_analytics)
+ * in Firestore, mapping IDs, slugs, and document keys to the authoritative book.id.
+ */
+export function subscribeToSoldBookCounts(
+  onSoldCountsUpdated: (counts: Record<string, number>) => void
+): () => void {
+  const unsubscribers: (() => void)[] = [];
+  let currentPurchases: any[] = [];
+  let currentOrders: any[] = [];
+  let currentAnalytics: any[] = [];
+
+  const recalculateAndNotify = () => {
+    const books = getCachedBooksSync();
+    const countMap: Record<string, number> = {};
+
+    const recordSale = (rawKey: string, count = 1) => {
+      if (!rawKey) return;
+      const k = String(rawKey).trim();
+      const normK = normalizeSlugKey(k);
+
+      // Find matching book in catalog
+      const matched = books.find(
+        (b) =>
+          b.id === k ||
+          b.id.toLowerCase() === k.toLowerCase() ||
+          (b.seoslug && b.seoslug.toLowerCase() === k.toLowerCase()) ||
+          (b.slug && b.slug.toLowerCase() === k.toLowerCase()) ||
+          (normK.length > 8 && normalizeSlugKey(b.seoslug || '') === normK) ||
+          (normK.length > 8 && normalizeSlugKey(b.slug || '') === normK)
+      );
+
+      const targetBookId = matched ? matched.id : k;
+      countMap[targetBookId] = (countMap[targetBookId] || 0) + count;
+    };
+
+    // 1. Purchases collection (each verified completed payment)
+    currentPurchases.forEach((p) => {
+      if (Array.isArray(p.bookIds)) {
+        p.bookIds.forEach((id: string) => recordSale(id, 1));
+      }
+    });
+
+    // 2. Orders collection (avoiding duplicate count if order was already recorded in purchases)
+    const purchaseOrderIds = new Set(currentPurchases.map((p) => p.orderId).filter(Boolean));
+    currentOrders.forEach((o) => {
+      if (!purchaseOrderIds.has(o.orderId) && !purchaseOrderIds.has(o.id)) {
+        if (Array.isArray(o.bookIds)) {
+          o.bookIds.forEach((id: string) => recordSale(id, 1));
+        }
+      }
+    });
+
+    // 3. Book analytics collection (incorporate higher verified totals if present)
+    currentAnalytics.forEach((a) => {
+      if (a.bookId && typeof a.totalPurchases === 'number' && a.totalPurchases > (countMap[a.bookId] || 0)) {
+        countMap[a.bookId] = a.totalPurchases;
+      }
+    });
+
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(LOCAL_STORAGE_SOLD_COUNTS_KEY, JSON.stringify(countMap));
+      } catch {}
+    }
+
+    onSoldCountsUpdated(countMap);
+  };
+
+  try {
+    // 1. Subscribe to /purchases
+    const purchasesCol = collection(db, 'purchases');
+    const unsubPurchases = onSnapshot(
+      purchasesCol,
+      (snap) => {
+        currentPurchases = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        recalculateAndNotify();
+      },
+      (err) => console.warn('Purchases sold listener warning:', err?.message)
+    );
+    unsubscribers.push(unsubPurchases);
+
+    // 2. Subscribe to /orders
+    const ordersCol = collection(db, 'orders');
+    const unsubOrders = onSnapshot(
+      ordersCol,
+      (snap) => {
+        currentOrders = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        recalculateAndNotify();
+      },
+      (err) => console.warn('Orders sold listener warning:', err?.message)
+    );
+    unsubscribers.push(unsubOrders);
+
+    // 3. Subscribe to /book_analytics
+    const analyticsCol = collection(db, 'book_analytics');
+    const unsubAnalytics = onSnapshot(
+      analyticsCol,
+      (snap) => {
+        currentAnalytics = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        recalculateAndNotify();
+      },
+      (err) => console.warn('Book analytics sold listener warning:', err?.message)
+    );
+    unsubscribers.push(unsubAnalytics);
+  } catch (err) {
+    console.warn('Realtime sales listeners error:', err);
+  }
+
+  return () => {
+    unsubscribers.forEach((fn) => {
+      try {
+        fn();
+      } catch {}
+    });
+  };
 }

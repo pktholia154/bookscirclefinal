@@ -687,3 +687,80 @@ export function subscribeToUserPurchases(
     });
   };
 }
+
+const SALES_COUNT_CACHE_KEY = 'bookscircle_sales_count_map';
+
+export function getCachedSalesCountMapSync(): Record<string, number> {
+  if (typeof window !== 'undefined') {
+    try {
+      const cached = localStorage.getItem(SALES_COUNT_CACHE_KEY);
+      if (cached) {
+        return JSON.parse(cached);
+      }
+    } catch {}
+  }
+  return {};
+}
+
+export function saveSalesCountMapLocal(map: Record<string, number>) {
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(SALES_COUNT_CACHE_KEY, JSON.stringify(map));
+    } catch {}
+  }
+}
+
+/**
+ * Aggregates verified sales numbers per book directly from Firestore
+ * (orders, purchases, and book_analytics) to ensure Best Sellers listing
+ * is strictly ordered by sold items count.
+ */
+export async function fetchTotalSalesCountMap(): Promise<Record<string, number>> {
+  const salesMap: Record<string, number> = { ...getCachedSalesCountMapSync() };
+
+  try {
+    const [purchasesSnap, ordersSnap, analyticsSnap] = await Promise.all([
+      getDocs(collection(db, 'purchases')).catch(() => null),
+      getDocs(collection(db, 'orders')).catch(() => null),
+      getDocs(collection(db, 'book_analytics')).catch(() => null),
+    ]);
+
+    function tally(idOrSlug: string, count: number = 1) {
+      if (!idOrSlug) return;
+      const clean = String(idOrSlug).trim();
+      salesMap[clean] = (salesMap[clean] || 0) + count;
+    }
+
+    if (purchasesSnap && !purchasesSnap.empty) {
+      purchasesSnap.forEach((d) => {
+        const data = d.data();
+        if (Array.isArray(data.bookIds)) data.bookIds.forEach((id: string) => tally(id));
+        if (Array.isArray(data.books)) data.books.forEach((b: any) => tally(b.id || b.slug));
+      });
+    }
+
+    if (ordersSnap && !ordersSnap.empty) {
+      ordersSnap.forEach((d) => {
+        const data = d.data();
+        if (Array.isArray(data.bookIds)) data.bookIds.forEach((id: string) => tally(id));
+        if (Array.isArray(data.books)) data.books.forEach((b: any) => tally(b.id || b.slug));
+      });
+    }
+
+    if (analyticsSnap && !analyticsSnap.empty) {
+      analyticsSnap.forEach((d) => {
+        const data = d.data();
+        const total = Number(data.totalPurchases || data.salesCount || 0);
+        if (total > 0) {
+          tally(d.id, total);
+        }
+      });
+    }
+
+    saveSalesCountMapLocal(salesMap);
+  } catch (err) {
+    console.warn('Sales count fetch error:', err);
+  }
+
+  return salesMap;
+}

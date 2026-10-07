@@ -54,7 +54,8 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: '/logo.svg', type: 'image/svg+xml' },
+      { url: '/booksCircle (2).png', sizes: '512x512', type: 'image/png' },
+      { url: '/logo.png', sizes: '512x512', type: 'image/png' },
       { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
       { url: '/icon-512.png', sizes: '512x512', type: 'image/png' },
       { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
@@ -66,8 +67,8 @@ export const metadata: Metadata = {
     other: [
       {
         rel: 'mask-icon',
-        url: '/logo.svg',
-        color: '#4029AB',
+        url: '/logo.png',
+        color: '#5814EA',
       },
     ],
   },

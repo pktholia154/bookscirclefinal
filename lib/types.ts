@@ -50,6 +50,7 @@ export interface Book {
   language?: string;
   type?: string;
   file_size?: string;
+  sold_count?: number;
   is_bestseller?: boolean;
   badge?: string;
   topics?: string[];

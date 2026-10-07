@@ -30,6 +30,8 @@ import {
   getCachedCategoriesSync,
   subscribeToFirestoreBooks,
   subscribeToFirestoreCategories,
+  subscribeToSoldBookCounts,
+  getCachedSoldCountsSync,
 } from '@/lib/services/books';
 import {
   subscribeToFirestoreDiscounts,
@@ -38,7 +40,13 @@ import {
 } from '@/lib/services/discounts';
 
 import { getPurchasedBookIdsFromLocal, savePurchasedBookIds } from '@/lib/offline-storage';
-import { recordUserPurchaseInFirestore, syncUserPurchases, subscribeToUserPurchases } from '@/lib/services/purchases';
+import {
+  recordUserPurchaseInFirestore,
+  syncUserPurchases,
+  subscribeToUserPurchases,
+  fetchTotalSalesCountMap,
+  getCachedSalesCountMapSync,
+} from '@/lib/services/purchases';
 import { syncUserProfileToFirestore } from '@/lib/services/users';
 import { processRazorpayPayment, loadRazorpayScript } from '@/lib/services/razorpay';
 import {
@@ -106,6 +114,13 @@ export default function HomePage() {
   const [activeTab, setActiveTab] = useState<TabKey>('home');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const [salesCountMap, setSalesCountMap] = useState<Record<string, number>>(
+    () => {
+      const live = getCachedSoldCountsSync();
+      if (live && Object.keys(live).length > 0) return live;
+      return getCachedSalesCountMapSync();
+    }
+  );
   const [isGoogleModalOpen, setIsGoogleModalOpen] = useState<boolean>(false);
   const [loginModalConfig, setLoginModalConfig] = useState<{
     title?: string;
@@ -261,6 +276,22 @@ export default function HomePage() {
   useEffect(() => {
     const unsubscribe = subscribeToCartChanges((updatedCart) => {
       setCart(updatedCart);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Subscribe to real-time verified sales counts strictly from Firestore purchases and orders
+  useEffect(() => {
+    fetchTotalSalesCountMap()
+      .then((map) => {
+        if (map && Object.keys(map).length > 0) {
+          setSalesCountMap(map);
+        }
+      })
+      .catch(() => {});
+
+    const unsubscribe = subscribeToSoldBookCounts((liveCounts) => {
+      setSalesCountMap(liveCounts);
     });
     return () => unsubscribe();
   }, []);
@@ -829,17 +860,23 @@ export default function HomePage() {
     return (featured.length > 0 ? featured : books).slice(0, 12);
   }, [books]);
 
+  // Best Sellers listing on home page strictly according to actual number of sold book items
   const bestSellerBooks = useMemo(() => {
-    const best = books.filter(
-      (b) =>
-        b.is_bestseller ||
-        b.badge === 'Bestseller' ||
-        (b.tags && b.tags.includes('bestseller')) ||
-        (b.rating_count && b.rating_count >= 200) ||
-        (b.rating && b.rating >= 4.7)
-    );
-    return (best.length > 0 ? best : books).slice(0, 12);
-  }, [books]);
+    return [...books]
+      .map((b) => {
+        const soldCount =
+          salesCountMap[b.id] ||
+          salesCountMap[b.slug] ||
+          salesCountMap[b.seoslug || ''] ||
+          b.sold_count ||
+          0;
+        return { book: { ...b, sold_count: soldCount }, soldCount };
+      })
+      .filter((item) => item.soldCount > 0)
+      .sort((a, b) => b.soldCount - a.soldCount)
+      .map((item) => item.book)
+      .slice(0, 12);
+  }, [books, salesCountMap]);
 
   // Top 3 categories with highest number of books
   const topCategoriesWithBooks = useMemo(() => {
@@ -1035,23 +1072,25 @@ export default function HomePage() {
                       onToggleWishlist={handleToggleWishlist}
                     />
 
-                    {/* Horizontal Carousel 2: Best Sellers (Most Sold Books) */}
-                    <CarouselSection
-                      title="Best Sellers"
-                      subtitle="Top-selling exam preparation e-books with proven student success"
-                      badge="Hot"
-                      limit={12}
-                      sectionId="bestseller-books"
-                      viewAllHref="/collection/bestsellers"
-                      books={bestSellerBooks}
-                      onSelectBook={(book) => router.push(`/book/${encodeURIComponent(book.seoslug || book.slug || book.id)}`)}
-                      onAddToCart={handleAddToCart}
-                      onBuyNow={handleBuyNow}
-                      cartBookIds={cartBookIds}
-                      purchasedBookIds={purchasedBookIds}
-                      wishlistBookIds={wishlistBookIds}
-                      onToggleWishlist={handleToggleWishlist}
-                    />
+                    {/* Horizontal Carousel 2: Best Sellers (Strictly according to actual number of sold book items) */}
+                    {bestSellerBooks.length > 0 && (
+                      <CarouselSection
+                        title="Best Sellers"
+                        subtitle="Strictly ranked according to actual student purchases and sold items"
+                        badge="Top Sold"
+                        limit={12}
+                        sectionId="bestseller-books"
+                        viewAllHref="/collection/bestsellers"
+                        books={bestSellerBooks}
+                        onSelectBook={(book) => router.push(`/book/${encodeURIComponent(book.seoslug || book.slug || book.id)}`)}
+                        onAddToCart={handleAddToCart}
+                        onBuyNow={handleBuyNow}
+                        cartBookIds={cartBookIds}
+                        purchasedBookIds={purchasedBookIds}
+                        wishlistBookIds={wishlistBookIds}
+                        onToggleWishlist={handleToggleWishlist}
+                      />
+                    )}
 
                     {/* Horizontal Carousel 3: Top Exam Category 1 */}
                     {topCategoriesWithBooks[0] && (

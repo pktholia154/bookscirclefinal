@@ -99,19 +99,11 @@ export const CategoriesView: React.FC<CategoriesViewProps> = ({
           >
             <Layers className="w-4 h-4" />
             <span>All Categories</span>
-            <span
-              className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
-                selectedCat === 'all' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-700'
-              }`}
-            >
-              {books.length}
-            </span>
           </button>
 
-          {/* Individual Category Chips - Seamlessly placed without background boxes */}
+          {/* Individual Category Chips - Just Category Names (No book counts) */}
           {categories.map((cat) => {
             const isSelected = selectedCat.toLowerCase() === cat.title.toLowerCase();
-            const count = categoryCounts[cat.title.toLowerCase()] || (cat.seolsug ? categoryCounts[cat.seolsug.toLowerCase()] : 0) || 0;
 
             return (
               <button
@@ -125,15 +117,6 @@ export const CategoriesView: React.FC<CategoriesViewProps> = ({
                 }`}
               >
                 <span>{cat.title}</span>
-                {count > 0 && (
-                  <span
-                    className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
-                      isSelected ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-700'
-                    }`}
-                  >
-                    {count}
-                  </span>
-                )}
               </button>
             );
           })}
@@ -145,11 +128,8 @@ export const CategoriesView: React.FC<CategoriesViewProps> = ({
         <div className="flex items-center justify-between border-b border-gray-100 pb-2">
           <div>
             <h2 className="text-sm sm:text-base font-black text-gray-950">
-              {selectedCat === 'all' ? 'All E-Books' : `${selectedCat} Titles`}
+              {selectedCat === 'all' ? 'All E-Books' : `${selectedCat}`}
             </h2>
-            <span className="text-xs font-bold text-gray-400">
-              {filteredBooks.length} Books Found
-            </span>
           </div>
 
           {selectedCat !== 'all' && (
