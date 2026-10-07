@@ -121,13 +121,39 @@ export default async function BookSSRPage({ params }: PageProps) {
     );
   }
 
-  // Fetch related books in the same category
+  // Fetch category sibling books & recent content for Link Loop Crawling
   let relatedBooks: Book[] = [];
+  let prevBook: Book | null = null;
+  let nextBook: Book | null = null;
+  let recentBooks: Book[] = [];
+
   try {
     const allBooks = await getBooksFromFirestore();
-    relatedBooks = allBooks
-      .filter((b) => b.id !== book.id && b.category.toLowerCase() === book.category.toLowerCase())
-      .slice(0, 6);
+    const activeBooks = allBooks.filter((b) => b.isActive !== false);
+
+    // Sibling links within same category
+    const categoryBooks = activeBooks.filter(
+      (b) => b.category.toLowerCase() === book.category.toLowerCase()
+    );
+    const currentIndex = categoryBooks.findIndex((b) => b.id === book.id);
+    if (currentIndex > 0) {
+      prevBook = categoryBooks[currentIndex - 1];
+    } else if (categoryBooks.length > 1) {
+      prevBook = categoryBooks[categoryBooks.length - 1];
+    }
+
+    if (currentIndex >= 0 && currentIndex < categoryBooks.length - 1) {
+      nextBook = categoryBooks[currentIndex + 1];
+    } else if (categoryBooks.length > 1) {
+      nextBook = categoryBooks[0];
+    }
+
+    relatedBooks = categoryBooks.filter((b) => b.id !== book.id).slice(0, 6);
+
+    // Recent Content Strip: Top 10 most recent books across catalog for crawlability
+    recentBooks = activeBooks
+      .filter((b) => b.id !== book.id)
+      .slice(0, 10);
   } catch {}
 
   // Generate nested JSON-LD schema
@@ -143,6 +169,64 @@ export default async function BookSSRPage({ params }: PageProps) {
 
       {/* Interactive & Accessible Presentation UI */}
       <BookPageClient book={book} relatedBooks={relatedBooks} />
+
+      {/* 4. Link Loop Injection (Bottom of Post Template: Prev/Next Siblings & Recent Strip for Crawler Traversal) */}
+      <footer aria-label="Related Guides & Crawl Loop" className="w-full bg-white border-t border-gray-100 px-4 sm:px-6 py-6 pb-20">
+        {/* Sibling Links in Same Category */}
+        {(prevBook || nextBook) && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+            {prevBook && prevBook.id !== book.id && (
+              <a
+                href={`/book/${encodeURIComponent(prevBook.seoslug || prevBook.slug || prevBook.id)}`}
+                className="flex flex-col p-3 rounded-xl border border-gray-200 hover:border-[#4029AB] hover:bg-[#4029AB]/[0.02] transition-colors group"
+              >
+                <span className="text-[10px] font-bold text-gray-400 group-hover:text-[#4029AB] uppercase tracking-wider mb-0.5">
+                  ← Previous in {book.category}
+                </span>
+                <span className="text-xs sm:text-sm font-bold text-gray-900 group-hover:text-[#4029AB] line-clamp-1">
+                  {prevBook.title}
+                </span>
+              </a>
+            )}
+            {nextBook && nextBook.id !== book.id && (
+              <a
+                href={`/book/${encodeURIComponent(nextBook.seoslug || nextBook.slug || nextBook.id)}`}
+                className="flex flex-col p-3 rounded-xl border border-gray-200 hover:border-[#4029AB] hover:bg-[#4029AB]/[0.02] transition-colors sm:text-right group"
+              >
+                <span className="text-[10px] font-bold text-gray-400 group-hover:text-[#4029AB] uppercase tracking-wider mb-0.5">
+                  Next in {book.category} →
+                </span>
+                <span className="text-xs sm:text-sm font-bold text-gray-900 group-hover:text-[#4029AB] line-clamp-1">
+                  {nextBook.title}
+                </span>
+              </a>
+            )}
+          </div>
+        )}
+
+        {/* Recent Content Plain Anchor Strip */}
+        {recentBooks.length > 0 && (
+          <aside className="p-4 rounded-xl bg-gray-50 border border-gray-100">
+            <h3 className="text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-2.5 flex items-center justify-between">
+              <span>Recent Exam Notes &amp; PDF Guides</span>
+              <span className="text-[10px] font-normal text-gray-400">Direct Links</span>
+            </h3>
+            <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+              {recentBooks.map((rb) => (
+                <li key={rb.id} className="truncate">
+                  <a
+                    href={`/book/${encodeURIComponent(rb.seoslug || rb.slug || rb.id)}`}
+                    className="text-gray-700 hover:text-[#4029AB] hover:underline font-medium"
+                    title={rb.title}
+                  >
+                    • {rb.title}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </aside>
+        )}
+      </footer>
     </>
   );
 }

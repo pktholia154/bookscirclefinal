@@ -130,6 +130,11 @@ export default function RootLayout({
   return (
     <html lang="en" className={roboto.variable}>
       <head>
+        {/* RSS Feed & Sitemaps Auto-Discovery */}
+        <link rel="alternate" type="application/rss+xml" title="BooksCircle - Latest E-Books Feed" href="/feed.xml" />
+        <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml" />
+        <link rel="sitemap" type="application/xml" title="Rolling Sitemap" href="/sitemap-latest.xml" />
+
         {/* Preconnect & DNS-Prefetch to Razorpay for lightning-fast instant gateway launch */}
         <link rel="preconnect" href="https://checkout.razorpay.com" crossOrigin="anonymous" />
         <link rel="dns-prefetch" href="https://checkout.razorpay.com" />

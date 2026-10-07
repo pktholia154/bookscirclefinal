@@ -10,6 +10,9 @@ export default function robots(): MetadataRoute.Robots {
           '/',
           '/book/',
           '/search',
+          '/sitemap.xml',
+          '/sitemap-latest.xml',
+          '/feed.xml',
           '/privacy',
           '/privacy-policy',
           '/terms',
@@ -36,11 +39,14 @@ export default function robots(): MetadataRoute.Robots {
           'facebookexternalhit',
           'Twitterbot',
         ],
-        allow: ['/', '/book/', '/search'],
+        allow: ['/', '/book/', '/search', '/sitemap.xml', '/sitemap-latest.xml', '/feed.xml'],
         disallow: ['/api/', '/pdf/', '/checkout/'],
       },
     ],
-    sitemap: `${SITE_URL}/sitemap.xml`,
+    sitemap: [
+      `${SITE_URL}/sitemap.xml`,
+      `${SITE_URL}/sitemap-latest.xml`,
+    ],
     host: SITE_URL,
   };
 }
