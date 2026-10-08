@@ -250,7 +250,7 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
   }, [rating]);
 
   return (
-    <div className="min-h-screen bg-white text-gray-900 pb-12 sm:pb-16 antialiased selection:bg-[#4029AB] selection:text-white">
+    <div className="min-h-screen bg-white text-gray-900 pb-24 sm:pb-28 antialiased selection:bg-[#4029AB] selection:text-white">
       {/* 1. Dedicated Top Navigation Bar */}
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-gray-100 px-4 sm:px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3 min-w-0">

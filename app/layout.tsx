@@ -4,6 +4,7 @@ import './globals.css';
 import { generateWebsiteSchema, SITE_URL, SITE_NAME } from '@/lib/seo';
 import { PWARegister } from '@/components/PWARegister';
 import { NativePageLoadingProvider } from '@/components/NativePageLoadingIndicator';
+import { NotificationPrompt } from '@/components/NotificationPrompt';
 
 const roboto = Roboto({
   weight: ['300', '400', '500', '700', '900'],
@@ -54,6 +55,7 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
+      { url: '/booksCircle (3).png', sizes: '512x512', type: 'image/png' },
       { url: '/booksCircle (2).png', sizes: '512x512', type: 'image/png' },
       { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
       { url: '/icon-512.png', sizes: '512x512', type: 'image/png' },
@@ -61,13 +63,13 @@ export const metadata: Metadata = {
       { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
     ],
     apple: [
-      { url: '/booksCircle (2).png', sizes: '180x180', type: 'image/png' },
+      { url: '/booksCircle (3).png', sizes: '180x180', type: 'image/png' },
       { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
     ],
     other: [
       {
         rel: 'mask-icon',
-        url: '/booksCircle (2).png',
+        url: '/booksCircle (3).png',
         color: '#5814EA',
       },
     ],
@@ -147,6 +149,34 @@ export default function RootLayout({
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteSchema) }}
         />
+
+        {/* OneSignal Web Push SDK (v16) */}
+        <script
+          src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js"
+          defer
+        />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.OneSignalDeferred = window.OneSignalDeferred || [];
+              OneSignalDeferred.push(async function(OneSignal) {
+                try {
+                  await OneSignal.init({
+                    appId: "7e7c93db-4e5d-4fcb-9d6d-ab33a1fe44be",
+                    allowLocalhostAsSecureOrigin: true,
+                  });
+                } catch (error) {
+                  // Gracefully ignore domain mismatch on development and staging URLs
+                  console.warn(
+                    "OneSignal push notifications: configured for https://bookscircle.org (preview domain: " +
+                    (window.location ? window.location.hostname : "unknown") +
+                    ")"
+                  );
+                }
+              });
+            `,
+          }}
+        />
       </head>
       <body
         className="bg-neutral-100/80 sm:bg-slate-100/70 text-gray-900 antialiased min-h-screen selection:bg-[#4029AB]/10 selection:text-[#4029AB] flex flex-col items-center justify-start"
@@ -156,6 +186,7 @@ export default function RootLayout({
         <div className="w-full max-w-2xl lg:max-w-3xl min-h-screen bg-white md:shadow-2xl md:shadow-gray-300/40 md:border-x md:border-gray-200/80 flex flex-col relative">
           <NativePageLoadingProvider>
             <PWARegister />
+            <NotificationPrompt />
             {children}
           </NativePageLoadingProvider>
         </div>

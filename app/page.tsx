@@ -1461,8 +1461,13 @@ export default function HomePage() {
 
       {/* Fixed High Density Bottom Navigation */}
       <BottomNav
-        activeTab={activeTab}
-        onTabChange={handleTabChange}
+        activeTab={selectedBook ? 'book' : activeTab}
+        onTabChange={(tab) => {
+          if (selectedBook) {
+            setSelectedBook(null);
+          }
+          handleTabChange(tab);
+        }}
         cartCount={totalCartCount}
       />
 

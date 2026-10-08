@@ -85,7 +85,7 @@ export const Header: React.FC<HeaderProps> = ({
         >
           <div className="relative w-8 h-8 sm:w-9 sm:h-9 shrink-0 transition-transform group-hover:scale-105">
             <Image
-              src="/booksCircle (2).png"
+              src="/booksCircle%20(3).png"
               alt="BooksCircle Logo"
               fill
               priority
@@ -286,6 +286,7 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
       </div>
+
     </header>
   );
 };

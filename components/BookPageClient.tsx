@@ -36,6 +36,7 @@ import { IOSInstallGuideModal } from '@/components/IOSInstallGuideModal';
 import { InstallSuccessModal } from '@/components/InstallSuccessModal';
 import { usePWAInstall } from '@/hooks/use-pwa-install';
 import { CartDrawer } from '@/components/CartDrawer';
+import { BottomNav, TabKey } from '@/components/BottomNav';
 import { UserProfile } from '@/components/Header';
 import { processRazorpayPayment, loadRazorpayScript } from '@/lib/services/razorpay';
 import { recordUserPurchaseInFirestore, syncUserPurchases, subscribeToUserPurchases } from '@/lib/services/purchases';
@@ -120,6 +121,22 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
   const [cart, setCart] = useState<CartItem[]>([]);
   const [pendingActionAfterLogin, setPendingActionAfterLogin] = useState<((user: UserProfile) => void) | null>(null);
   const [, startTransition] = useTransition();
+
+  const totalCartCount = useMemo(() => {
+    return cart.reduce((acc, i) => acc + i.quantity, 0);
+  }, [cart]);
+
+  const handleTabChange = (tab: TabKey) => {
+    if (tab === 'cart') {
+      setIsCartOpen(true);
+      return;
+    }
+    if (tab === 'home') {
+      router.push('/');
+      return;
+    }
+    router.push(`/?tab=${tab}`);
+  };
 
   // Keep in sync with initialBook prop
   useEffect(() => {
@@ -466,7 +483,7 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
       : 25;
 
   return (
-    <div className="min-h-screen bg-white text-gray-900 pb-12 sm:pb-16 antialiased selection:bg-[#4029AB] selection:text-white">
+    <div className="min-h-screen bg-white text-gray-900 pb-24 sm:pb-28 antialiased selection:bg-[#4029AB] selection:text-white">
       {/* Top Header Navigation */}
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-gray-100 px-4 sm:px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3 min-w-0">
@@ -1022,6 +1039,12 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
           </motion.div>
         )}
       </AnimatePresence>
+      {/* Fixed Bottom Navigation Menu Bar */}
+      <BottomNav
+        activeTab="book"
+        onTabChange={handleTabChange}
+        cartCount={totalCartCount}
+      />
     </div>
   );
 };
