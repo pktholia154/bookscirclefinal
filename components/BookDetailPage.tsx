@@ -806,7 +806,7 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
         )}
       </main>
 
-      {/* Real-time PDFium WASM Vector PDF Reader for Sample & Purchased Reading */}
+      {/* Real-time PDFium WASM PDF Reader for Sample & Purchased Reading */}
       {activePdfReaderMode && (
         <PDFReaderModal
           book={book}

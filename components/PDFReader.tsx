@@ -563,7 +563,7 @@ export default function PDFReader() {
                   Initializing PDFium WASM Engine...
                 </p>
                 <p className="text-[11px] max-w-[260px] text-center text-slate-500">
-                  Loading high-precision WebAssembly vector engine.
+                  Loading high-precision WebAssembly rendering engine.
                 </p>
               </div>
             )}

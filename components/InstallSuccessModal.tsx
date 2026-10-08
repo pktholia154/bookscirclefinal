@@ -48,7 +48,7 @@ export const InstallSuccessModal: React.FC<InstallSuccessModalProps> = ({
           <div className="relative mt-1">
             <div className="w-16 h-16 rounded-2xl overflow-hidden bg-transparent shadow-md flex items-center justify-center">
               <Image
-                src="/logo.png"
+                src="/booksCircle (2).png"
                 alt="BooksCircle"
                 width={64}
                 height={64}

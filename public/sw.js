@@ -1,7 +1,8 @@
 // BooksCircle Service Worker (Static Media Assets Only)
-const CACHE_NAME = 'bookscircle-v7';
+const CACHE_NAME = 'bookscircle-v9';
 const STATIC_ASSETS = [
   '/manifest.json',
+  '/booksCircle (2).png',
   '/logo.png',
   '/icon-192.png',
   '/icon-512.png',

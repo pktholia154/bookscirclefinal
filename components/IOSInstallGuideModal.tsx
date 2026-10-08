@@ -41,7 +41,7 @@ export const IOSInstallGuideModal: React.FC<IOSInstallGuideModalProps> = ({
             <div className="flex items-center gap-3">
               <div className="relative w-11 h-11 rounded-xl overflow-hidden shadow-xs shrink-0">
                 <Image
-                  src="/logo.png"
+                  src="/booksCircle (2).png"
                   alt="BooksCircle Logo"
                   fill
                   unoptimized

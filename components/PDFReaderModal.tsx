@@ -976,7 +976,7 @@ export const PDFReaderModal: React.FC<PDFReaderModalProps> = ({
                     : 'Loading Sample Preview...'}
                 </p>
                 <p className="text-[11px] text-slate-500 max-w-xs text-center">
-                  Crystal-clear vector rendering via PDFium WASM Engine.
+                  Crystal-clear high-speed rendering via PDFium WASM Engine.
                 </p>
               </div>
             )}
