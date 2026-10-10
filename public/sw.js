@@ -1,12 +1,5 @@
-// OneSignal Web Push Integration
-try {
-  importScripts("https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js");
-} catch (e) {
-  // Graceful fallback if offline
-}
-
 // BooksCircle Service Worker (Static Media Assets Only)
-const CACHE_NAME = 'bookscircle-v11';
+const CACHE_NAME = 'bookscircle-v12';
 const STATIC_ASSETS = [
   '/manifest.json',
   '/booksCircle (3).png',

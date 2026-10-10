@@ -23,6 +23,7 @@ import { DiscountBanner } from '@/components/DiscountBanner';
 import { InstallAppBanner } from '@/components/InstallAppBanner';
 import { Book, Category, CartItem, CartTierDiscount } from '@/lib/types';
 import { DEFAULT_BOOK_COVER, INITIAL_BOOKS, INITIAL_CATEGORIES } from '@/lib/data';
+import { searchBooks } from '@/lib/search';
 import {
   getBooksFromFirestore,
   getCategoriesFromFirestore,
@@ -823,35 +824,12 @@ export default function HomePage() {
 
   // Filter books based on search & active category for Home Page
   const filteredBooks = useMemo(() => {
-    let result = books;
-
-    // Filter by category
-    if (selectedCategory !== 'all') {
-      const target = selectedCategory.toLowerCase().trim();
-      result = result.filter((b) => {
-        const cat = (b.category || '').toLowerCase();
-        const slug = (b.categorySlug || '').toLowerCase();
-        return cat === target || slug === target || target.includes(slug) || slug.includes(target) || target.includes(cat) || cat.includes(target);
-      });
-    }
-
-    // Filter by search query
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
-      result = result.filter(
-        (b) =>
-          b.title.toLowerCase().includes(q) ||
-          b.category.toLowerCase().includes(q) ||
-          (b.categorySlug && b.categorySlug.toLowerCase().includes(q)) ||
-          (b.seoDescription && b.seoDescription.toLowerCase().includes(q)) ||
-          (b.topics && b.topics.some((t) => t.toLowerCase().includes(q))) ||
-          b.author?.toLowerCase().includes(q) ||
-          b.publisher?.toLowerCase().includes(q) ||
-          b.language?.toLowerCase().includes(q)
-      );
-    }
-
-    return result;
+    return searchBooks(books, searchQuery, {
+      category: selectedCategory,
+      sortBy: 'relevance',
+      includePartialMatches: true,
+      minScore: 40,
+    });
   }, [books, selectedCategory, searchQuery]);
 
   // Curated collections for Horizontal Carousel Sections - Enforced 12-item initial limit

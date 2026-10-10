@@ -20,6 +20,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { Book, Category } from '@/lib/types';
 import { DEFAULT_BOOK_COVER } from '@/lib/data';
+import { searchBooks, scoreBook } from '@/lib/search';
 
 interface DedicatedSearchViewProps {
   books: Book[];
@@ -125,46 +126,23 @@ export const DedicatedSearchView: React.FC<DedicatedSearchViewProps> = ({
     return () => clearInterval(interval);
   }, [query]);
 
-  // Real-time filtering and sorting
-  const searchResults = useMemo(() => {
-    let list = books;
-    const q = query.trim().toLowerCase();
+  // Real-time tokenized, order-independent, fuzzy relevance search
+  const { searchResults, searchScores } = useMemo(() => {
+    const list = searchBooks(books, query, {
+      category: selectedCategory,
+      sortBy: sortBy,
+      includePartialMatches: true,
+      minScore: 40,
+    });
 
-    // 1. Filter by category
-    if (selectedCategory !== 'all') {
-      const target = selectedCategory.toLowerCase().trim();
-      list = list.filter((b) => {
-        const cat = (b.category || '').toLowerCase();
-        const slug = (b.categorySlug || '').toLowerCase();
-        return cat === target || slug === target || target.includes(slug) || slug.includes(target) || target.includes(cat) || cat.includes(target);
+    const scoreMap = new Map<string, ReturnType<typeof scoreBook>>();
+    if (query.trim()) {
+      list.forEach((b) => {
+        scoreMap.set(b.id, scoreBook(b, query));
       });
     }
 
-    // 2. Filter by search query
-    if (q) {
-      list = list.filter((b) => {
-        const titleMatch = b.title?.toLowerCase().includes(q);
-        const catMatch = b.category?.toLowerCase().includes(q);
-        const authorMatch = b.author?.toLowerCase().includes(q);
-        const publisherMatch = b.publisher?.toLowerCase().includes(q);
-        const descMatch = b.seo_description?.toLowerCase().includes(q) || b.full_description?.toLowerCase().includes(q);
-        const topicMatch = b.topics && b.topics.some((t) => t.toLowerCase().includes(q));
-        const tagMatch = b.tags && b.tags.some((t) => t.toLowerCase().includes(q));
-
-        return titleMatch || catMatch || authorMatch || publisherMatch || descMatch || topicMatch || tagMatch;
-      });
-    }
-
-    // 3. Sort results
-    if (sortBy === 'rating') {
-      list = [...list].sort((a, b) => (b.rating || 0) - (a.rating || 0));
-    } else if (sortBy === 'price_low') {
-      list = [...list].sort((a, b) => (a.buy_price || 0) - (b.buy_price || 0));
-    } else if (sortBy === 'price_high') {
-      list = [...list].sort((a, b) => (b.buy_price || 0) - (a.buy_price || 0));
-    }
-
-    return list;
+    return { searchResults: list, searchScores: scoreMap };
   }, [books, query, selectedCategory, sortBy]);
 
   const handleExecuteSearch = (searchTerm: string) => {
@@ -249,7 +227,88 @@ export const DedicatedSearchView: React.FC<DedicatedSearchViewProps> = ({
 
       {/* Main Search View Content */}
       <main className="px-3 sm:px-5 py-3 space-y-4">
+        {/* Category Filter Chips Bar */}
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
+          <button
+            onClick={() => setSelectedCategory('all')}
+            className={`shrink-0 px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
+              selectedCategory === 'all'
+                ? 'bg-[#5e17eb] text-white shadow-xs'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            All
+          </button>
+          {categories.slice(0, 10).map((cat) => {
+            const isSelected =
+              selectedCategory.toLowerCase() === cat.title.toLowerCase() ||
+              selectedCategory.toLowerCase() === cat.id.toLowerCase();
+            return (
+              <button
+                key={cat.id}
+                onClick={() => setSelectedCategory(isSelected ? 'all' : cat.title)}
+                className={`shrink-0 px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                  isSelected
+                    ? 'bg-[#5e17eb] text-white shadow-xs'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                {cat.title}
+              </button>
+            );
+          })}
+        </div>
 
+        {/* When query is empty: show Recent Searches & Popular Tags */}
+        {!query && (
+          <div className="space-y-3 pt-1">
+            {recentSearches.length > 0 && (
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-gray-500">
+                    <Clock className="w-3.5 h-3.5 text-gray-400" />
+                    <span>Recent Searches</span>
+                  </div>
+                  <button
+                    onClick={handleClearRecentSearches}
+                    className="text-[11px] font-semibold text-gray-400 hover:text-red-500 transition-colors cursor-pointer"
+                  >
+                    Clear
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {recentSearches.map((term, i) => (
+                    <button
+                      key={i}
+                      onClick={() => handleExecuteSearch(term)}
+                      className="px-2.5 py-1 rounded-full bg-gray-50 border border-gray-200 text-xs font-medium text-gray-700 hover:border-[#5e17eb] hover:text-[#5e17eb] transition-all cursor-pointer"
+                    >
+                      {term}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-gray-500">
+                <TrendingUp className="w-3.5 h-3.5 text-[#5e17eb]" />
+                <span>Popular Searches</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {POPULAR_SEARCH_TAGS.map((tag, i) => (
+                  <button
+                    key={i}
+                    onClick={() => handleExecuteSearch(tag)}
+                    className="px-2.5 py-1 rounded-full bg-gray-50 border border-gray-200 text-xs font-medium text-gray-800 hover:border-[#5e17eb] hover:text-[#5e17eb] transition-all cursor-pointer"
+                  >
+                    {tag}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Search Results Header: Count & Sort Filter */}
         <div className="flex items-center justify-between pt-1 border-b border-gray-100 pb-2">
@@ -306,6 +365,7 @@ export const DedicatedSearchView: React.FC<DedicatedSearchViewProps> = ({
               {searchResults.slice(0, visibleCount).map((book) => {
                 const inCart = cartBookIds.has(book.id);
                 const isOwned = purchasedBookIds.includes(book.id);
+                const scoreData = searchScores.get(book.id);
                 const discountPercent =
                   book.list_price && book.list_price > book.buy_price
                     ? Math.round(((book.list_price - book.buy_price) / book.list_price) * 100)
@@ -336,6 +396,29 @@ export const DedicatedSearchView: React.FC<DedicatedSearchViewProps> = ({
                       <h3 className="font-bold text-sm sm:text-base text-gray-950 line-clamp-2 leading-snug group-hover:text-[#5e17eb] transition-colors">
                         {book.title}
                       </h3>
+
+                      {/* Match Tier Relevance Badge */}
+                      {query.trim() && scoreData && scoreData.matchTier !== 'none' && (
+                        <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                          {scoreData.matchTier === 'exact_phrase' && (
+                            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-[#5e17eb]/10 text-[#5e17eb] inline-flex items-center gap-0.5">
+                              <Sparkles className="w-2.5 h-2.5" />
+                              Exact Match
+                            </span>
+                          )}
+                          {scoreData.matchTier === 'all_tokens' && (
+                            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center gap-0.5">
+                              <Check className="w-2.5 h-2.5" />
+                              All Keywords Match
+                            </span>
+                          )}
+                          {scoreData.matchTier === 'partial' && (
+                            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 text-gray-600 inline-flex items-center">
+                              {scoreData.matchedTokensCount}/{scoreData.totalTokensCount} Keywords
+                            </span>
+                          )}
+                        </div>
+                      )}
 
                       {/* Category, Language & Type in same row (display only field values, not field labels) */}
                       <div className="flex items-center gap-1.5 text-xs sm:text-[13px] text-gray-600 truncate mt-1">

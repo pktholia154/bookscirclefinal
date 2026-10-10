@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { Book, Category, CartItem } from '@/lib/types';
 import { DEFAULT_BOOK_COVER } from '@/lib/data';
+import { searchBooks } from '@/lib/search';
 import { BookCard } from '@/components/BookCard';
 import { BookListView } from '@/components/BookListView';
 import { CartDrawer } from '@/components/CartDrawer';
@@ -131,38 +132,13 @@ export const CategoryPageClient: React.FC<CategoryPageClientProps> = ({
   const [currentPage, setCurrentPage] = useState(1);
   const resultsTopRef = React.useRef<HTMLDivElement>(null);
 
-  // Filter and Sort Books
+  // Filter and Sort Books with tokenized order-independent fuzzy search
   const filteredAndSortedBooks = useMemo(() => {
-    let result = [...books];
-
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
-      result = result.filter(
-        (b) =>
-          b.title.toLowerCase().includes(q) ||
-          (b.category && b.category.toLowerCase().includes(q)) ||
-          (b.author && b.author.toLowerCase().includes(q)) ||
-          (b.tags && b.tags.some((t) => t.toLowerCase().includes(q)))
-      );
-    }
-
-    switch (sortBy) {
-      case 'price-asc':
-        result.sort((a, b) => a.buy_price - b.buy_price);
-        break;
-      case 'price-desc':
-        result.sort((a, b) => b.buy_price - a.buy_price);
-        break;
-      case 'rating':
-        result.sort((a, b) => (b.rating || 0) - (a.rating || 0));
-        break;
-      case 'popular':
-      default:
-        result.sort((a, b) => (b.rating_count || 0) - (a.rating_count || 0));
-        break;
-    }
-
-    return result;
+    return searchBooks(books, searchQuery, {
+      sortBy: sortBy as any,
+      includePartialMatches: true,
+      minScore: 40,
+    });
   }, [books, searchQuery, sortBy]);
 
   // Pagination calculations
