@@ -77,6 +77,25 @@
         }
       },
       "required": ["title", "is_active", "tiers"]
+    },
+    "Review": {
+      "title": "Review",
+      "description": "User star rating and written review feedback for a book item",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique review identifier" },
+        "bookId": { "type": "string", "description": "ID of the reviewed book item" },
+        "userId": { "type": "string", "description": "UID of author if logged in" },
+        "userName": { "type": "string", "description": "Display name of reviewer" },
+        "userAvatar": { "type": "string", "description": "Avatar URL of reviewer" },
+        "rating": { "type": "number", "description": "Numerical rating between 1 and 5" },
+        "comment": { "type": "string", "description": "Text review comments and feedback" },
+        "title": { "type": "string", "description": "Optional review headline or topic" },
+        "verifiedPurchase": { "type": "boolean", "description": "True if user has purchased this ebook" },
+        "helpfulCount": { "type": "number", "description": "Total count of users who marked this review helpful" },
+        "createdAt": { "type": "string", "description": "ISO timestamp of review submission" }
+      },
+      "required": ["id", "bookId", "userName", "rating", "comment", "createdAt"]
     }
   },
   "firestore": {
@@ -91,6 +110,14 @@
     "/books/{bookId}": {
       "schema": "Book",
       "description": "Ebooks catalog"
+    },
+    "/books/{bookId}/reviews/{reviewId}": {
+      "schema": "Review",
+      "description": "Subcollection of reviews under a specific book"
+    },
+    "/reviews/{reviewId}": {
+      "schema": "Review",
+      "description": "Collection of ratings and reviews across all book items"
     },
     "/discounts/{discountId}": {
       "schema": "Discount",

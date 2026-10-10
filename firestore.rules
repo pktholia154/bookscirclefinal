@@ -5,6 +5,15 @@ service cloud.firestore {
     // Books catalog - public read and sync
     match /books/{bookId} {
       allow read, write: if true;
+
+      match /reviews/{reviewId} {
+        allow read, write: if true;
+      }
+    }
+
+    // Book Ratings and Reviews
+    match /reviews/{reviewId} {
+      allow read, write: if true;
     }
 
     // Discounts & Promotions

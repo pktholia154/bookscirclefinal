@@ -64,7 +64,7 @@ export async function GET(req: NextRequest) {
 
     const activeBooks = books
       .filter((b) => b.isActive !== false)
-      .slice(0, 3500);
+      .slice(0, 1000);
 
     const bookUrlNodes = activeBooks
       .map((b) => {

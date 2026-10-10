@@ -24,6 +24,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { Book, Review } from '@/lib/types';
 import { DEFAULT_BOOK_COVER, BOOK_FAQS } from '@/lib/data';
+import { BookReviewsSection } from '@/components/BookReviewsSection';
 import { PDFReaderModal } from '@/components/PDFReaderModal';
 import { MarkdownReaderModal } from '@/components/MarkdownReaderModal';
 import { SampleSwitcher } from '@/components/SampleSwitcher';
@@ -110,19 +111,6 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
   const book = currentBook;
   const imgSrc = imgLoadFailed ? DEFAULT_BOOK_COVER : (book.cover || DEFAULT_BOOK_COVER);
 
-  // Reviews state with local interactive submission
-  const [customReviews, setCustomReviews] = useState<Review[]>([]);
-
-  const reviewsList = useMemo(() => {
-    return [...customReviews, ...(book.reviews && Array.isArray(book.reviews) ? book.reviews : [])];
-  }, [customReviews, book.reviews]);
-
-  // User review form state
-  const [showReviewForm, setShowReviewForm] = useState(false);
-  const [newReviewRating, setNewReviewRating] = useState(5);
-  const [newReviewComment, setNewReviewComment] = useState('');
-  const [newReviewName, setNewReviewName] = useState('');
-
   // Scroll to top on mount
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' });
@@ -169,29 +157,6 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
     showToast(res.isWishlisted ? 'Added to your wishlist!' : 'Removed from wishlist');
   };
 
-  const handleAddReview = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newReviewComment.trim()) return;
-
-    const newRev: Review = {
-      id: `rev-${Date.now()}`,
-      user: newReviewName.trim() || 'BooksCircle Student',
-      rating: newReviewRating,
-      date: new Date().toLocaleDateString('en-GB', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-      }),
-      comment: newReviewComment.trim(),
-    };
-
-    setCustomReviews((prev) => [newRev, ...prev]);
-    setNewReviewComment('');
-    setNewReviewName('');
-    setShowReviewForm(false);
-    showToast('Thank you! Your review has been published.');
-  };
-
   const rating = book.rating && book.rating > 0 ? book.rating : 4.8;
   const ratingCount = book.rating_count && book.rating_count > 0 ? book.rating_count : 120;
   const formattedReviewsCount =
@@ -219,35 +184,6 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
     const combined = Array.from(new Set([...rawTags, ...defaultTagPool]));
     return combined.slice(0, 6);
   }, [book.tags, book.category, book.language, book.type]);
-
-  // Dynamic Rating distribution bars
-  const ratingBars = useMemo(() => {
-    if (rating >= 4.7) {
-      return [
-        { stars: 5, pct: 78 },
-        { stars: 4, pct: 16 },
-        { stars: 3, pct: 4 },
-        { stars: 2, pct: 1 },
-        { stars: 1, pct: 1 },
-      ];
-    } else if (rating >= 4.4) {
-      return [
-        { stars: 5, pct: 64 },
-        { stars: 4, pct: 24 },
-        { stars: 3, pct: 8 },
-        { stars: 2, pct: 2 },
-        { stars: 1, pct: 2 },
-      ];
-    } else {
-      return [
-        { stars: 5, pct: 52 },
-        { stars: 4, pct: 28 },
-        { stars: 3, pct: 12 },
-        { stars: 2, pct: 5 },
-        { stars: 1, pct: 3 },
-      ];
-    }
-  }, [rating]);
 
   return (
     <div className="min-h-screen bg-white text-gray-900 pb-24 sm:pb-28 antialiased selection:bg-[#4029AB] selection:text-white">
@@ -581,193 +517,19 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
           </div>
         </section>
 
-        {/* 6. "Ratings and reviews" Section */}
-        <section id="book-detail-reviews-section" className="space-y-4 pt-4 border-t border-gray-100">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base sm:text-lg font-bold text-gray-900 flex items-center gap-1.5">
-              <span>Ratings and reviews</span>
-              <ChevronRight className="w-4 h-4 text-gray-400" />
-            </h2>
-
-            <button
-              onClick={() => setShowReviewForm(!showReviewForm)}
-              className="text-xs font-bold text-[#4029AB] hover:underline cursor-pointer"
-            >
-              {showReviewForm ? 'Cancel' : 'Rate this book'}
-            </button>
-          </div>
-
-          {/* Rating Summary Block (Left: Big Number & Stars, Right: 5 Distribution Bars) */}
-          <div className="flex items-center gap-6 sm:gap-8">
-            {/* Left: Overall Rating */}
-            <div className="flex flex-col items-start shrink-0">
-              <span className="text-4xl sm:text-5xl font-black text-gray-950 tracking-tight leading-none">
-                {rating.toFixed(1)}
-              </span>
-              <div className="flex items-center gap-0.5 mt-2 text-[#4029AB]">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <Star
-                    key={star}
-                    className={`w-3.5 h-3.5 ${
-                      star <= Math.round(rating)
-                        ? 'fill-[#4029AB] text-[#4029AB]'
-                        : 'text-gray-200 fill-gray-200'
-                    }`}
-                  />
-                ))}
-              </div>
-              <span className="text-xs text-gray-500 mt-1 font-medium">
-                {formattedReviewsCount} reviews
-              </span>
-            </div>
-
-            {/* Right: 5-to-1 Star Horizontal Progress Bars */}
-            <div className="flex-1 space-y-1.5">
-              {ratingBars.map((bar) => (
-                <div key={bar.stars} className="flex items-center gap-2 text-xs">
-                  <span className="w-2.5 text-right font-medium text-gray-600 text-[11px]">
-                    {bar.stars}
-                  </span>
-                  <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-[#4029AB] rounded-full transition-all duration-500"
-                      style={{ width: `${bar.pct}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Interactive Review Form */}
-          <AnimatePresence>
-            {showReviewForm && (
-              <motion.form
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                onSubmit={handleAddReview}
-                className="p-4 rounded-xl border border-[#4029AB]/20 bg-[#4029AB]/5 space-y-3"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-gray-900">Your Rating:</span>
-                  <div className="flex items-center gap-1">
-                    {[1, 2, 3, 4, 5].map((s) => (
-                      <button
-                        type="button"
-                        key={s}
-                        onClick={() => setNewReviewRating(s)}
-                        className="p-0.5 cursor-pointer"
-                      >
-                        <Star
-                          className={`w-5 h-5 ${
-                            s <= newReviewRating
-                              ? 'fill-amber-400 text-amber-400'
-                              : 'text-gray-300'
-                          }`}
-                        />
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <input
-                  type="text"
-                  placeholder="Your Name (Optional)"
-                  value={newReviewName}
-                  onChange={(e) => setNewReviewName(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-lg border border-gray-200 bg-white focus:outline-none focus:border-[#4029AB]"
-                />
-
-                <textarea
-                  placeholder="Write your review and study feedback..."
-                  value={newReviewComment}
-                  onChange={(e) => setNewReviewComment(e.target.value)}
-                  rows={3}
-                  required
-                  className="w-full px-3 py-2 text-xs rounded-lg border border-gray-200 bg-white focus:outline-none focus:border-[#4029AB] resize-none"
-                />
-
-                <button
-                  type="submit"
-                  className="w-full py-2 rounded-lg bg-[#4029AB] text-white text-xs font-bold hover:bg-[#34208e] transition-all cursor-pointer flex items-center justify-center gap-1.5"
-                >
-                  <Send className="w-3.5 h-3.5" />
-                  <span>Post Review</span>
-                </button>
-              </motion.form>
-            )}
-          </AnimatePresence>
-
-          {/* User Reviews List */}
-          <div className="space-y-4 pt-2">
-            {reviewsList.length === 0 ? (
-              <div className="py-6 text-center bg-gray-50/70 rounded-xl border border-gray-100">
-                <p className="text-xs text-gray-500 font-medium">No reviews yet for this title.</p>
-                <p className="text-[11px] text-gray-400 mt-0.5">Click &ldquo;Rate this book&rdquo; above to be the first to share your feedback!</p>
-              </div>
-            ) : (
-              reviewsList.map((rev) => (
-                <div key={rev.id} className="space-y-1.5 border-b border-gray-100 pb-3.5 last:border-0">
-                  {/* User Header */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      {/* User Avatar */}
-                      {rev.avatar ? (
-                        <div className="relative w-8 h-8 rounded-full overflow-hidden bg-gray-200 shrink-0">
-                          <Image
-                            src={rev.avatar}
-                            alt={rev.user}
-                            fill
-                            sizes="32px"
-                            className="object-cover"
-                            referrerPolicy="no-referrer"
-                          />
-                        </div>
-                      ) : (
-                        <div className="w-8 h-8 rounded-full bg-[#4029AB]/10 text-[#4029AB] flex items-center justify-center font-bold text-xs shrink-0">
-                          {rev.user.charAt(0).toUpperCase()}
-                        </div>
-                      )}
-                      <span className="text-xs font-bold text-gray-900">{rev.user}</span>
-                    </div>
-
-                    <button
-                      className="text-gray-400 hover:text-gray-600 p-1 cursor-pointer"
-                      aria-label="Review options"
-                    >
-                      <MoreVertical className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-
-                  {/* Rating Stars + Date */}
-                  <div className="flex items-center gap-2 text-xs">
-                    <div className="flex items-center gap-0.5 text-[#4029AB]">
-                      {[1, 2, 3, 4, 5].map((s) => (
-                        <Star
-                          key={s}
-                          className={`w-3 h-3 ${
-                            s <= rev.rating
-                              ? 'fill-[#4029AB] text-[#4029AB]'
-                              : 'text-gray-200 fill-gray-200'
-                          }`}
-                        />
-                      ))}
-                    </div>
-                    <span className="text-[11px] text-gray-400 font-normal">
-                      {rev.date}
-                    </span>
-                  </div>
-
-                  {/* Comment Text */}
-                  <p className="text-xs text-gray-700 leading-relaxed font-normal pt-0.5">
-                    {rev.comment}
-                  </p>
-                </div>
-              ))
-            )}
-          </div>
-        </section>
+        {/* 6. Ratings and reviews Section - Live Firebase DB Integration */}
+        <div id="book-detail-reviews-section">
+          <BookReviewsSection
+            book={book}
+            onRatingUpdated={(newRating, newCount) => {
+              setCurrentBook((prev) => ({
+                ...prev,
+                rating: newRating,
+                rating_count: newCount,
+              }));
+            }}
+          />
+        </div>
 
         {/* 7. Similar Books Section (Carousel) */}
         {relatedBooks.length > 0 && (

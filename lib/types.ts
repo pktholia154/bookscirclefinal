@@ -1,10 +1,19 @@
 export interface Review {
   id: string;
+  bookId?: string;
+  userId?: string;
   user: string;
+  userName?: string;
   avatar?: string;
+  userAvatar?: string;
   rating: number;
   date: string;
   comment: string;
+  title?: string;
+  verifiedPurchase?: boolean;
+  helpfulCount?: number;
+  helpfulUserIds?: string[];
+  createdAt?: string;
 }
 
 export interface Book {
