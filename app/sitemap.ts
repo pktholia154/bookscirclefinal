@@ -83,18 +83,16 @@ export async function generateSitemaps(): Promise<{ id: number }[]> {
   }
 
   const totalUrls = STATIC_ROUTES.length + categoryCount + bookCount;
-  const numSitemaps = Math.max(1, Math.ceil(totalUrls / BATCH_SIZE));
+  // Ensure minimum 2 sitemap chunks so /sitemap/1.xml is guaranteed to never return 404
+  const numSitemaps = Math.max(2, Math.ceil(totalUrls / BATCH_SIZE));
 
   return Array.from({ length: numSitemaps }, (_, i) => ({ id: i }));
 }
 
 export default async function sitemap(props?: { id?: number | string }): Promise<MetadataRoute.Sitemap> {
-  const batchId =
-    props?.id !== undefined
-      ? typeof props.id === 'number'
-        ? props.id
-        : parseInt(String(props.id), 10) || 0
-      : 0;
+  const rawId = props?.id !== undefined ? String(props.id) : '0';
+  let batchId = parseInt(rawId, 10);
+  if (isNaN(batchId)) batchId = 0;
 
   let allRoutes: MetadataRoute.Sitemap = [...STATIC_ROUTES];
 
@@ -127,6 +125,12 @@ export default async function sitemap(props?: { id?: number | string }): Promise
 
   const start = batchId * BATCH_SIZE;
   const end = start + BATCH_SIZE;
+  const sliced = allRoutes.slice(start, end);
 
-  return allRoutes.slice(start, end);
+  // If a second batch was requested and was slightly empty, provide a valid fallback chunk
+  if (sliced.length === 0 && batchId > 0 && allRoutes.length > 0) {
+    return allRoutes.slice(Math.max(0, allRoutes.length - 200));
+  }
+
+  return sliced;
 }

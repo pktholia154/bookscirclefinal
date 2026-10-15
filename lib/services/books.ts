@@ -186,22 +186,43 @@ function parseFirestoreRestDocument(docObj: any): { id: string; [key: string]: a
   return res as { id: string; [key: string]: any };
 }
 
-// REST fallback for books
+// Server-side in-memory cache for fast 0ms sitemap & SSR response
+let serverBooksCache: Book[] | null = null;
+let serverBooksCacheExpiresAt = 0;
+const SERVER_BOOKS_CACHE_TTL = 15 * 60 * 1000; // 15 minutes
+
+let serverCategoriesCache: Category[] | null = null;
+let serverCategoriesCacheExpiresAt = 0;
+
+// REST query for books fetching full catalog in one fast request
 async function fetchBooksFromFirestoreRest(): Promise<Book[] | null> {
   try {
-    const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/${FIRESTORE_DATABASE_ID}/documents/books?pageSize=100&key=${FIREBASE_API_KEY}`;
-    const res = await fetch(url, { cache: 'no-store' });
+    const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/${FIRESTORE_DATABASE_ID}/documents:runQuery?key=${FIREBASE_API_KEY}`;
+    const queryBody = {
+      structuredQuery: {
+        from: [{ collectionId: 'books' }],
+        limit: 3000,
+      },
+    };
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(queryBody),
+      cache: 'no-store',
+    });
+
     if (!res.ok) return null;
-    const contentType = res.headers.get('content-type') || '';
-    if (!contentType.includes('application/json')) return null;
-    const text = await res.text();
-    if (text.trim().startsWith('<')) return null;
-    const json = JSON.parse(text);
-    if (json && Array.isArray(json.documents)) {
-      return json.documents.map((docObj: any) => {
-        const parsed = parseFirestoreRestDocument(docObj);
-        return parseBookDocument(parsed);
-      });
+    const data = await res.json();
+    if (Array.isArray(data)) {
+      const books: Book[] = [];
+      for (const item of data) {
+        if (item.document) {
+          const parsed = parseFirestoreRestDocument(item.document);
+          books.push(parseBookDocument(parsed));
+        }
+      }
+      return books.length > 0 ? books : null;
     }
     return null;
   } catch (err) {
@@ -241,6 +262,14 @@ async function fetchCategoriesFromFirestoreRest(): Promise<Category[] | null> {
 
 // Fetch all books with fast race between Firestore SDK, REST API and cache
 export async function getBooksFromFirestore(): Promise<Book[]> {
+  const isServer = typeof window === 'undefined';
+  const now = Date.now();
+
+  // Return server-side memory cache immediately if fresh
+  if (isServer && serverBooksCache && now < serverBooksCacheExpiresAt && serverBooksCache.length > 0) {
+    return serverBooksCache;
+  }
+
   purgeLegacyDemoCache();
   const fallback = getCachedBooksSync();
 
@@ -267,24 +296,31 @@ export async function getBooksFromFirestore(): Promise<Book[]> {
   })();
 
   const timeoutPromise = new Promise<null>((resolve) =>
-    setTimeout(() => resolve(null), 2500)
+    setTimeout(() => resolve(null), isServer ? 3500 : 2500)
   );
 
   let result = await Promise.race([sdkFetch, timeoutPromise]);
   if (!result || result.length === 0) {
-    // Attempt rapid REST fallback
+    // Attempt rapid REST fallback with full collection runQuery
     const restBooks = await fetchBooksFromFirestoreRest();
     if (restBooks && restBooks.length > 0) {
       if (typeof window !== 'undefined') {
         try {
           localStorage.setItem(LOCAL_STORAGE_BOOKS_KEY, JSON.stringify(restBooks));
         } catch {}
+      } else {
+        serverBooksCache = restBooks;
+        serverBooksCacheExpiresAt = now + SERVER_BOOKS_CACHE_TTL;
       }
       return restBooks;
     }
   }
 
   if (result && result.length > 0) {
+    if (isServer) {
+      serverBooksCache = result;
+      serverBooksCacheExpiresAt = now + SERVER_BOOKS_CACHE_TTL;
+    }
     return result;
   }
 
