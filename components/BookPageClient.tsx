@@ -39,6 +39,7 @@ import { InstallSuccessModal } from '@/components/InstallSuccessModal';
 import { usePWAInstall } from '@/hooks/use-pwa-install';
 import { CartDrawer } from '@/components/CartDrawer';
 import { BottomNav, TabKey } from '@/components/BottomNav';
+import { triggerNativeLoading } from '@/components/NativePageLoadingIndicator';
 import { UserProfile } from '@/components/Header';
 import { processRazorpayPayment, loadRazorpayScript } from '@/lib/services/razorpay';
 import { recordUserPurchaseInFirestore, syncUserPurchases, subscribeToUserPurchases } from '@/lib/services/purchases';
@@ -129,16 +130,29 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
     return cart.reduce((acc, i) => acc + i.quantity, 0);
   }, [cart]);
 
+  // Prefetch critical destinations for ultra-fast instant transitions
+  useEffect(() => {
+    router.prefetch('/purchased');
+    router.prefetch('/');
+  }, [router]);
+
   const handleTabChange = (tab: TabKey) => {
     if (tab === 'cart') {
       setIsCartOpen(true);
       return;
     }
-    if (tab === 'home') {
-      router.push('/');
-      return;
-    }
-    router.push(`/?tab=${tab}`);
+    triggerNativeLoading(150);
+    startTransition(() => {
+      if (tab === 'purchased') {
+        router.push('/purchased');
+        return;
+      }
+      if (tab === 'home') {
+        router.push('/');
+        return;
+      }
+      router.push(`/?tab=${tab}`);
+    });
   };
 
   // Keep in sync with initialBook prop
@@ -927,9 +941,9 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
           </motion.div>
         )}
       </AnimatePresence>
-      {/* Fixed Bottom Navigation Menu Bar - Purchased tab kept active to catch visitor attention */}
+      {/* Fixed Bottom Navigation Menu Bar - Book Details View */}
       <BottomNav
-        activeTab="purchased"
+        activeTab="book"
         onTabChange={handleTabChange}
         cartCount={totalCartCount}
         purchasedCount={purchasedBookIds.length}

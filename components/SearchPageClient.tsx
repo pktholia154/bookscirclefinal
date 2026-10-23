@@ -204,8 +204,8 @@ function SearchPageContent({
       router.push('/');
       return;
     }
-    if (tab === 'search') {
-      setSelectedBook(null);
+    if (tab === 'purchased') {
+      router.push('/purchased');
       return;
     }
     router.push(`/?tab=${tab}`);

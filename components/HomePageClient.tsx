@@ -123,8 +123,18 @@ export default function HomePage({
     initialCategories && initialCategories.length > 0 ? initialCategories : INITIAL_CATEGORIES
   );
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [activeTab, setActiveTab] = useState<TabKey>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const tabParam = new URLSearchParams(window.location.search).get('tab');
+        if (tabParam && ['home', 'categories', 'purchased', 'cart', 'profile', 'search'].includes(tabParam)) {
+          return tabParam as TabKey;
+        }
+      } catch {}
+    }
+    return 'home';
+  });
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [activeTab, setActiveTab] = useState<TabKey>('home');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [salesCountMap, setSalesCountMap] = useState<Record<string, number>>({});
@@ -1453,9 +1463,9 @@ export default function HomePage({
         onClose={closeInstallSuccess}
       />
 
-      {/* Fixed High Density Bottom Navigation - Keeps Purchased button in active mode on Book details view */}
+      {/* Fixed High Density Bottom Navigation */}
       <BottomNav
-        activeTab={selectedBook ? 'purchased' : activeTab}
+        activeTab={selectedBook ? 'book' : activeTab}
         onTabChange={(tab) => {
           if (selectedBook) {
             setSelectedBook(null);
