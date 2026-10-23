@@ -54,6 +54,8 @@ export interface Book {
   publisher?: string;
   publication?: string;
   published_date?: string;
+  created_at?: string;
+  updated_at?: string;
   isbn?: string;
   pages?: number;
   language?: string;

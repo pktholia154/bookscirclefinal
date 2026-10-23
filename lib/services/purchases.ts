@@ -21,6 +21,7 @@ import {
   removePendingPurchase,
 } from '../offline-storage';
 import { CartItem, Book } from '../types';
+import { FREE_SAMPLE_BOOK_ID } from '../data';
 
 export interface PurchaseItemDetail {
   id: string;
@@ -388,13 +389,13 @@ export async function syncUserPurchases(userId?: string, userEmail?: string): Pr
 
   // Merge remote with local purchases to ensure offline resilience
   if (userId && userId !== 'guest_user') {
-    const mergedIds = Array.from(new Set([...localPurchased, ...uniqueRemoteIds]));
+    const mergedIds = Array.from(new Set([FREE_SAMPLE_BOOK_ID, ...localPurchased, ...uniqueRemoteIds]));
     await savePurchasedBookIds(mergedIds);
     return mergedIds;
   }
 
-  // Fallback for guest users without an account: return local storage
-  return Array.from(new Set(localPurchased));
+  // Fallback for guest users without an account: return local storage with sample book
+  return Array.from(new Set([FREE_SAMPLE_BOOK_ID, ...localPurchased]));
 }
 
 /**

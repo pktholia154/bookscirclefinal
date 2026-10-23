@@ -48,20 +48,25 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   const category = matchCategory(slug, categories);
   const title = category ? category.title : decodeURIComponent(slug);
+  const canonicalSlug = category ? (category.seolsug || category.id) : decodeURIComponent(slug);
   const seoCat = category?.seoCat || '';
-  const url = `${SITE_URL}/categories/${encodeURIComponent(slug)}`;
+  const metaDescription =
+    seoCat ||
+    `Download ${title} PDF e-books, previous year solved question papers, and competitive exam study material with instant preview on ${SITE_NAME}.`;
+  const canonicalUrl = `${SITE_URL}/category/${encodeURIComponent(canonicalSlug)}`;
 
   return {
     title: `${title} PDF E-Books & Study Material | ${SITE_NAME}`,
-    ...(seoCat ? { description: seoCat } : {}),
+    description: metaDescription,
     alternates: {
-      canonical: url,
+      canonical: canonicalUrl,
     },
     openGraph: {
-      title: `${title} E-Books & Exam Preparation PDF Library`,
-      ...(seoCat ? { description: seoCat } : {}),
-      url: url,
+      title: `${title} E-Books & Exam Preparation PDF Library | ${SITE_NAME}`,
+      description: metaDescription,
+      url: canonicalUrl,
       siteName: SITE_NAME,
+      locale: 'en_IN',
       type: 'website',
     },
   };

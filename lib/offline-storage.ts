@@ -2,6 +2,7 @@
 
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
 import { Book } from './types';
+import { FREE_SAMPLE_BOOK_ID } from './data';
 
 const OFFLINE_CACHE_NAME = 'bookscircle-offline-pdfs-v2';
 
@@ -147,31 +148,31 @@ export async function savePurchasedBookIds(bookIds: string[]): Promise<void> {
 
     // Also sync to localStorage for instantaneous synchronous lookups
     const existing = getPurchasedBookIdsFromLocal();
-    const combined = Array.from(new Set([...existing, ...bookIds]));
+    const combined = Array.from(new Set([FREE_SAMPLE_BOOK_ID, ...existing, ...bookIds]));
     localStorage.setItem('bookscircle_purchased_books', JSON.stringify(combined));
     requestPersistentStorage().catch(() => {});
   } catch (e) {
     console.warn('Failed to save purchased books to DB:', (e as any)?.message || String(e));
     try {
       const existing = getPurchasedBookIdsFromLocal();
-      const combined = Array.from(new Set([...existing, ...bookIds]));
+      const combined = Array.from(new Set([FREE_SAMPLE_BOOK_ID, ...existing, ...bookIds]));
       localStorage.setItem('bookscircle_purchased_books', JSON.stringify(combined));
     } catch {}
   }
 }
 
 export function getPurchasedBookIdsFromLocal(): string[] {
-  if (typeof window === 'undefined') return [];
+  if (typeof window === 'undefined') return [FREE_SAMPLE_BOOK_ID];
   try {
     const saved = localStorage.getItem('bookscircle_purchased_books');
     if (saved) {
       const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed)) return Array.from(new Set([FREE_SAMPLE_BOOK_ID, ...parsed]));
     }
   } catch (e) {
     console.warn('Failed to read purchased books from localStorage:', (e as any)?.message || String(e));
   }
-  return [];
+  return [FREE_SAMPLE_BOOK_ID];
 }
 
 /**

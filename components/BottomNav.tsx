@@ -9,12 +9,14 @@ interface BottomNavProps {
   activeTab: TabKey;
   onTabChange: (tab: TabKey) => void;
   cartCount: number;
+  purchasedCount?: number;
 }
 
 export const BottomNav: React.FC<BottomNavProps> = ({
   activeTab,
   onTabChange,
   cartCount,
+  purchasedCount = 0,
 }) => {
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 h-16 sm:h-18 bg-white/95 backdrop-blur-md border-t-2 md:border-x-2 border-gray-200 flex items-center justify-around px-2 sm:px-6 max-w-2xl lg:max-w-3xl mx-auto shadow-md">
@@ -23,13 +25,13 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         id="nav-tab-home"
         onClick={() => onTabChange('home')}
         className={`flex-1 py-1 flex flex-col items-center justify-center gap-1 transition-all active:scale-95 cursor-pointer ${
-          activeTab === 'home' ? 'text-[#5e17eb]' : 'text-gray-600 hover:text-gray-900'
+          activeTab === 'home' ? 'text-[#1c0ca3]' : 'text-gray-600 hover:text-gray-900'
         }`}
       >
         <div
           className={`w-9.5 h-9.5 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl border-2 flex items-center justify-center transition-all ${
             activeTab === 'home'
-              ? 'border-[#5e17eb] bg-[#5e17eb]/10 text-[#5e17eb] shadow-xs'
+              ? 'border-[#1c0ca3] bg-[#1c0ca3]/10 text-[#1c0ca3] shadow-xs'
               : 'border-gray-300 bg-white text-gray-700 hover:border-gray-500'
           }`}
         >
@@ -40,7 +42,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         </div>
         <span
           className={`text-xs font-bold tracking-tight ${
-            activeTab === 'home' ? 'text-[#5e17eb]' : 'text-gray-600'
+            activeTab === 'home' ? 'text-[#1c0ca3]' : 'text-gray-600'
           }`}
         >
           Home
@@ -52,13 +54,13 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         id="nav-tab-categories"
         onClick={() => onTabChange('categories')}
         className={`flex-1 py-1 flex flex-col items-center justify-center gap-1 transition-all active:scale-95 cursor-pointer ${
-          activeTab === 'categories' ? 'text-[#5e17eb]' : 'text-gray-600 hover:text-gray-900'
+          activeTab === 'categories' ? 'text-[#1c0ca3]' : 'text-gray-600 hover:text-gray-900'
         }`}
       >
         <div
           className={`w-9.5 h-9.5 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl border-2 flex items-center justify-center transition-all ${
             activeTab === 'categories'
-              ? 'border-[#5e17eb] bg-[#5e17eb]/10 text-[#5e17eb] shadow-xs'
+              ? 'border-[#1c0ca3] bg-[#1c0ca3]/10 text-[#1c0ca3] shadow-xs'
               : 'border-gray-300 bg-white text-gray-700 hover:border-gray-500'
           }`}
         >
@@ -69,7 +71,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         </div>
         <span
           className={`text-xs font-bold tracking-tight ${
-            activeTab === 'categories' ? 'text-[#5e17eb]' : 'text-gray-600'
+            activeTab === 'categories' ? 'text-[#1c0ca3]' : 'text-gray-600'
           }`}
         >
           Categories
@@ -81,13 +83,13 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         id="nav-tab-cart"
         onClick={() => onTabChange('cart')}
         className={`flex-1 py-1 relative flex flex-col items-center justify-center gap-1 transition-all active:scale-95 cursor-pointer ${
-          activeTab === 'cart' ? 'text-[#5e17eb]' : 'text-gray-600 hover:text-gray-900'
+          activeTab === 'cart' ? 'text-[#1c0ca3]' : 'text-gray-600 hover:text-gray-900'
         }`}
       >
         <div
           className={`w-9.5 h-9.5 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl border-2 relative flex items-center justify-center transition-all ${
             activeTab === 'cart'
-              ? 'border-[#5e17eb] bg-[#5e17eb]/10 text-[#5e17eb] shadow-xs'
+              ? 'border-[#1c0ca3] bg-[#1c0ca3]/10 text-[#1c0ca3] shadow-xs'
               : 'border-gray-300 bg-white text-gray-700 hover:border-gray-500'
           }`}
         >
@@ -96,14 +98,14 @@ export const BottomNav: React.FC<BottomNavProps> = ({
             strokeWidth={activeTab === 'cart' ? 2.5 : 2.2}
           />
           {cartCount > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] bg-[#5e17eb] text-white text-[10px] font-black rounded-full flex items-center justify-center px-1 shadow-xs border-2 border-white">
+            <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] bg-[#1c0ca3] text-white text-[10px] font-black rounded-full flex items-center justify-center px-1 shadow-xs border-2 border-white">
               {cartCount}
             </span>
           )}
         </div>
         <span
           className={`text-xs font-bold tracking-tight ${
-            activeTab === 'cart' ? 'text-[#5e17eb]' : 'text-gray-600'
+            activeTab === 'cart' ? 'text-[#1c0ca3]' : 'text-gray-600'
           }`}
         >
           Cart
@@ -114,14 +116,14 @@ export const BottomNav: React.FC<BottomNavProps> = ({
       <button
         id="nav-tab-purchased"
         onClick={() => onTabChange('purchased')}
-        className={`flex-1 py-1 flex flex-col items-center justify-center gap-1 transition-all active:scale-95 cursor-pointer ${
-          activeTab === 'purchased' ? 'text-[#5e17eb]' : 'text-gray-600 hover:text-gray-900'
+        className={`flex-1 py-1 relative flex flex-col items-center justify-center gap-1 transition-all active:scale-95 cursor-pointer ${
+          activeTab === 'purchased' ? 'text-[#1c0ca3]' : 'text-gray-600 hover:text-gray-900'
         }`}
       >
         <div
-          className={`w-9.5 h-9.5 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl border-2 flex items-center justify-center transition-all ${
+          className={`w-9.5 h-9.5 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl border-2 relative flex items-center justify-center transition-all ${
             activeTab === 'purchased'
-              ? 'border-[#5e17eb] bg-[#5e17eb]/10 text-[#5e17eb] shadow-xs'
+              ? 'border-[#1c0ca3] bg-[#1c0ca3]/15 text-[#1c0ca3] shadow-xs ring-2 ring-[#1c0ca3]/20'
               : 'border-gray-300 bg-white text-gray-700 hover:border-gray-500'
           }`}
         >
@@ -131,8 +133,8 @@ export const BottomNav: React.FC<BottomNavProps> = ({
           />
         </div>
         <span
-          className={`text-xs font-bold tracking-tight ${
-            activeTab === 'purchased' ? 'text-[#5e17eb]' : 'text-gray-600'
+          className={`text-xs tracking-tight ${
+            activeTab === 'purchased' ? 'text-[#1c0ca3] font-black' : 'text-gray-600 font-bold'
           }`}
         >
           Purchased
@@ -144,13 +146,13 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         id="nav-tab-profile"
         onClick={() => onTabChange('profile')}
         className={`flex-1 py-1 flex flex-col items-center justify-center gap-1 transition-all active:scale-95 cursor-pointer ${
-          activeTab === 'profile' ? 'text-[#5e17eb]' : 'text-gray-600 hover:text-gray-900'
+          activeTab === 'profile' ? 'text-[#1c0ca3]' : 'text-gray-600 hover:text-gray-900'
         }`}
       >
         <div
           className={`w-9.5 h-9.5 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl border-2 flex items-center justify-center transition-all ${
             activeTab === 'profile'
-              ? 'border-[#5e17eb] bg-[#5e17eb]/10 text-[#5e17eb] shadow-xs'
+              ? 'border-[#1c0ca3] bg-[#1c0ca3]/10 text-[#1c0ca3] shadow-xs'
               : 'border-gray-300 bg-white text-gray-700 hover:border-gray-500'
           }`}
         >
@@ -161,7 +163,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         </div>
         <span
           className={`text-xs font-bold tracking-tight ${
-            activeTab === 'profile' ? 'text-[#5e17eb]' : 'text-gray-600'
+            activeTab === 'profile' ? 'text-[#1c0ca3]' : 'text-gray-600'
           }`}
         >
           Profile

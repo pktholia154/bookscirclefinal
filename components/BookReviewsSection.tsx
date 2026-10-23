@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useTransition } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useTransition } from 'react';
 import Image from 'next/image';
 import {
   Star,
@@ -113,12 +113,37 @@ export const BookReviewsSection: React.FC<BookReviewsSectionProps> = ({
     return computeRatingStats(reviews, baseRating, baseCount);
   }, [reviews, baseRating, baseCount]);
 
-  // Notify parent if rating changes
+  // Stable ref for onRatingUpdated callback to prevent infinite re-render loops
+  const onRatingUpdatedRef = useRef(onRatingUpdated);
   useEffect(() => {
-    if (onRatingUpdated && reviews.length > 0) {
-      onRatingUpdated(ratingStats.averageRating, ratingStats.totalCount);
+    onRatingUpdatedRef.current = onRatingUpdated;
+  }, [onRatingUpdated]);
+
+  const lastNotifiedRef = useRef<{ rating: number; count: number } | null>(null);
+
+  // Notify parent if rating changes, with strict equality guard
+  useEffect(() => {
+    if (!onRatingUpdatedRef.current || reviews.length === 0) return;
+
+    const newRating = ratingStats.averageRating;
+    const newCount = ratingStats.totalCount;
+
+    if (
+      lastNotifiedRef.current &&
+      lastNotifiedRef.current.rating === newRating &&
+      lastNotifiedRef.current.count === newCount
+    ) {
+      return;
     }
-  }, [reviews.length, ratingStats.averageRating, ratingStats.totalCount, onRatingUpdated]);
+
+    if (book.rating === newRating && book.rating_count === newCount) {
+      lastNotifiedRef.current = { rating: newRating, count: newCount };
+      return;
+    }
+
+    lastNotifiedRef.current = { rating: newRating, count: newCount };
+    onRatingUpdatedRef.current(newRating, newCount);
+  }, [reviews.length, ratingStats.averageRating, ratingStats.totalCount, book.rating, book.rating_count]);
 
   // Filtered and Sorted Reviews
   const filteredReviews = useMemo(() => {

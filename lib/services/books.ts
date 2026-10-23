@@ -67,6 +67,38 @@ export function getCachedCategoriesSync(): Category[] {
   return INITIAL_CATEGORIES;
 }
 
+function resolveIsoTimestamp(val: any): string | undefined {
+  if (!val) return undefined;
+  try {
+    if (typeof val === 'object') {
+      if (typeof val.seconds === 'number') {
+        return new Date(val.seconds * 1000).toISOString();
+      }
+      if (typeof val._seconds === 'number') {
+        return new Date(val._seconds * 1000).toISOString();
+      }
+      if (typeof val.toDate === 'function') {
+        return val.toDate().toISOString();
+      }
+    }
+    if (typeof val === 'number' && val > 946684800000) {
+      return new Date(val).toISOString();
+    }
+    if (typeof val === 'string') {
+      const trimmed = val.trim();
+      if (!trimmed) return undefined;
+      if (/^\d{4}$/.test(trimmed)) {
+        return `${trimmed}-01-01T00:00:00.000Z`;
+      }
+      const parsed = new Date(trimmed);
+      if (!isNaN(parsed.getTime())) {
+        return parsed.toISOString();
+      }
+    }
+  } catch {}
+  return undefined;
+}
+
 export function parseBookDocument(docSnap: any): Book {
   const data = docSnap.data ? docSnap.data() : docSnap;
   const bookId = docSnap.id || data.id || '';
@@ -101,6 +133,13 @@ export function parseBookDocument(docSnap: any): Book {
   const publisher = data.publisher || data.publication || 'Mocktime Publication';
   const language = data.language || 'English';
   const bookType = data.type || data.format || data.book_type || data.edition || 'Question Bank';
+
+  const createdAtIso =
+    resolveIsoTimestamp(data.createdAt ?? data.created_at ?? data._createTime) ||
+    resolveIsoTimestamp(data.published_date ?? data.publish_date);
+  const updatedAtIso =
+    resolveIsoTimestamp(data.updatedAt ?? data.updated_at ?? data._updateTime) ||
+    createdAtIso;
 
   return {
     id: bookId,
@@ -140,6 +179,8 @@ export function parseBookDocument(docSnap: any): Book {
     publisher: publisher,
     publication: publisher,
     published_date: data.published_date || data.published_year || data.publish_date || (data.createdAt?.seconds ? new Date(data.createdAt.seconds * 1000).getFullYear().toString() : '2026'),
+    created_at: createdAtIso,
+    updated_at: updatedAtIso,
     isbn: data.isbn || '',
     pages: pages > 0 ? pages : 280,
     language: language,
@@ -183,6 +224,8 @@ function parseFirestoreRestDocument(docObj: any): { id: string; [key: string]: a
   }
   const parts = (docObj.name || '').split('/');
   res.id = res.id || parts[parts.length - 1] || '';
+  if (docObj.createTime) res._createTime = docObj.createTime;
+  if (docObj.updateTime) res._updateTime = docObj.updateTime;
   return res as { id: string; [key: string]: any };
 }
 
@@ -382,6 +425,18 @@ export function subscribeToFirestoreBook(bookId: string, onUpdate: (book: Book |
 
 // Fetch all categories with fast timeout and REST fallback
 export async function getCategoriesFromFirestore(): Promise<Category[]> {
+  const isServer = typeof window === 'undefined';
+  const now = Date.now();
+
+  if (
+    isServer &&
+    serverCategoriesCache &&
+    now < serverCategoriesCacheExpiresAt &&
+    serverCategoriesCache.length > 0
+  ) {
+    return serverCategoriesCache;
+  }
+
   purgeLegacyDemoCache();
   const fallback = getCachedCategoriesSync();
 
@@ -428,12 +483,19 @@ export async function getCategoriesFromFirestore(): Promise<Category[]> {
         try {
           localStorage.setItem(LOCAL_STORAGE_CATEGORIES_KEY, JSON.stringify(restCats));
         } catch {}
+      } else {
+        serverCategoriesCache = restCats;
+        serverCategoriesCacheExpiresAt = now + SERVER_BOOKS_CACHE_TTL;
       }
       return restCats;
     }
   }
 
   if (result && result.length > 0) {
+    if (isServer) {
+      serverCategoriesCache = result;
+      serverCategoriesCacheExpiresAt = now + SERVER_BOOKS_CACHE_TTL;
+    }
     return result;
   }
 

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useTransition } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useTransition } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
@@ -24,10 +24,11 @@ import {
   HelpCircle,
   Heart,
   FileCode,
+  Smartphone,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Book, Review, CartItem } from '@/lib/types';
-import { DEFAULT_BOOK_COVER, BOOK_FAQS } from '@/lib/data';
+import { DEFAULT_BOOK_COVER, BOOK_FAQS, FREE_SAMPLE_BOOK_ID } from '@/lib/data';
 import { BookReviewsSection } from '@/components/BookReviewsSection';
 import { PDFReaderModal } from '@/components/PDFReaderModal';
 import { MarkdownReaderModal } from '@/components/MarkdownReaderModal';
@@ -53,6 +54,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
+import { MarkdownCodeBlock, MarkdownCodeElement } from '@/components/MarkdownCodeBlock';
 
 interface BookPageClientProps {
   book: Book;
@@ -118,7 +120,7 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
   } = usePWAInstall();
   const [isGoogleModalOpen, setIsGoogleModalOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
-  const [purchasedBookIds, setPurchasedBookIds] = useState<string[]>([]);
+  const [purchasedBookIds, setPurchasedBookIds] = useState<string[]>([FREE_SAMPLE_BOOK_ID]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [pendingActionAfterLogin, setPendingActionAfterLogin] = useState<((user: UserProfile) => void) | null>(null);
   const [, startTransition] = useTransition();
@@ -143,7 +145,8 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
   useEffect(() => {
     setCurrentBook(initialBook);
     setImgLoadFailed(false);
-  }, [initialBook.id, initialBook]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialBook.id]);
 
   // Real-time Firestore synchronization for this exact book
   useEffect(() => {
@@ -155,6 +158,20 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
     });
     return () => unsubscribe();
   }, [initialBook.id]);
+
+  // Memoized rating updater to prevent cyclical re-renders
+  const handleRatingUpdated = useCallback((newRating: number, newCount: number) => {
+    setCurrentBook((prev) => {
+      if (prev.rating === newRating && prev.rating_count === newCount) {
+        return prev;
+      }
+      return {
+        ...prev,
+        rating: newRating,
+        rating_count: newCount,
+      };
+    });
+  }, []);
 
   const book = currentBook;
 
@@ -461,11 +478,19 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
           >
             <ArrowLeft className="w-4 h-4 text-gray-800" />
           </Link>
-          <div className="flex items-center gap-1.5 text-xs text-gray-500 font-semibold truncate">
+          <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-gray-500 font-semibold truncate">
             <Link href="/" className="hover:text-[#4029AB]">Home</Link>
-            <ChevronRight className="w-3 h-3 text-gray-400" />
-            <span className="text-[#4029AB] font-bold truncate">{book.category}</span>
-          </div>
+            <ChevronRight className="w-3 h-3 text-gray-400 shrink-0" />
+            <Link
+              href={`/category/${encodeURIComponent(
+                book.categorySlug ||
+                  (book.category || 'all').toLowerCase().trim().replace(/\s+/g, '-')
+              )}`}
+              className="text-[#4029AB] font-bold truncate hover:underline"
+            >
+              {book.category}
+            </Link>
+          </nav>
         </div>
       </header>
 
@@ -628,11 +653,11 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
 
             {/* Right: Full Edition (Buy Now or Read Full) */}
             <div className="flex flex-col gap-1 w-full">
-              {/* Attached FULL EDITION tag text at top left corner in small light font */}
-              <div className="flex items-center justify-start px-0.5">
+              {/* Attached FULL EDITION tag text centered in small light font */}
+              <div className="flex items-center justify-center px-0.5 text-center">
                 <span
                   id="full-edition-label-text"
-                  className="text-[10px] sm:text-[11px] font-medium text-gray-500 uppercase tracking-wider select-none"
+                  className="text-[10px] sm:text-[11px] font-medium text-gray-500 uppercase tracking-wider select-none text-center"
                 >
                   FULL EDITION
                 </span>
@@ -640,11 +665,11 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
 
               {/* Right Action Button */}
               {isPurchased ? (
-                <div className="flex items-stretch rounded-full overflow-hidden border-2 border-emerald-600 shadow-xs h-10 w-full bg-emerald-600 p-[2px]">
+                <div className="flex items-stretch rounded-md overflow-hidden border-2 border-emerald-600 shadow-xs h-10 w-full bg-emerald-600 p-[2px]">
                   <button
                     id="book-page-read-pdf-btn"
                     onClick={() => setActivePdfReaderMode('full')}
-                    className="flex-1 rounded-l-full bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-1 transition-all cursor-pointer px-2 border-r border-white/25 select-none"
+                    className="flex-1 rounded-l-[4px] bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-1 transition-all cursor-pointer px-2 border-r border-white/25 select-none"
                     title="Read Complete eBook in PDF format"
                   >
                     <BookOpen className="w-3.5 h-3.5 text-white" />
@@ -653,11 +678,11 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
                   <button
                     id="book-page-read-md-btn"
                     onClick={() => setActiveMdReaderMode('full')}
-                    className="flex-1 rounded-r-full bg-[#FFFFFF] hover:bg-[#d9e802] active:scale-95 text-slate-950 font-black text-xs sm:text-sm flex items-center justify-center gap-1 transition-all cursor-pointer px-2 select-none"
-                    title="Read Complete eBook in Markdown / ePub format"
+                    className="flex-1 rounded-r-[4px] bg-[#FFFFFF] hover:bg-[#d9e802] active:scale-95 text-slate-950 font-black text-xs sm:text-sm flex items-center justify-center gap-1 transition-all cursor-pointer px-2 select-none"
+                    title="Read Complete eBook in Mobile format"
                   >
-                    <FileCode className="w-3.5 h-3.5 text-slate-950" />
-                    <span>Full epub</span>
+                    <Smartphone className="w-3.5 h-3.5 text-slate-950" />
+                    <span>Full mobile</span>
                   </button>
                 </div>
               ) : (
@@ -666,7 +691,7 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
                   onMouseEnter={() => loadRazorpayScript()}
                   onTouchStart={() => loadRazorpayScript()}
                   onClick={handleBuyNow}
-                  className="w-full h-10 rounded-full bg-white hover:bg-[#4029AB]/5 text-[#4029AB] border-2 border-[#4029AB] text-xs sm:text-sm font-black transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                  className="w-full h-10 rounded-md bg-white hover:bg-[#4029AB]/5 text-[#4029AB] border-2 border-[#4029AB] text-xs sm:text-sm font-black transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
                 >
                   <ShoppingBag className="w-4 h-4 text-[#4029AB]" />
                   <span>Buy (₹{book.buy_price})</span>
@@ -724,11 +749,8 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
                           {children}
                         </blockquote>
                       ),
-                      code: ({ children }) => (
-                        <code className="bg-gray-100 px-1.5 py-0.5 rounded text-[11px] font-mono text-gray-900">
-                          {children}
-                        </code>
-                      ),
+                      pre: MarkdownCodeBlock,
+                      code: MarkdownCodeElement,
                       a: ({ href, children }) => (
                         <a href={href} className="text-[#4029AB] underline font-medium hover:text-[#34208e]">
                           {children}
@@ -789,13 +811,7 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
         <div id="book-ssr-reviews-section">
           <BookReviewsSection
             book={book}
-            onRatingUpdated={(newRating, newCount) => {
-              setCurrentBook((prev) => ({
-                ...prev,
-                rating: newRating,
-                rating_count: newCount,
-              }));
-            }}
+            onRatingUpdated={handleRatingUpdated}
           />
         </div>
 
@@ -911,11 +927,12 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
           </motion.div>
         )}
       </AnimatePresence>
-      {/* Fixed Bottom Navigation Menu Bar */}
+      {/* Fixed Bottom Navigation Menu Bar - Purchased tab kept active to catch visitor attention */}
       <BottomNav
-        activeTab="book"
+        activeTab="purchased"
         onTabChange={handleTabChange}
         cartCount={totalCartCount}
+        purchasedCount={purchasedBookIds.length}
       />
     </div>
   );

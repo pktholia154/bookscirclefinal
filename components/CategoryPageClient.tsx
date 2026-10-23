@@ -21,7 +21,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { Book, Category, CartItem } from '@/lib/types';
-import { DEFAULT_BOOK_COVER } from '@/lib/data';
+import { DEFAULT_BOOK_COVER, FREE_SAMPLE_BOOK_ID } from '@/lib/data';
 import { searchBooks } from '@/lib/search';
 import { BookCard } from '@/components/BookCard';
 import { BookListView } from '@/components/BookListView';
@@ -77,7 +77,7 @@ export const CategoryPageClient: React.FC<CategoryPageClientProps> = ({
   const [sortBy, setSortBy] = useState<'popular' | 'price-asc' | 'price-desc' | 'rating'>('popular');
   const [wishlistIds, setWishlistIds] = useState<string[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [purchasedBookIds, setPurchasedBookIds] = useState<string[]>([]);
+  const [purchasedBookIds, setPurchasedBookIds] = useState<string[]>([FREE_SAMPLE_BOOK_ID]);
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);

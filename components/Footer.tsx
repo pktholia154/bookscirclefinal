@@ -43,7 +43,7 @@ export const Footer: React.FC<FooterProps> = () => {
 
         {/* Minimal Legal & Copyright Text */}
         <div className="flex flex-col sm:flex-row items-center sm:items-baseline justify-between gap-2 text-[11px] text-gray-400 pt-1">
-          <p>
+          <p suppressHydrationWarning>
             © {new Date().getFullYear()} <span className="font-semibold text-gray-600">Exam Kart</span> (Legal Entity: Pardeep Kumar). All rights reserved.
           </p>
           <p className="text-[11px] text-gray-400">

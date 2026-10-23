@@ -79,6 +79,33 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      {
+        source: '/api/md(.*)',
+        headers: [
+          {
+            key: 'X-Robots-Tag',
+            value: 'noindex, nofollow, noarchive',
+          },
+        ],
+      },
+      {
+        source: '/pdf(.*)',
+        headers: [
+          {
+            key: 'X-Robots-Tag',
+            value: 'noindex, nofollow, noarchive',
+          },
+        ],
+      },
+      {
+        source: '/md(.*)',
+        headers: [
+          {
+            key: 'X-Robots-Tag',
+            value: 'noindex, nofollow, noarchive',
+          },
+        ],
+      },
     ];
   },
   webpack: (config, { isServer, webpack }) => {

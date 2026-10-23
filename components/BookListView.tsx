@@ -103,7 +103,13 @@ const BookListItem: React.FC<{
       <div className="flex-1 min-w-0 pr-1">
         {/* 2-row Title */}
         <h3 className="font-bold text-sm sm:text-base text-gray-950 line-clamp-2 leading-snug group-hover:text-[#5e17eb] transition-colors">
-          {book.title}
+          <a
+            href={`/book/${encodeURIComponent(book.seoslug || book.slug || book.id)}`}
+            onClick={(e) => e.preventDefault()}
+            className="text-inherit no-underline"
+          >
+            {book.title}
+          </a>
         </h3>
 
         {/* Category, Language & Type in same row */}

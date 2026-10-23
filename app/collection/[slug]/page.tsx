@@ -117,7 +117,8 @@ export default async function CollectionPage({ params }: Props) {
     colInfo.title,
     slug,
     colInfo.desc,
-    collectionBooks
+    collectionBooks,
+    '/collection'
   );
 
   return (

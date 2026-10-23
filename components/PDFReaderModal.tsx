@@ -812,7 +812,7 @@ export const PDFReaderModal: React.FC<PDFReaderModalProps> = ({
             {onBuyNow && (
               <button
                 onClick={() => onBuyNow(book)}
-                className="w-full py-3 px-4 rounded-xl bg-[#5e17eb] hover:bg-[#4d0ec5] text-white font-bold text-xs shadow-md transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2"
+                className="w-full py-3 px-4 rounded-md bg-[#5e17eb] hover:bg-[#4d0ec5] text-white font-bold text-xs shadow-md transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2"
               >
                 <ShoppingBag className="w-4 h-4" />
                 <span>Instant Buy Now (₹{book.buy_price})</span>
@@ -820,7 +820,7 @@ export const PDFReaderModal: React.FC<PDFReaderModalProps> = ({
             )}
             <button
               onClick={() => setActiveMode('sample')}
-              className="w-full py-2.5 px-4 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2"
+              className="w-full py-2.5 px-4 rounded-md border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2"
             >
               <Eye className="w-4 h-4 text-[#5e17eb]" />
               <span>Read Free Sample Preview (All Visitors)</span>
@@ -1001,7 +1001,7 @@ export const PDFReaderModal: React.FC<PDFReaderModalProps> = ({
                 {onBuyNow && (
                   <button
                     onClick={() => onBuyNow(book)}
-                    className="w-full py-3 rounded-xl bg-[#5e17eb] hover:bg-[#4d0ec5] text-white font-bold text-xs shadow-lg transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2"
+                    className="w-full py-3 rounded-md bg-[#5e17eb] hover:bg-[#4d0ec5] text-white font-bold text-xs shadow-lg transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2"
                   >
                     <ShoppingBag className="w-4 h-4" />
                     <span>Purchase Complete eBook (₹{book.buy_price})</span>

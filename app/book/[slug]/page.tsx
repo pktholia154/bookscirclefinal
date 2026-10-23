@@ -17,7 +17,7 @@ interface PageProps {
 export async function generateStaticParams() {
   try {
     const books = await getBooksFromFirestore();
-    return books.map((book) => ({
+    return books.slice(0, 20).map((book) => ({
       slug: book.seoslug || book.slug || book.id,
     }));
   } catch (error) {

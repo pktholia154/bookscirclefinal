@@ -53,38 +53,31 @@ export function usePWAInstall() {
     getDisplayModeServerSnapshot
   );
 
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(() => {
-    if (typeof window !== 'undefined' && window.__pwaInstallPrompt) {
-      return window.__pwaInstallPrompt;
-    }
-    return null;
-  });
+  const [isMounted, setIsMounted] = useState<boolean>(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isIOSPromptOpen, setIsIOSPromptOpen] = useState<boolean>(false);
-  const [isInstallSuccessOpen, setIsInstallSuccessOpen] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const justInstalled = localStorage.getItem('bookscircle_just_installed');
-        const acknowledged = localStorage.getItem('bookscircle_install_ack');
-        if (justInstalled === 'true' && acknowledged !== 'true') {
-          return true;
-        }
-      } catch {}
-    }
-    return false;
-  });
-  const [hasPromptReceived, setHasPromptReceived] = useState<boolean>(() => {
-    if (typeof window !== 'undefined' && window.__pwaInstallPrompt) {
-      return true;
-    }
-    return false;
-  });
+  const [isInstallSuccessOpen, setIsInstallSuccessOpen] = useState<boolean>(false);
+  const [hasPromptReceived, setHasPromptReceived] = useState<boolean>(false);
+  const [isIOS, setIsIOS] = useState<boolean>(false);
 
   useEffect(() => {
+    setIsMounted(true);
+    const ios = typeof window !== 'undefined' && /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
+    setIsIOS(ios);
+
     // If prompt was already captured globally
-    if (typeof window !== 'undefined' && window.__pwaInstallPrompt && !deferredPrompt) {
+    if (typeof window !== 'undefined' && window.__pwaInstallPrompt) {
       setDeferredPrompt(window.__pwaInstallPrompt);
       setHasPromptReceived(true);
     }
+
+    try {
+      const justInstalled = localStorage.getItem('bookscircle_just_installed');
+      const acknowledged = localStorage.getItem('bookscircle_install_ack');
+      if (justInstalled === 'true' && acknowledged !== 'true') {
+        setIsInstallSuccessOpen(true);
+      }
+    } catch {}
 
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
@@ -118,11 +111,10 @@ export function usePWAInstall() {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       window.removeEventListener('appinstalled', handleAppInstalled);
     };
-  }, [deferredPrompt]);
+  }, []);
 
-  const isIOS = typeof window !== 'undefined' && /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
-  // App is installable if it's not currently running in standalone app mode and either beforeinstallprompt has fired or on iOS
-  const isInstallable = !isStandalone && (hasPromptReceived || isIOS);
+  // App is installable only after client mount if it's not currently running in standalone app mode and either beforeinstallprompt has fired or on iOS
+  const isInstallable = isMounted && !isStandalone && (hasPromptReceived || isIOS);
 
   const promptInstall = useCallback(async () => {
     if (isStandalone) return;

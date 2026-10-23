@@ -37,6 +37,7 @@ import {
   KATEX_SAFE_OPTIONS,
   MarkdownSection,
 } from '@/lib/markdown-engine';
+import { MarkdownCodeBlock, MarkdownCodeElement } from '@/components/MarkdownCodeBlock';
 
 interface MarkdownReaderModalProps {
   book: Book;
@@ -311,19 +312,47 @@ export const MarkdownReaderModal: React.FC<MarkdownReaderModalProps> = ({
         }
       }}
     >
-      {/* Anti-copy protection & KaTeX pure black font color */}
+      {/* Anti-copy protection, KaTeX pure black font color, and Clean Light Codeblocks */}
       <style jsx global>{`
         .katex, .katex * {
           color: #000000 !important;
         }
-        .markdown-body,
-        .markdown-body * {
+        .markdown-body {
           color: #000000 !important;
           -webkit-user-select: none !important;
           -moz-user-select: none !important;
           -ms-user-select: none !important;
           user-select: none !important;
           -webkit-touch-callout: none !important;
+        }
+        .markdown-body p,
+        .markdown-body h1,
+        .markdown-body h2,
+        .markdown-body h3,
+        .markdown-body h4,
+        .markdown-body ul,
+        .markdown-body ol,
+        .markdown-body li,
+        .markdown-body blockquote,
+        .markdown-body table,
+        .markdown-body th,
+        .markdown-body td,
+        .markdown-body strong,
+        .markdown-body em {
+          color: #000000 !important;
+        }
+        .markdown-body pre {
+          background-color: #f9fafb !important;
+          border-color: #e5e7eb !important;
+        }
+        .markdown-body pre code {
+          background-color: transparent !important;
+          color: #111827 !important;
+        }
+        .markdown-body code.markdown-inline-code {
+          background-color: #f3f4f6 !important;
+          color: #111827 !important;
+          border-color: #e5e7eb !important;
         }
         .markdown-body ::selection {
           background: transparent !important;
@@ -571,7 +600,7 @@ export const MarkdownReaderModal: React.FC<MarkdownReaderModalProps> = ({
                   {onBuyNow && (
                     <button
                       onClick={() => onBuyNow(book)}
-                      className="w-full py-3 bg-[#1c0ca3] hover:bg-[#150980] text-white rounded-xl text-xs font-bold shadow-md cursor-pointer transition-all flex items-center justify-center gap-2 active:scale-95"
+                      className="w-full py-3 bg-[#1c0ca3] hover:bg-[#150980] text-white rounded-md text-xs font-bold shadow-md cursor-pointer transition-all flex items-center justify-center gap-2 active:scale-95"
                     >
                       <ShoppingBag className="w-4 h-4" />
                       <span>Buy Full Edition for ₹{book.buy_price || book.list_price || 49}</span>
@@ -579,7 +608,7 @@ export const MarkdownReaderModal: React.FC<MarkdownReaderModalProps> = ({
                   )}
                   <button
                     onClick={() => setActiveMode('sample')}
-                    className="w-full py-2.5 bg-gray-100 hover:bg-gray-200 text-black rounded-xl text-xs font-bold cursor-pointer transition-all flex items-center justify-center gap-2"
+                    className="w-full py-2.5 bg-gray-100 hover:bg-gray-200 text-black rounded-md text-xs font-bold cursor-pointer transition-all flex items-center justify-center gap-2"
                   >
                     <Eye className="w-4 h-4" />
                     <span>Read Free Sample Preview</span>
@@ -729,26 +758,8 @@ export const MarkdownReaderModal: React.FC<MarkdownReaderModalProps> = ({
                           {children}
                         </blockquote>
                       ),
-                      code: ({ inline, className, children, ...props }: any) => {
-                        if (inline) {
-                          return (
-                            <code
-                              className="bg-gray-100 text-black px-1.5 py-0.5 rounded font-mono text-[0.9em] border border-gray-200"
-                              style={{ color: '#000000' }}
-                              {...props}
-                            >
-                              {children}
-                            </code>
-                          );
-                        }
-                        return (
-                          <pre className="bg-gray-950 text-white p-4 rounded-xl overflow-x-auto my-4 text-xs font-mono leading-relaxed shadow-sm">
-                            <code className={className} {...props}>
-                              {children}
-                            </code>
-                          </pre>
-                        );
-                      },
+                      pre: MarkdownCodeBlock,
+                      code: MarkdownCodeElement,
                       table: ({ children, ...props }) => (
                         <div className="overflow-x-auto my-5 rounded-xl border border-gray-200">
                           <table className="w-full text-left text-xs border-collapse text-black" style={{ color: '#000000' }} {...props}>

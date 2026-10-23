@@ -1,36 +1,69 @@
-export const dynamic = "force-dynamic";
-import { NextResponse } from 'next/server';
-import { SITE_URL } from '@/lib/seo';
+import { NextRequest, NextResponse } from 'next/server';
+import { buildSitemapIndexXml, generateEtag } from '@/lib/sitemap-helper';
+
+export const revalidate = 900; // 15-minute ISR
+
+let cachedIndexXml: string | null = null;
+let cachedIndexEtag: string | null = null;
+let indexCacheExpiresAt = 0;
+const CACHE_TTL_MS = 15 * 60 * 1000;
 
 /**
  * Root Sitemap Index Handler: /sitemap.xml
- * Resolves the 404 on the root sitemap URL and provides search engines (Google Search Console, Bing)
- * with a standard <sitemapindex> referencing all sub-sitemaps and rolling updates.
+ * Provides search engines (Google Search Console, Bing) with a standard <sitemapindex>
+ * dynamically referencing all 1,000-URL sub-sitemaps (/sitemap/0.xml, /sitemap/1.xml, ...)
+ * and the fast-discovery rolling sitemap (/sitemap-latest.xml).
  */
-export async function GET() {
-  const now = new Date().toISOString();
+export async function GET(req: NextRequest) {
+  const now = Date.now();
+  const ifNoneMatch = req.headers.get('if-none-match');
 
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <sitemap>
-    <loc>${SITE_URL}/sitemap/0.xml</loc>
-    <lastmod>${now}</lastmod>
-  </sitemap>
-  <sitemap>
-    <loc>${SITE_URL}/sitemap/1.xml</loc>
-    <lastmod>${now}</lastmod>
-  </sitemap>
-  <sitemap>
-    <loc>${SITE_URL}/sitemap-latest.xml</loc>
-    <lastmod>${now}</lastmod>
-  </sitemap>
-</sitemapindex>`;
+  if (cachedIndexXml && cachedIndexEtag && now < indexCacheExpiresAt) {
+    if (ifNoneMatch && ifNoneMatch === cachedIndexEtag) {
+      return new NextResponse(null, {
+        status: 304,
+        headers: {
+          ETag: cachedIndexEtag,
+          'Cache-Control': 'public, max-age=900, s-maxage=3600, stale-while-revalidate=86400',
+        },
+      });
+    }
+
+    return new NextResponse(cachedIndexXml, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/xml; charset=utf-8',
+        ETag: cachedIndexEtag,
+        'Cache-Control': 'public, max-age=900, s-maxage=3600, stale-while-revalidate=86400',
+        'X-Cache-Status': 'HIT',
+      },
+    });
+  }
+
+  const xml = await buildSitemapIndexXml();
+  const etag = generateEtag(xml);
+
+  cachedIndexXml = xml;
+  cachedIndexEtag = etag;
+  indexCacheExpiresAt = now + CACHE_TTL_MS;
+
+  if (ifNoneMatch && ifNoneMatch === etag) {
+    return new NextResponse(null, {
+      status: 304,
+      headers: {
+        ETag: etag,
+        'Cache-Control': 'public, max-age=900, s-maxage=3600, stale-while-revalidate=86400',
+      },
+    });
+  }
 
   return new NextResponse(xml, {
     status: 200,
     headers: {
       'Content-Type': 'application/xml; charset=utf-8',
-      'Cache-Control': 'public, max-age=3600, stale-while-revalidate=86400',
+      ETag: etag,
+      'Cache-Control': 'public, max-age=900, s-maxage=3600, stale-while-revalidate=86400',
+      'X-Cache-Status': 'MISS',
     },
   });
 }

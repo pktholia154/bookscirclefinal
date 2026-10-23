@@ -145,7 +145,13 @@ export const BookCard: React.FC<BookCardProps> = ({
         className="text-xs sm:text-sm md:text-base font-bold text-gray-900 truncate leading-snug mt-1 group-hover:text-[#5e17eb] transition-colors w-full min-w-0"
         title={book.title}
       >
-        {book.title}
+        <a
+          href={`/book/${encodeURIComponent(book.seoslug || book.slug || book.id)}`}
+          onClick={(e) => e.preventDefault()}
+          className="text-inherit no-underline"
+        >
+          {book.title}
+        </a>
       </h3>
 
       {/* Category Subtitle */}

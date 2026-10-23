@@ -23,7 +23,6 @@ export const CategoryChips: React.FC<CategoryChipsProps> = ({
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
 
   const hasMore = categories.length > initialVisibleCount;
-  const visibleCategories = isExpanded ? categories : categories.slice(0, initialVisibleCount);
 
   const handleCategoryClick = (cat: Category, e: React.MouseEvent) => {
     const slug = cat.seolsug || cat.id;
@@ -51,16 +50,17 @@ export const CategoryChips: React.FC<CategoryChipsProps> = ({
         </Link>
 
         {/* Category Chips (linking directly to SEO ready /category/[slug]) */}
-        {visibleCategories.map((cat) => {
+        {categories.map((cat, idx) => {
           const isSelected = selectedCategory.toLowerCase() === cat.title.toLowerCase();
           const slug = cat.seolsug || cat.id;
+          const isHiddenWhenCollapsed = !isExpanded && idx >= initialVisibleCount;
 
           return (
             <Link
               key={cat.id}
               id={`chip-${slug}`}
               href={`/category/${encodeURIComponent(slug)}`}
-              className={`shrink-0 px-4 py-2 rounded-full text-sm sm:text-[15px] font-bold transition-all duration-200 active:scale-95 whitespace-nowrap cursor-pointer ${
+              className={`${isHiddenWhenCollapsed ? 'hidden' : 'shrink-0'} px-4 py-2 rounded-full text-sm sm:text-[15px] font-bold transition-all duration-200 active:scale-95 whitespace-nowrap cursor-pointer ${
                 isSelected
                   ? 'bg-[#5e17eb] text-white border border-[#5e17eb] shadow-xs'
                   : 'bg-gray-100 text-gray-800 border border-transparent hover:bg-gray-200'

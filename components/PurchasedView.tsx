@@ -13,7 +13,8 @@ import {
   Play,
 } from 'lucide-react';
 import { Book } from '@/lib/types';
-import { DEFAULT_BOOK_COVER } from '@/lib/data';
+import { DEFAULT_BOOK_COVER, FREE_SAMPLE_BOOK_ID, FREE_SAMPLE_BOOK } from '@/lib/data';
+import { getFirestoreBookById } from '@/lib/services/books';
 import {
   savePdfOffline,
   deleteOfflinePdf,
@@ -61,6 +62,32 @@ export const PurchasedView: React.FC<PurchasedViewProps> = ({
   const [offlineCachedBooks, setOfflineCachedBooks] = useState<Book[]>([]);
   const [filterMode, setFilterMode] = useState<'all' | 'offline_only'>('all');
   const [readingProgressMap, setReadingProgressMap] = useState<Record<string, ReadingProgressRecord>>({});
+  
+  // Real-time synchronization of the free sample book (BK0002286) from Firestore
+  const [liveSampleBook, setLiveSampleBook] = useState<Book>(() => {
+    const fromProps = books?.find((b) => b.id === FREE_SAMPLE_BOOK_ID);
+    return fromProps || FREE_SAMPLE_BOOK;
+  });
+
+  useEffect(() => {
+    const fromProps = books?.find((b) => b.id === FREE_SAMPLE_BOOK_ID);
+    if (fromProps) {
+      setLiveSampleBook(fromProps);
+      return;
+    }
+    let active = true;
+    getFirestoreBookById(FREE_SAMPLE_BOOK_ID)
+      .then((doc) => {
+        if (active && doc) {
+          setLiveSampleBook(doc);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [books]);
+
   const [activeReader, setActiveReader] = useState<{
     book: Book;
     mode: 'full' | 'offline';
@@ -172,21 +199,26 @@ export const PurchasedView: React.FC<PurchasedViewProps> = ({
       .catch(() => {});
   }, [refreshOfflineStatus]);
 
-  // Map of all known books (remote Firestore + local offline metadata)
+  // Map of all known books (remote Firestore + local offline metadata + guaranteed Free Sample Book BK0002286)
   const allKnownBooksMap = useMemo(() => {
     const map = new Map<string, Book>();
+    map.set(FREE_SAMPLE_BOOK_ID, liveSampleBook);
     offlineCachedBooks.forEach((b) => map.set(b.id, b));
     books.forEach((b) => map.set(b.id, b));
+    if (!map.has(FREE_SAMPLE_BOOK_ID)) {
+      map.set(FREE_SAMPLE_BOOK_ID, liveSampleBook);
+    }
     return map;
-  }, [books, offlineCachedBooks]);
+  }, [books, offlineCachedBooks, liveSampleBook]);
 
-  // Purchased books list (including offline cached items)
+  // Purchased books list (always includes the Free Sample Book BK0002286 for all visitors & users)
   const purchasedBooks = useMemo(() => {
     const offlineIds = [
       ...Object.keys(offlinePdfMap).filter((id) => offlinePdfMap[id]?.status === 'downloaded'),
       ...Object.keys(offlineEpubMap).filter((id) => offlineEpubMap[id]?.status === 'downloaded'),
     ];
-    const combinedIds = Array.from(new Set([...purchasedBookIds, ...offlineIds]));
+    // Always include the Free Sample Book (BK0002286) for all visitors & users
+    const combinedIds = Array.from(new Set([FREE_SAMPLE_BOOK_ID, ...purchasedBookIds, ...offlineIds]));
     return combinedIds
       .map((id) => allKnownBooksMap.get(id))
       .filter((b): b is Book => Boolean(b));
@@ -472,29 +504,49 @@ export const PurchasedView: React.FC<PurchasedViewProps> = ({
           </div>
         )}
 
-        {/* Empty State */}
-        {purchasedBooks.length === 0 ? (
-          <div className="py-16 text-center bg-gray-50 rounded-2xl border border-gray-200/80 space-y-4 p-6">
-            <div className="w-16 h-16 rounded-full bg-purple-100/60 text-[#1c0ca3] flex items-center justify-center mx-auto">
-              <BookOpen className="w-8 h-8" />
-            </div>
-            <div className="space-y-1">
-              <h3 className="text-base font-bold text-gray-900">Your Library is Empty</h3>
-              <p className="text-xs text-gray-500 max-w-sm mx-auto">
-                Browse our catalog of study guides and competitive exam preparation e-books. All purchases auto-sync across your devices with offline access for both PDF and ePub.
-              </p>
-            </div>
-            <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
+        {/* Empty States */}
+        {filteredPurchasedBooks.length === 0 ? (
+          filterMode === 'offline_only' ? (
+            <div className="py-12 text-center bg-gray-50 rounded-2xl border border-gray-200/80 space-y-3 p-6">
+              <div className="w-12 h-12 rounded-full bg-gray-100 text-gray-500 flex items-center justify-center mx-auto">
+                <WifiOff className="w-6 h-6" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-sm font-bold text-gray-900">No Offline Books Downloaded Yet</h3>
+                <p className="text-xs text-gray-500 max-w-sm mx-auto">
+                  Click &quot;Save Offline&quot; on the free sample book above to download its PDF or ePub for instant offline reading without an internet connection.
+                </p>
+              </div>
               <button
-                id="empty-library-browse-btn"
-                onClick={onNavigateHome}
-                className="px-5 py-2.5 bg-[#1c0ca3] text-white rounded-xl text-xs font-bold shadow-xs hover:bg-[#150980] cursor-pointer inline-flex items-center gap-1.5 active:scale-95 transition-all"
+                onClick={() => setFilterMode('all')}
+                className="px-4 py-2 bg-[#1c0ca3] text-white rounded-xl text-xs font-bold hover:bg-[#150980] cursor-pointer inline-flex items-center gap-1.5 active:scale-95 transition-all shadow-2xs"
               >
-                <ShoppingBag className="w-3.5 h-3.5" />
-                <span>Explore E-Books</span>
+                <span>View All Library Books</span>
               </button>
             </div>
-          </div>
+          ) : (
+            <div className="py-16 text-center bg-gray-50 rounded-2xl border border-gray-200/80 space-y-4 p-6">
+              <div className="w-16 h-16 rounded-full bg-purple-100/60 text-[#1c0ca3] flex items-center justify-center mx-auto">
+                <BookOpen className="w-8 h-8" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-gray-900">Your Library is Empty</h3>
+                <p className="text-xs text-gray-500 max-w-sm mx-auto">
+                  Browse our catalog of study guides and competitive exam preparation e-books.
+                </p>
+              </div>
+              <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
+                <button
+                  id="empty-library-browse-btn"
+                  onClick={onNavigateHome}
+                  className="px-5 py-2.5 bg-[#1c0ca3] text-white rounded-xl text-xs font-bold shadow-xs hover:bg-[#150980] cursor-pointer inline-flex items-center gap-1.5 active:scale-95 transition-all"
+                >
+                  <ShoppingBag className="w-3.5 h-3.5" />
+                  <span>Explore E-Books</span>
+                </button>
+              </div>
+            </div>
+          )
         ) : (
           /* Books Grid: Strictly 1 item per row on mobile & tablet so delete button & buttons remain 100% visible */
           <div className="grid grid-cols-1 gap-3.5">
@@ -506,19 +558,27 @@ export const PurchasedView: React.FC<PurchasedViewProps> = ({
               const epubDlState = offlineEpubMap[book.id] || { status: 'idle', progress: 0, loadedMb: 0, totalMb: 0 };
               const isEpubDownloaded = epubDlState.status === 'downloaded';
               const isEpubDownloading = epubDlState.status === 'downloading';
+              const isSampleBook = book.id === FREE_SAMPLE_BOOK_ID;
 
               return (
                 <div
                   key={book.id}
-                  className="p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-gray-200/90 bg-white hover:border-[#1c0ca3]/40 transition-all flex flex-col justify-between gap-3 shadow-2xs group"
+                  className={`p-3 sm:p-4 rounded-xl sm:rounded-2xl border bg-white transition-all flex flex-col justify-between gap-3 shadow-2xs group ${
+                    isSampleBook
+                      ? 'border-[#1c0ca3]/30 hover:border-[#1c0ca3]'
+                      : 'border-gray-200/90 hover:border-[#1c0ca3]/40'
+                  }`}
                 >
                   {/* Top Info Section */}
                   <div
-                    className="flex gap-3 sm:gap-4 cursor-pointer"
+                    className="flex items-start gap-3 sm:gap-4 cursor-pointer"
                     onClick={() => onSelectBook(book)}
                   >
-                    {/* Cover */}
-                    <div className="relative w-16 sm:w-20 aspect-[3/4] shrink-0 overflow-hidden bg-gray-100 border border-gray-200 shadow-2xs rounded-lg">
+                    {/* Cover - Strict 3:4 aspect ratio */}
+                    <div
+                      style={{ aspectRatio: '3 / 4' }}
+                      className="relative w-16 sm:w-20 aspect-[3/4] shrink-0 self-start overflow-hidden bg-gray-100 border border-gray-200 shadow-2xs rounded-lg"
+                    >
                       <Image
                         src={book.cover || DEFAULT_BOOK_COVER}
                         alt={book.title}
@@ -537,6 +597,11 @@ export const PurchasedView: React.FC<PurchasedViewProps> = ({
                           <span className="text-[9px] font-black text-[#1c0ca3] uppercase tracking-wider bg-[#1c0ca3]/10 px-1.5 py-0.5 rounded">
                             {book.category || 'EXAM'}
                           </span>
+                          {isSampleBook && (
+                            <span className="text-[9px] font-black text-white bg-[#1c0ca3] px-2 py-0.5 rounded shadow-2xs">
+                              Free Test Sample
+                            </span>
+                          )}
                           {(isPdfDownloaded || isEpubDownloaded) && (
                             <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded flex items-center gap-0.5">
                               <Check className="w-2.5 h-2.5" />
@@ -561,7 +626,7 @@ export const PurchasedView: React.FC<PurchasedViewProps> = ({
                         <span>•</span>
                         <span>{book.language || 'English'}</span>
                         <span>•</span>
-                        <span>{book.file_size || '14.5 MB'}</span>
+                        <span>{book.file_size || '2.5 MB'}</span>
                       </div>
                     </div>
                   </div>
@@ -571,7 +636,7 @@ export const PurchasedView: React.FC<PurchasedViewProps> = ({
                     <div className="pt-2 pb-0.5 border-t border-gray-100 flex flex-col gap-1.5">
                       <div className="flex items-center justify-between text-[11px]">
                         <div className="flex items-center gap-1.5 min-w-0 text-gray-600">
-                          <span className="font-black text-[#5e17eb] shrink-0">
+                          <span className="font-black text-[#1c0ca3] shrink-0">
                             {readingProgressMap[book.id].progressPercentage}% read
                           </span>
                           <span className="text-gray-300">•</span>
@@ -597,7 +662,7 @@ export const PurchasedView: React.FC<PurchasedViewProps> = ({
                             e.stopPropagation();
                             handleResumeBook(book, readingProgressMap[book.id]);
                           }}
-                          className="text-[11px] font-bold text-[#5e17eb] hover:text-[#4d0ec5] active:scale-95 inline-flex items-center gap-1 transition-all cursor-pointer py-0.5 px-2 rounded-md hover:bg-[#5e17eb]/10 shrink-0"
+                          className="text-[11px] font-bold text-[#1c0ca3] hover:text-[#150980] active:scale-95 inline-flex items-center gap-1 transition-all cursor-pointer py-0.5 px-2 rounded-md hover:bg-[#1c0ca3]/10 shrink-0"
                           title="Resume reading where you left off"
                         >
                           <Play className="w-2.5 h-2.5 fill-current" />
@@ -619,7 +684,7 @@ export const PurchasedView: React.FC<PurchasedViewProps> = ({
                           className={`h-full rounded-full transition-all duration-300 ${
                             readingProgressMap[book.id].progressPercentage >= 100
                               ? 'bg-emerald-500'
-                              : 'bg-[#5e17eb]'
+                              : 'bg-[#1c0ca3]'
                           }`}
                         />
                       </div>

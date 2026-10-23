@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getBooksFromFirestore } from '@/lib/services/books';
-import { SITE_URL, SITE_NAME, BRAND_NAME } from '@/lib/seo';
+import { SITE_URL, SITE_NAME, BRAND_NAME, safeIsoDate, getBookTimestampMs } from '@/lib/seo';
 
 // 15-minute in-memory cache
 let cachedFeedXml: string | null = null;
@@ -56,20 +56,17 @@ export async function GET(req: NextRequest) {
     // Latest 100 published items ordered DESC
     const sortedBooks = books
       .filter((b) => b.isActive !== false)
-      .sort((a, b) => {
-        const timeA = a.published_date ? new Date(a.published_date).getTime() : 0;
-        const timeB = b.published_date ? new Date(b.published_date).getTime() : 0;
-        return timeB - timeA;
-      })
-      .slice(0, 100);
+      .map((book, index) => ({ book, index, ts: getBookTimestampMs(book) }))
+      .sort((a, b) => (b.ts !== a.ts ? b.ts - a.ts : b.index - a.index))
+      .slice(0, 100)
+      .map((item) => item.book);
 
     const itemsXml = sortedBooks
       .map((b) => {
         const slug = encodeURIComponent(b.seoslug || b.slug || b.id);
         const bookUrl = `${SITE_URL}/book/${slug}`;
-        const pubDate = b.published_date
-          ? new Date(b.published_date).toUTCString()
-          : new Date().toUTCString();
+        const isoDate = safeIsoDate(b.updated_at, b.created_at, b.published_date);
+        const pubDate = new Date(isoDate).toUTCString();
         const desc = b.seo_description || b.full_description || `${b.title} PDF eBook for competitive exams.`;
 
         return `    <item>

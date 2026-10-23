@@ -49,26 +49,35 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   const category = matchCategory(slug, categories);
   const title = category ? category.title : decodeURIComponent(slug);
+  const canonicalSlug = category ? (category.seolsug || category.id) : decodeURIComponent(slug);
   const seoCat = category?.seoCat || '';
-  const url = `${SITE_URL}/category/${encodeURIComponent(slug)}`;
+  const metaDescription =
+    seoCat ||
+    `Download ${title} PDF e-books, previous year solved question papers, and competitive exam study material with instant preview on ${SITE_NAME}.`;
+  const url = `${SITE_URL}/category/${encodeURIComponent(canonicalSlug)}`;
 
   return {
     title: `${title} PDF E-Books & Study Material | ${SITE_NAME}`,
-    ...(seoCat ? { description: seoCat } : {}),
+    description: metaDescription,
     alternates: {
       canonical: url,
     },
+    robots: {
+      index: true,
+      follow: true,
+    },
     openGraph: {
-      title: `${title} E-Books & Exam Preparation PDF Library`,
-      ...(seoCat ? { description: seoCat } : {}),
+      title: `${title} E-Books & Exam Preparation PDF Library | ${SITE_NAME}`,
+      description: metaDescription,
       url: url,
       siteName: SITE_NAME,
+      locale: 'en_IN',
       type: 'website',
     },
     twitter: {
       card: 'summary_large_image',
-      title: `${title} E-Books | ${SITE_NAME}`,
-      ...(seoCat ? { description: seoCat } : {}),
+      title: `${title} PDF E-Books | ${SITE_NAME}`,
+      description: metaDescription,
     },
   };
 }

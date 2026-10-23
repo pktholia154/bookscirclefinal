@@ -9,8 +9,11 @@ export default function robots(): MetadataRoute.Robots {
         allow: [
           '/',
           '/book/',
+          '/books/',
           '/search',
           '/category/',
+          '/categories/',
+          '/collection/',
           '/sitemap.xml',
           '/sitemap/',
           '/sitemap-latest.xml',
@@ -25,7 +28,7 @@ export default function robots(): MetadataRoute.Robots {
           '/license',
           '/license-agreement',
         ],
-        disallow: ['/api/', '/pdf/', '/account/', '/checkout/'],
+        disallow: ['/api/', '/pdf/', '/md/', '/account/', '/checkout/'],
       },
       // Explicit AI & Discovery Search Engine Bot Rules
       {
@@ -44,14 +47,17 @@ export default function robots(): MetadataRoute.Robots {
         allow: [
           '/',
           '/book/',
+          '/books/',
           '/search',
           '/category/',
+          '/categories/',
+          '/collection/',
           '/sitemap.xml',
           '/sitemap/',
           '/sitemap-latest.xml',
           '/feed.xml',
         ],
-        disallow: ['/api/', '/pdf/', '/checkout/'],
+        disallow: ['/api/', '/pdf/', '/md/', '/checkout/'],
       },
     ],
     sitemap: [

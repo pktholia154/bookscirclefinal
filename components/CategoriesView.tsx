@@ -191,7 +191,13 @@ export const CategoriesView: React.FC<CategoriesViewProps> = ({
                           className="font-bold text-sm sm:text-base text-gray-950 truncate leading-snug group-hover:text-[#5e17eb] transition-colors"
                           title={book.title}
                         >
-                          {book.title}
+                          <a
+                            href={`/book/${encodeURIComponent(book.seoslug || book.slug || book.id)}`}
+                            onClick={(e) => e.preventDefault()}
+                            className="text-inherit no-underline"
+                          >
+                            {book.title}
+                          </a>
                         </h4>
                         {/* Category, Language & Type in same row (display only field values, not field labels) */}
                         <div className="flex items-center gap-1.5 text-xs sm:text-[13px] text-gray-600 truncate mt-1">
