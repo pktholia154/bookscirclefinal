@@ -2,52 +2,55 @@
 
 import { useEffect } from 'react';
 import { requestPersistentStorage } from '@/lib/offline-storage';
+import { BeforeInstallPromptEvent } from '@/hooks/use-pwa-install';
 
 export function PWARegister() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    // 1. Request persistent storage from browser engine immediately
+    // 1. Capture beforeinstallprompt as early as possible on mount
+    const captureEarlyPrompt = (e: Event) => {
+      e.preventDefault();
+      window.__pwaInstallPrompt = e as BeforeInstallPromptEvent;
+    };
+    window.addEventListener('beforeinstallprompt', captureEarlyPrompt);
+
+    // 2. Request persistent storage from browser engine immediately
     requestPersistentStorage().catch(() => {});
 
-    // 2. Service Worker lifecycle governance
+    // 3. Service Worker lifecycle governance (required for Android/Windows/Desktop PWA installability)
     if ('serviceWorker' in navigator) {
-      const isDevOrPreview =
-        process.env.NODE_ENV !== 'production' ||
-        window.self !== window.top ||
-        window.location.hostname === 'localhost' ||
-        window.location.hostname.includes('127.0.0.1') ||
-        window.location.hostname.includes('run.app');
+      const registerSW = () => {
+        navigator.serviceWorker
+          .register('/sw.js', { scope: '/' })
+          .then((registration) => {
+            registration.update().catch(() => {});
+          })
+          .catch(() => {});
+      };
 
-      if (isDevOrPreview) {
-        // Unregister any active or legacy service workers in dev/preview to prevent stale script caching
-        navigator.serviceWorker.getRegistrations().then((registrations) => {
-          for (const registration of registrations) {
-            registration.unregister().catch(() => {});
-          }
-        }).catch(() => {});
+      if (document.readyState === 'complete') {
+        registerSW();
+      } else {
+        window.addEventListener('load', registerSW, { once: true });
+      }
 
-        // Purge old SW cache stores
-        if ('caches' in window) {
-          caches.keys().then((keys) => {
+      // Clean up outdated cache buckets while preserving current v14 static media cache
+      if ('caches' in window) {
+        caches
+          .keys()
+          .then((keys) => {
             for (const key of keys) {
-              if (key.startsWith('bookscircle')) {
+              if (key.startsWith('bookscircle') && key !== 'bookscircle-v14') {
                 caches.delete(key).catch(() => {});
               }
             }
-          }).catch(() => {});
-        }
-      } else {
-        // True standalone production PWA registration
-        window.addEventListener('load', () => {
-          navigator.serviceWorker
-            .register('/sw.js')
-            .catch(() => {});
-        });
+          })
+          .catch(() => {});
       }
     }
 
-    // 3. Keep storage persistent on visibility change / focus
+    // 4. Keep storage persistent on visibility change / focus
     const handleFocus = () => {
       requestPersistentStorage().catch(() => {});
     };
@@ -55,6 +58,7 @@ export function PWARegister() {
     window.addEventListener('focus', handleFocus);
 
     return () => {
+      window.removeEventListener('beforeinstallprompt', captureEarlyPrompt);
       window.removeEventListener('visibilitychange', handleFocus);
       window.removeEventListener('focus', handleFocus);
     };

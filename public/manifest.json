@@ -1,15 +1,16 @@
 {
+  "id": "/",
   "name": "BooksCircle - Buy PDF E-Books & Exam Guides",
   "short_name": "BooksCircle",
-  "description": "Digital PDF eBooks & competitive exam guides marketplace with instant preview and secure checkout.",
+  "description": "Digital PDF eBooks & competitive exam guides marketplace with instant preview and offline reader.",
   "start_url": "/?source=pwa",
-  "id": "/?source=pwa",
+  "scope": "/",
   "display": "standalone",
   "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
   "background_color": "#FFFFFF",
-  "theme_color": "#5e17eb",
-  "orientation": "portrait-primary",
-  "scope": "/",
+  "theme_color": "#4029AB",
+  "orientation": "any",
+  "prefer_related_applications": false,
   "categories": ["education", "books", "shopping"],
   "icons": [
     {
@@ -31,7 +32,7 @@
       "purpose": "maskable"
     },
     {
-      "src": "/booksCircle (3).png",
+      "src": "/booksCircle%20(3).png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"

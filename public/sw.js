@@ -1,12 +1,13 @@
 // BooksCircle Service Worker (Static Media Assets Only)
-const CACHE_NAME = 'bookscircle-v13';
+const CACHE_NAME = 'bookscircle-v14';
 const STATIC_ASSETS = [
   '/manifest.json',
-  '/booksCircle (3).png',
-  '/booksCircle (2).png',
+  '/booksCircle%20(3).png',
+  '/booksCircle%20(2).png',
   '/logo.png',
   '/icon-192.png',
   '/icon-512.png',
+  '/icon-maskable-512.png',
   '/apple-touch-icon.png',
   '/favicon.png',
   '/favicon-32x32.png',
@@ -16,9 +17,7 @@ const STATIC_ASSETS = [
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS).catch((err) => {
-        console.warn('Pre-cache error:', err);
-      });
+      return Promise.allSettled(STATIC_ASSETS.map((url) => cache.add(url)));
     })
   );
   self.skipWaiting();

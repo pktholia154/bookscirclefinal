@@ -1437,6 +1437,7 @@ export default function HomePage({
       <InstallSuccessModal
         isOpen={isInstallSuccessOpen}
         onClose={closeInstallSuccess}
+        onLaunch={() => showToast('BooksCircle App Launched', 2500)}
       />
 
       {/* Fixed High Density Bottom Navigation */}

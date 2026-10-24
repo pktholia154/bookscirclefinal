@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { Search, ShoppingCart, X, LogIn, Sparkles, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { usePWAInstall } from '@/hooks/use-pwa-install';
 
 export interface UserProfile {
   uid: string;
@@ -50,6 +51,7 @@ export const Header: React.FC<HeaderProps> = ({
   onInstall,
 }) => {
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
+  const { isInstalling, installProgress, isInstalled } = usePWAInstall();
 
   // Cycling animated placeholder to entice user attention
   useEffect(() => {
@@ -153,15 +155,49 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Right Actions (Install + Login / Account + Cart) */}
         <div className="flex items-center gap-1.5 sm:gap-2">
           {/* PWA Install Button: Visible only when not installed / not in standalone */}
-          {isInstallable && onInstall && (
+          {(isInstallable || isInstalling) && !isInstalled && onInstall && (
             <button
               id="header-install-app-btn"
               onClick={onInstall}
-              className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs font-black text-[#4029AB] bg-[#4029AB]/10 hover:bg-[#4029AB]/20 active:scale-95 transition-all shadow-2xs border border-[#4029AB]/20 cursor-pointer"
+              disabled={isInstalling}
+              className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs font-black text-[#4029AB] bg-[#4029AB]/10 hover:bg-[#4029AB]/20 active:scale-95 transition-all shadow-2xs border border-[#4029AB]/20 cursor-pointer disabled:opacity-90"
               title="Add BooksCircle to Home Screen"
             >
-              <Download className="w-3.5 h-3.5 text-[#4029AB] shrink-0 stroke-[2.5]" />
-              <span className="leading-none">Install Now</span>
+              {isInstalling ? (
+                <>
+                  <svg className="w-3.5 h-3.5 -rotate-90 shrink-0" viewBox="0 0 24 24">
+                    <circle
+                      cx="12"
+                      cy="12"
+                      r="9"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeOpacity="0.25"
+                      strokeWidth="3"
+                    />
+                    <circle
+                      cx="12"
+                      cy="12"
+                      r="9"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                      strokeDasharray={2 * Math.PI * 9}
+                      strokeDashoffset={
+                        2 * Math.PI * 9 - (Math.min(100, installProgress) / 100) * (2 * Math.PI * 9)
+                      }
+                      className="transition-all duration-150 ease-out"
+                    />
+                  </svg>
+                  <span className="leading-none tabular-nums">{installProgress}%</span>
+                </>
+              ) : (
+                <>
+                  <Download className="w-3.5 h-3.5 text-[#4029AB] shrink-0 stroke-[2.5]" />
+                  <span className="leading-none">Install Now</span>
+                </>
+              )}
             </button>
           )}
 
