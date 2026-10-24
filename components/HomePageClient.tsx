@@ -68,7 +68,12 @@ import { auth, signOutUser, signInWithGoogle } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { usePWAInstall } from '@/hooks/use-pwa-install';
 import { triggerNativeLoading } from '@/components/NativePageLoadingIndicator';
-import { executePurchaseQuickJump, subscribeToPurchasesUpdated } from '@/lib/services/quick-jump';
+import {
+  executePurchaseQuickJump,
+  subscribeToPurchasesUpdated,
+  consumeTargetHomeTab,
+  HOME_TAB_SWITCH_EVENT,
+} from '@/lib/services/quick-jump';
 import { Check, ShoppingBag, RefreshCw, Lock, Trash2, Tag, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -124,17 +129,7 @@ export default function HomePage({
     initialCategories && initialCategories.length > 0 ? initialCategories : INITIAL_CATEGORIES
   );
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [activeTab, setActiveTab] = useState<TabKey>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const tabParam = new URLSearchParams(window.location.search).get('tab');
-        if (tabParam && ['home', 'categories', 'purchased', 'cart', 'profile', 'search'].includes(tabParam)) {
-          return tabParam as TabKey;
-        }
-      } catch {}
-    }
-    return 'home';
-  });
+  const [activeTab, setActiveTab] = useState<TabKey>('home');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
@@ -196,69 +191,80 @@ export default function HomePage({
     closeInstallSuccess,
   } = usePWAInstall();
 
-  // Load client persisted data after initial mount
+  // Load client persisted data & target tab after initial mount (hydration-safe)
   useEffect(() => {
+    try {
+      const pendingTab = consumeTargetHomeTab();
+      if (pendingTab && ['home', 'categories', 'purchased', 'cart', 'profile', 'search'].includes(pendingTab)) {
+        setActiveTab(pendingTab as TabKey);
+      } else if (typeof window !== 'undefined') {
+        const urlParams = new URLSearchParams(window.location.search);
+        const tabParam = urlParams.get('tab');
+        if (tabParam && ['home', 'categories', 'purchased', 'cart', 'profile', 'search'].includes(tabParam)) {
+          setActiveTab(tabParam as TabKey);
+        }
+      }
+    } catch {}
+
+    const handleTabSwitchEvent = (e: Event) => {
+      const custom = e as CustomEvent<{ tab?: string }>;
+      const requested = custom.detail?.tab || consumeTargetHomeTab();
+      if (requested && ['home', 'categories', 'purchased', 'cart', 'profile', 'search'].includes(requested)) {
+        setSelectedBook(null);
+        setActiveTab(requested as TabKey);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    };
+
+    window.addEventListener(HOME_TAB_SWITCH_EVENT, handleTabSwitchEvent as EventListener);
+
     const timer = setTimeout(() => {
       try {
         const cachedBooks = getCachedBooksSync();
         if (cachedBooks && cachedBooks.length > 0) {
-          setBooks(cachedBooks);
+          setBooks((prev) => (cachedBooks.length >= prev.length ? cachedBooks : prev));
         }
         const cachedCats = getCachedCategoriesSync();
         if (cachedCats && cachedCats.length > 0) {
           setCategories(cachedCats);
         }
-      } catch (e) {
-        console.warn('Cache load note:', e);
-      }
+      } catch {}
 
       try {
-        const savedUser = localStorage.getItem('bookscircle_auth_user');
+        const savedUser =
+          localStorage.getItem('bookscircle_auth_user') ||
+          localStorage.getItem('bookscircle_user_session');
         if (savedUser) {
           setCurrentUser(JSON.parse(savedUser));
         }
-      } catch (e) {
-        console.warn('User load note:', e);
-      }
+      } catch {}
 
       try {
         const localPurchased = getPurchasedBookIdsFromLocal();
         setPurchasedBookIds(Array.from(new Set([FREE_SAMPLE_BOOK_ID, ...localPurchased])));
-      } catch (e) {
-        console.warn('Purchased load note:', e);
-      }
+      } catch {}
 
       try {
         const localWishlist = getWishlistIdsFromLocal();
         setWishlistIds(localWishlist);
-      } catch (e) {
-        console.warn('Wishlist load note:', e);
-      }
+      } catch {}
 
       try {
         const loadedCart = getCartItemsFromLocal();
         setCart(loadedCart);
-      } catch (e) {
-        console.warn('Cart load note:', e);
-      }
-
-      try {
-        if (typeof window !== 'undefined') {
-          const urlParams = new URLSearchParams(window.location.search);
-          const tabParam = urlParams.get('tab');
-          if (tabParam && ['home', 'categories', 'purchased', 'cart', 'profile', 'search'].includes(tabParam)) {
-            setActiveTab(tabParam as TabKey);
-          }
-        }
-      } catch (e) {
-        console.warn('URL tab load note:', e);
-      }
+      } catch {}
 
       setIsClientLoaded(true);
     }, 0);
 
-    return () => clearTimeout(timer);
-  }, []);
+    router.prefetch('/purchased');
+    router.prefetch('/search');
+
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener(HOME_TAB_SWITCH_EVENT, handleTabSwitchEvent as EventListener);
+    };
+  }, [router]);
 
   // Subscribe to wishlist updates
   useEffect(() => {
@@ -469,7 +475,10 @@ export default function HomePage({
         });
 
         if (typeof window !== 'undefined') {
-          localStorage.removeItem('bookscircle_user_session');
+          try {
+            localStorage.setItem('bookscircle_auth_user', JSON.stringify(profile));
+            localStorage.removeItem('bookscircle_user_session');
+          } catch {}
         }
 
         // Non-blocking background sync of user profile document to Firestore /users/{uid}
@@ -694,7 +703,10 @@ export default function HomePage({
     });
 
     if (typeof window !== 'undefined') {
-      localStorage.setItem('bookscircle_user_session', JSON.stringify(profile));
+      try {
+        localStorage.setItem('bookscircle_auth_user', JSON.stringify(profile));
+        localStorage.setItem('bookscircle_user_session', JSON.stringify(profile));
+      } catch {}
     }
     showToast(`Signed in as ${profile.displayName || profile.email}`, 3000);
 
@@ -741,7 +753,10 @@ export default function HomePage({
       console.warn('Firebase signout note:', (e as any)?.message || String(e));
     }
     if (typeof window !== 'undefined') {
-      localStorage.removeItem('bookscircle_user_session');
+      try {
+        localStorage.removeItem('bookscircle_auth_user');
+        localStorage.removeItem('bookscircle_user_session');
+      } catch {}
     }
     setCurrentUser(null);
     showToast('Signed out successfully.', 2500);
@@ -809,7 +824,11 @@ export default function HomePage({
   }, [cart]);
 
   const cartBookIds = useMemo(() => {
-    return new Set(cart.map((item) => item.book.id));
+    return new Set(
+      (Array.isArray(cart) ? cart : [])
+        .filter((item) => item && item.book && item.book.id)
+        .map((item) => item.book.id)
+    );
   }, [cart]);
 
   // Filter books based on search & active category for Home Page
@@ -824,13 +843,14 @@ export default function HomePage({
 
   // Curated collections for Horizontal Carousel Sections - Enforced 12-item initial limit
   const featuredTrendingBooks = useMemo(() => {
-    const featured = books.filter((b) => (b.rating && b.rating >= 4.6) || (b.tags && b.tags.includes('featured')));
+    const featured = books.filter((b) => b && ((b.rating && b.rating >= 4.6) || (Array.isArray(b.tags) && b.tags.includes('featured'))));
     return (featured.length > 0 ? featured : books).slice(0, 12);
   }, [books]);
 
   // Best Sellers listing on home page strictly according to actual number of sold book items
   const bestSellerBooks = useMemo(() => {
     return [...books]
+      .filter(Boolean)
       .map((b) => {
         const soldCount =
           salesCountMap[b.id] ||
@@ -851,18 +871,20 @@ export default function HomePage({
     const counts: Record<string, { category: Category; books: Book[] }> = {};
 
     categories.forEach((cat) => {
+      if (!cat) return;
       const target = (cat.title || '').toLowerCase();
-      const slug = (cat.seolsug || cat.id).toLowerCase();
+      const slug = (cat.seolsug || cat.id || '').toLowerCase();
       const matched = books.filter((b) => {
+        if (!b) return false;
         const bCat = (b.category || '').toLowerCase();
         const bSlug = (b.categorySlug || '').toLowerCase();
         return (
           bCat === target ||
           bSlug === slug ||
-          target.includes(bSlug) ||
-          bSlug.includes(target) ||
-          bCat.includes(target) ||
-          target.includes(bCat)
+          (bSlug && target.includes(bSlug)) ||
+          (target && bSlug.includes(target)) ||
+          (target && bCat.includes(target)) ||
+          (bCat && target.includes(bCat))
         );
       });
       if (matched.length > 0) {
@@ -875,9 +897,8 @@ export default function HomePage({
       .slice(0, 3);
   }, [books, categories]);
 
-  // Switch tab with smooth scroll
+  // Switch tab with instant client state transition (zero history.pushState router reload loops)
   const handleTabChange = (tab: TabKey) => {
-    triggerNativeLoading(100);
     startTransition(() => {
       setSelectedBook(null);
       setActiveTab(tab);
@@ -885,17 +906,8 @@ export default function HomePage({
         setIsCartOpen(true);
       }
       if (typeof window !== 'undefined') {
-        try {
-          const url = new URL(window.location.href);
-          if (tab === 'home') {
-            url.searchParams.delete('tab');
-          } else {
-            url.searchParams.set('tab', tab);
-          }
-          window.history.pushState({}, '', url.toString());
-        } catch {}
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       }
-      window.scrollTo({ top: 0, behavior: 'smooth' });
     });
   };
 

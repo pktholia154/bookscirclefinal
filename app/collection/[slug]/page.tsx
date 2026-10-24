@@ -1,12 +1,12 @@
 import { Metadata } from 'next';
-import { getBooksFromFirestore, getCategoriesFromFirestore } from '@/lib/services/books';
+import { getBooksFromFirestore, getCategoriesFromFirestore, slimBookForList } from '@/lib/services/books';
 import { fetchTotalSalesCountMap } from '@/lib/services/purchases';
 import { INITIAL_BOOKS, INITIAL_CATEGORIES } from '@/lib/data';
 import { Book, Category } from '@/lib/types';
 import { generateCategorySchema, SITE_URL, SITE_NAME } from '@/lib/seo';
 import { CategoryPageClient } from '@/components/CategoryPageClient';
 
-export const revalidate = 60;
+export const revalidate = 300;
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -113,11 +113,13 @@ export default async function CollectionPage({ params }: Props) {
     collectionBooks = withSales.length > 0 ? withSales : collectionBooks;
   }
 
+  const slimmedBooks = collectionBooks.slice(0, 120).map(slimBookForList);
+
   const jsonLd = generateCategorySchema(
     colInfo.title,
     slug,
     colInfo.desc,
-    collectionBooks,
+    slimmedBooks.slice(0, 24),
     '/collection'
   );
 
@@ -131,7 +133,7 @@ export default async function CollectionPage({ params }: Props) {
         categoryTitle={colInfo.title}
         categorySlug={slug}
         categoryDescription={colInfo.desc}
-        books={collectionBooks}
+        books={slimmedBooks}
         allCategories={categories}
       />
     </>

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import SearchPageClient from '@/components/SearchPageClient';
-import { getBooksFromFirestore, getCategoriesFromFirestore } from '@/lib/services/books';
+import { getBooksFromFirestore, getCategoriesFromFirestore, slimBooksForSSR } from '@/lib/services/books';
 import { INITIAL_BOOKS, INITIAL_CATEGORIES } from '@/lib/data';
 import { SITE_URL, SITE_NAME } from '@/lib/seo';
 
@@ -37,5 +37,5 @@ export default async function SearchRoutePage() {
     if (fetchedCategories && fetchedCategories.length > 0) categories = fetchedCategories;
   } catch {}
 
-  return <SearchPageClient initialBooks={books} initialCategories={categories} />;
+  return <SearchPageClient initialBooks={slimBooksForSSR(books, 96)} initialCategories={categories} />;
 }

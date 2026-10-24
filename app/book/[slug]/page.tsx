@@ -1,13 +1,12 @@
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, BookOpen } from 'lucide-react';
-import { getBooksFromFirestore, getFirestoreBookById } from '@/lib/services/books';
+import { getBooksFromFirestore, getFirestoreBookById, slimBookForList } from '@/lib/services/books';
 import { generateBookSchema, SITE_URL, SITE_NAME } from '@/lib/seo';
 import { BookPageClient } from '@/components/BookPageClient';
 import { Book } from '@/lib/types';
 
-export const revalidate = 60; // ISR: revalidate every 60 seconds
+export const revalidate = 300; // ISR: revalidate every 5 minutes
 export const dynamicParams = true;
 
 interface PageProps {
@@ -38,11 +37,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     };
   }
 
-  const bookTitle = `${book.title} - ${book.category} PDF eBook | BooksCircle`;
+  const bookTitle = `${book.title} - ${book.category || 'Exam'} PDF eBook | BooksCircle`;
   const bookDesc =
     book.seo_description ||
     book.full_description ||
-    `Download ${book.title} PDF eBook for ${book.category}. Complete syllabus, study notes, and solved questions with instant delivery.`;
+    `Download ${book.title} PDF eBook for ${book.category || 'Competitive Exams'}. Complete syllabus, study notes, and solved questions with instant delivery.`;
   const canonicalUrl = `${SITE_URL}/book/${encodeURIComponent(book.seoslug || book.slug || book.id)}`;
   const coverUrl = book.cover || 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?q=80&w=1200&auto=format&fit=crop';
 
@@ -51,11 +50,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     description: bookDesc.slice(0, 160),
     keywords: [
       book.title,
-      book.category,
-      `${book.category} PDF`,
+      book.category || 'Exam Guide',
+      `${book.category || 'Exam'} PDF`,
       'Exam Guide eBook',
       'Study Notes PDF',
-      ...(book.tags || []),
+      ...(Array.isArray(book.tags) ? book.tags : []),
     ],
     alternates: {
       canonical: canonicalUrl,
@@ -83,7 +82,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
           url: coverUrl,
           width: 800,
           height: 1200,
-          alt: `${book.title} - ${book.category} Cover`,
+          alt: `${book.title} - ${book.category || 'Exam'} Cover`,
         },
       ],
     },
@@ -129,31 +128,36 @@ export default async function BookSSRPage({ params }: PageProps) {
 
   try {
     const allBooks = await getBooksFromFirestore();
-    const activeBooks = allBooks.filter((b) => b.isActive !== false);
+    const activeBooks = allBooks.filter((b) => b && b.isActive !== false);
+    const targetCategoryLower = (book.category || '').toLowerCase();
 
     // Sibling links within same category
     const categoryBooks = activeBooks.filter(
-      (b) => b.category.toLowerCase() === book.category.toLowerCase()
+      (b) => (b.category || '').toLowerCase() === targetCategoryLower
     );
     const currentIndex = categoryBooks.findIndex((b) => b.id === book.id);
     if (currentIndex > 0) {
-      prevBook = categoryBooks[currentIndex - 1];
+      prevBook = slimBookForList(categoryBooks[currentIndex - 1]);
     } else if (categoryBooks.length > 1) {
-      prevBook = categoryBooks[categoryBooks.length - 1];
+      prevBook = slimBookForList(categoryBooks[categoryBooks.length - 1]);
     }
 
     if (currentIndex >= 0 && currentIndex < categoryBooks.length - 1) {
-      nextBook = categoryBooks[currentIndex + 1];
+      nextBook = slimBookForList(categoryBooks[currentIndex + 1]);
     } else if (categoryBooks.length > 1) {
-      nextBook = categoryBooks[0];
+      nextBook = slimBookForList(categoryBooks[0]);
     }
 
-    relatedBooks = categoryBooks.filter((b) => b.id !== book.id).slice(0, 6);
+    relatedBooks = categoryBooks
+      .filter((b) => b.id !== book.id)
+      .slice(0, 6)
+      .map(slimBookForList);
 
     // Recent Content Strip: Top 10 most recent books across catalog for crawlability
     recentBooks = activeBooks
       .filter((b) => b.id !== book.id)
-      .slice(0, 10);
+      .slice(0, 10)
+      .map(slimBookForList);
   } catch {}
 
   // Generate nested JSON-LD schema
@@ -176,7 +180,7 @@ export default async function BookSSRPage({ params }: PageProps) {
         {(prevBook || nextBook) && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
             {prevBook && prevBook.id !== book.id && (
-              <a
+              <Link
                 href={`/book/${encodeURIComponent(prevBook.seoslug || prevBook.slug || prevBook.id)}`}
                 className="flex flex-col p-3 rounded-xl border border-gray-200 hover:border-[#4029AB] hover:bg-[#4029AB]/[0.02] transition-colors group"
               >
@@ -186,10 +190,10 @@ export default async function BookSSRPage({ params }: PageProps) {
                 <span className="text-xs sm:text-sm font-bold text-gray-900 group-hover:text-[#4029AB] line-clamp-1">
                   {prevBook.title}
                 </span>
-              </a>
+              </Link>
             )}
             {nextBook && nextBook.id !== book.id && (
-              <a
+              <Link
                 href={`/book/${encodeURIComponent(nextBook.seoslug || nextBook.slug || nextBook.id)}`}
                 className="flex flex-col p-3 rounded-xl border border-gray-200 hover:border-[#4029AB] hover:bg-[#4029AB]/[0.02] transition-colors sm:text-right group"
               >
@@ -199,12 +203,12 @@ export default async function BookSSRPage({ params }: PageProps) {
                 <span className="text-xs sm:text-sm font-bold text-gray-900 group-hover:text-[#4029AB] line-clamp-1">
                   {nextBook.title}
                 </span>
-              </a>
+              </Link>
             )}
           </div>
         )}
 
-        {/* Recent Content Plain Anchor Strip */}
+        {/* Recent Content Anchor Strip */}
         {recentBooks.length > 0 && (
           <aside className="p-4 rounded-xl bg-gray-50 border border-gray-100">
             <h3 className="text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-2.5 flex items-center justify-between">
@@ -214,13 +218,13 @@ export default async function BookSSRPage({ params }: PageProps) {
             <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
               {recentBooks.map((rb) => (
                 <li key={rb.id} className="truncate">
-                  <a
+                  <Link
                     href={`/book/${encodeURIComponent(rb.seoslug || rb.slug || rb.id)}`}
                     className="text-gray-700 hover:text-[#4029AB] hover:underline font-medium"
                     title={rb.title}
                   >
                     • {rb.title}
-                  </a>
+                  </Link>
                 </li>
               ))}
             </ul>

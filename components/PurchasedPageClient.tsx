@@ -19,7 +19,11 @@ import { auth, signInWithGoogle } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { usePWAInstall } from '@/hooks/use-pwa-install';
 import { triggerNativeLoading } from '@/components/NativePageLoadingIndicator';
-import { executePurchaseQuickJump, subscribeToPurchasesUpdated } from '@/lib/services/quick-jump';
+import {
+  executePurchaseQuickJump,
+  subscribeToPurchasesUpdated,
+  setTargetHomeTab,
+} from '@/lib/services/quick-jump';
 import { AnimatePresence, motion } from 'motion/react';
 import { Check } from 'lucide-react';
 
@@ -33,34 +37,14 @@ export const PurchasedPageClient: React.FC<PurchasedPageClientProps> = ({
   const router = useRouter();
   const [, startTransition] = useTransition();
 
-  // Instant 0ms synchronous hydration of book catalog
-  const [books, setBooks] = useState<Book[]>(() => {
-    if (initialBooks && initialBooks.length > 0) return initialBooks;
-    const cached = getCachedBooksSync();
-    if (cached && cached.length > 0) return cached;
-    return INITIAL_BOOKS;
-  });
+  const [books, setBooks] = useState<Book[]>(
+    initialBooks && initialBooks.length > 0 ? initialBooks : INITIAL_BOOKS
+  );
 
   // Free access sample book BK0002286 is guaranteed on day 1 for all visitors and logged in users
-  const [purchasedBookIds, setPurchasedBookIds] = useState<string[]>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const local = getPurchasedBookIdsFromLocal();
-        return Array.from(new Set([FREE_SAMPLE_BOOK_ID, ...local]));
-      } catch {}
-    }
-    return [FREE_SAMPLE_BOOK_ID];
-  });
+  const [purchasedBookIds, setPurchasedBookIds] = useState<string[]>([FREE_SAMPLE_BOOK_ID]);
 
-  const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('bookscircle_auth_user');
-        if (saved) return JSON.parse(saved);
-      } catch {}
-    }
-    return null;
-  });
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -91,13 +75,25 @@ export const PurchasedPageClient: React.FC<PurchasedPageClientProps> = ({
   // Prefetch main destinations for lightning navigation
   useEffect(() => {
     router.prefetch('/');
-    router.prefetch('/?tab=categories');
-    router.prefetch('/?tab=profile');
     router.prefetch('/search');
   }, [router]);
 
   // Client-side hydration
   useEffect(() => {
+    try {
+      const cached = getCachedBooksSync();
+      if (cached && cached.length > 0) {
+        setBooks((prev) => (cached.length >= prev.length ? cached : prev));
+      }
+    } catch {}
+
+    try {
+      const saved =
+        localStorage.getItem('bookscircle_auth_user') ||
+        localStorage.getItem('bookscircle_user_session');
+      if (saved) setCurrentUser(JSON.parse(saved));
+    } catch {}
+
     try {
       const localPurchased = getPurchasedBookIdsFromLocal();
       setPurchasedBookIds(Array.from(new Set([FREE_SAMPLE_BOOK_ID, ...localPurchased])));
@@ -203,7 +199,7 @@ export const PurchasedPageClient: React.FC<PurchasedPageClientProps> = ({
   };
 
   const totalCartCount = useMemo(() => {
-    return cart.reduce((acc, i) => acc + i.quantity, 0);
+    return (Array.isArray(cart) ? cart : []).reduce((acc, i) => acc + (i?.quantity || 1), 0);
   }, [cart]);
 
   const handleTabChange = (tab: TabKey) => {
@@ -217,13 +213,10 @@ export const PurchasedPageClient: React.FC<PurchasedPageClientProps> = ({
       }
       return;
     }
-    triggerNativeLoading(150);
+    triggerNativeLoading(120);
     startTransition(() => {
-      if (tab === 'home') {
-        router.push('/');
-        return;
-      }
-      router.push(`/?tab=${tab}`);
+      setTargetHomeTab(tab || 'home');
+      router.push('/');
     });
   };
 

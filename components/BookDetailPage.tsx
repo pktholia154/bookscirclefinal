@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Image from 'next/image';
+import dynamic from 'next/dynamic';
 import {
   ArrowLeft,
   Share2,
@@ -26,12 +27,19 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Book, Review } from '@/lib/types';
 import { DEFAULT_BOOK_COVER, BOOK_FAQS } from '@/lib/data';
 import { BookReviewsSection } from '@/components/BookReviewsSection';
-import { PDFReaderModal } from '@/components/PDFReaderModal';
-import { MarkdownReaderModal } from '@/components/MarkdownReaderModal';
 import { SampleSwitcher } from '@/components/SampleSwitcher';
 import { InstallAppBanner } from '@/components/InstallAppBanner';
 import { IOSInstallGuideModal } from '@/components/IOSInstallGuideModal';
 import { InstallSuccessModal } from '@/components/InstallSuccessModal';
+
+const PDFReaderModal = dynamic(
+  () => import('@/components/PDFReaderModal').then((m) => m.PDFReaderModal),
+  { ssr: false }
+);
+const MarkdownReaderModal = dynamic(
+  () => import('@/components/MarkdownReaderModal').then((m) => m.MarkdownReaderModal),
+  { ssr: false }
+);
 import { usePWAInstall } from '@/hooks/use-pwa-install';
 import { loadRazorpayScript } from '@/lib/services/razorpay';
 import { getWishlistIdsFromLocal, toggleWishlistAction, subscribeToWishlistChanges } from '@/lib/services/wishlist';

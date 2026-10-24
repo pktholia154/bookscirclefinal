@@ -9,6 +9,42 @@ import { removeFromCartAction } from '@/lib/services/cart';
 import { triggerNativeLoading } from '@/components/NativePageLoadingIndicator';
 
 export const PURCHASES_UPDATED_EVENT = 'bookscircle:purchases-updated';
+export const HOME_TAB_STORAGE_KEY = 'bookscircle_target_home_tab';
+export const HOME_TAB_SWITCH_EVENT = 'bookscircle:switch-home-tab';
+
+let pendingMemoryHomeTab: string | null = null;
+
+/**
+ * Sets the target tab for HomePageClient prior to route transition so `/` can be reused
+ * from Next.js client cache in 0ms without triggering uncached `/?tab=...` server roundtrips.
+ */
+export function setTargetHomeTab(tab: string): void {
+  pendingMemoryHomeTab = tab;
+  if (typeof window !== 'undefined') {
+    try {
+      sessionStorage.setItem(HOME_TAB_STORAGE_KEY, tab);
+      window.dispatchEvent(new CustomEvent(HOME_TAB_SWITCH_EVENT, { detail: { tab } }));
+    } catch {}
+  }
+}
+
+/**
+ * Consumes and clears any pending target tab on HomePageClient mount.
+ */
+export function consumeTargetHomeTab(): string | null {
+  const mem = pendingMemoryHomeTab;
+  pendingMemoryHomeTab = null;
+  if (typeof window !== 'undefined') {
+    try {
+      const stored = sessionStorage.getItem(HOME_TAB_STORAGE_KEY);
+      if (stored) {
+        sessionStorage.removeItem(HOME_TAB_STORAGE_KEY);
+        return stored;
+      }
+    } catch {}
+  }
+  return mem;
+}
 
 /**
  * Verifies local auth state across Firebase Auth instance and local storage caches.

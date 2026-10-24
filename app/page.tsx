@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import HomePageClient from '@/components/HomePageClient';
-import { getBooksFromFirestore, getCategoriesFromFirestore } from '@/lib/services/books';
+import { getBooksFromFirestore, getCategoriesFromFirestore, slimBooksForSSR } from '@/lib/services/books';
 import { INITIAL_BOOKS, INITIAL_CATEGORIES } from '@/lib/data';
 import { generateHomePageSchema, SITE_URL, SITE_NAME } from '@/lib/seo';
 
@@ -43,6 +43,7 @@ export default async function Page() {
   } catch {}
 
   const homeSchema = generateHomePageSchema(books, categories);
+  const ssrBooks = slimBooksForSSR(books, 96);
 
   return (
     <>
@@ -50,7 +51,7 @@ export default async function Page() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(homeSchema) }}
       />
-      <HomePageClient initialBooks={books} initialCategories={categories} />
+      <HomePageClient initialBooks={ssrBooks} initialCategories={categories} />
     </>
   );
 }

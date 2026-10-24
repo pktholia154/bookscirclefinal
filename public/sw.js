@@ -1,5 +1,5 @@
 // BooksCircle Service Worker (Static Media Assets Only)
-const CACHE_NAME = 'bookscircle-v12';
+const CACHE_NAME = 'bookscircle-v13';
 const STATIC_ASSETS = [
   '/manifest.json',
   '/booksCircle (3).png',
@@ -40,10 +40,13 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Never intercept POST/PUT/DELETE, API, Next.js internal chunks, or 3rd-party auth/payment
+  // Never intercept navigation requests, RSC flight payloads, POST/PUT/DELETE, API, Next.js internal chunks, or 3rd-party auth/payment
   const url = event.request.url;
   if (
     event.request.method !== 'GET' ||
+    event.request.mode === 'navigate' ||
+    event.request.headers.get('RSC') === '1' ||
+    url.includes('_rsc=') ||
     url.includes('/api/') ||
     url.includes('/_next/') ||
     url.endsWith('.js') ||

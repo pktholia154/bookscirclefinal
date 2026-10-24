@@ -7,9 +7,8 @@ import React, {
   useEffect,
   useCallback,
   useRef,
-  Suspense,
 } from 'react';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 
 interface NativeLoaderContextType {
   showLoader: (durationMs?: number) => void;
@@ -28,7 +27,7 @@ export const useNativeLoader = () => useContext(NativeLoaderContext);
 /**
  * Programmatic helper to trigger native loader from anywhere
  */
-export const triggerNativeLoading = (durationMs = 150) => {
+export const triggerNativeLoading = (durationMs = 120) => {
   if (typeof window !== 'undefined') {
     window.dispatchEvent(
       new CustomEvent('native-loader:show', { detail: { durationMs } })
@@ -43,28 +42,21 @@ export const hideNativeLoading = () => {
 };
 
 /**
- * Inner component listening to Next.js route transitions
+ * Inner component listening to Next.js route pathname transitions without useSearchParams suspense overhead
  */
 function RouteChangeObserver({ onRouteSettled }: { onRouteSettled: () => void }) {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
   const prevPathRef = useRef(pathname);
-  const prevParamsRef = useRef(searchParams?.toString() || '');
 
   useEffect(() => {
-    const currentParams = searchParams?.toString() || '';
-    if (prevPathRef.current !== pathname || prevParamsRef.current !== currentParams) {
+    if (prevPathRef.current !== pathname) {
       prevPathRef.current = pathname;
-      prevParamsRef.current = currentParams;
-
-      // When route or query changes, smoothly hide loader after brief render settle
       const timer = setTimeout(() => {
         onRouteSettled();
-      }, 120);
-
+      }, 60);
       return () => clearTimeout(timer);
     }
-  }, [pathname, searchParams, onRouteSettled]);
+  }, [pathname, onRouteSettled]);
 
   return null;
 }
@@ -94,10 +86,10 @@ export const NativePageLoadingProvider: React.FC<{ children: React.ReactNode }> 
         setIsLoading(false);
       }, durationMs);
     } else {
-      // For page transitions, keep loader active until route settles, with safety auto-dismiss
+      // For page transitions, keep loader active until route settles, with crisp safety auto-dismiss
       safetyTimeoutRef.current = setTimeout(() => {
         setIsLoading(false);
-      }, 3500);
+      }, 900);
     }
   }, []);
 
@@ -113,7 +105,6 @@ export const NativePageLoadingProvider: React.FC<{ children: React.ReactNode }> 
       if (!target) return;
 
       // 0. Exclude simple immediate micro-actions (Add to Cart, Wishlist, counter buttons, close buttons)
-      // Cart toggle is instantaneous and should NEVER trigger the page loading circular indicator HUD
       const isCartOrWishlistBtn = target.closest(
         '[id*="cart"], [id*="wishlist"], [aria-label*="cart" i], [aria-label*="wishlist" i], [title*="cart" i], [title*="wishlist" i], button[id*="close"], [data-no-loader="true"]'
       );
@@ -121,7 +112,14 @@ export const NativePageLoadingProvider: React.FC<{ children: React.ReactNode }> 
         return;
       }
 
-      // 1. Check if clicking on an anchor / link
+      // 1. Same-page fast tab or category chip switches -> ultra-fast 120ms tactile feedback
+      const tabOrChip = target.closest('[id^="nav-tab-"], [id^="cat-chip-"]');
+      if (tabOrChip) {
+        showLoader(120);
+        return;
+      }
+
+      // 2. Check if clicking on an anchor / link
       const anchor = target.closest('a') as HTMLAnchorElement | null;
       if (anchor) {
         const href = anchor.getAttribute('href');
@@ -141,30 +139,33 @@ export const NativePageLoadingProvider: React.FC<{ children: React.ReactNode }> 
           return;
         }
 
-        // Internal navigation detected -> trigger smooth circular loader in sync with route transition
-        showLoader();
+        // If linking to the exact current pathname, only show brief micro-feedback
+        if (typeof window !== 'undefined' && href === window.location.pathname) {
+          showLoader(100);
+          return;
+        }
+
+        showLoader(600);
         return;
       }
 
-      // 2. Check if clicking on navigating interactive items (Book cards, list items, category chips, bottom nav tabs, view all)
+      // 3. Check if clicking on navigating interactive items (Book cards, list items, view all)
       const navItem = target.closest(
-        '[id^="book-card-"], [id^="list-item-"], [id^="cat-book-"], [id^="search-item-"], [id^="search-result-"], [id^="nav-tab-"], [id^="cat-chip-"], .peekaboo-item, button[id*="view-all"], a[id*="view-all"]'
+        '[id^="book-card-"], [id^="list-item-"], [id^="cat-book-"], [id^="search-item-"], [id^="search-result-"], .peekaboo-item, button[id*="view-all"], a[id*="view-all"]'
       ) as HTMLElement | null;
 
       if (navItem) {
-        // Trigger native loader in sync with page/view loading until route settled
-        showLoader();
+        showLoader(600);
         return;
       }
 
-      // 3. Other navigating/blocking action buttons (Buy now, load more, checkout)
-      // Exclude cart buttons explicitly
+      // 4. Other action buttons (Buy now, load more, checkout)
       const actionItem = target.closest(
         'button[id*="buy-now"], button[id*="load-more"], button[id*="checkout"], button[id^="btn-login"]'
       ) as HTMLElement | null;
 
       if (actionItem) {
-        showLoader();
+        showLoader(250);
       }
     };
 
@@ -191,9 +192,7 @@ export const NativePageLoadingProvider: React.FC<{ children: React.ReactNode }> 
 
   return (
     <NativeLoaderContext.Provider value={{ showLoader, hideLoader, isLoading }}>
-      <Suspense fallback={null}>
-        <RouteChangeObserver onRouteSettled={hideLoader} />
-      </Suspense>
+      <RouteChangeObserver onRouteSettled={hideLoader} />
 
       {children}
 

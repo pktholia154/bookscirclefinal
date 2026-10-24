@@ -1,10 +1,10 @@
 import type { Metadata } from 'next';
 import { PurchasedPageClient } from '@/components/PurchasedPageClient';
-import { getBooksFromFirestore } from '@/lib/services/books';
+import { getBooksFromFirestore, slimBooksForSSR } from '@/lib/services/books';
 import { INITIAL_BOOKS } from '@/lib/data';
 import { SITE_NAME, SITE_URL } from '@/lib/seo';
 
-export const revalidate = 60;
+export const revalidate = 300;
 
 export const metadata: Metadata = {
   title: `My Library & Purchased E-Books | ${SITE_NAME}`,
@@ -28,5 +28,5 @@ export default async function PurchasedPage() {
     }
   } catch {}
 
-  return <PurchasedPageClient initialBooks={books} />;
+  return <PurchasedPageClient initialBooks={slimBooksForSSR(books, 72)} />;
 }

@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useTransition } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
@@ -30,8 +31,6 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Book, Review, CartItem } from '@/lib/types';
 import { DEFAULT_BOOK_COVER, BOOK_FAQS, FREE_SAMPLE_BOOK_ID } from '@/lib/data';
 import { BookReviewsSection } from '@/components/BookReviewsSection';
-import { PDFReaderModal } from '@/components/PDFReaderModal';
-import { MarkdownReaderModal } from '@/components/MarkdownReaderModal';
 import { SampleSwitcher } from '@/components/SampleSwitcher';
 import { InstallAppBanner } from '@/components/InstallAppBanner';
 import { IOSInstallGuideModal } from '@/components/IOSInstallGuideModal';
@@ -40,8 +39,21 @@ import { usePWAInstall } from '@/hooks/use-pwa-install';
 import { CartDrawer } from '@/components/CartDrawer';
 import { BottomNav, TabKey } from '@/components/BottomNav';
 import { triggerNativeLoading } from '@/components/NativePageLoadingIndicator';
-import { executePurchaseQuickJump, subscribeToPurchasesUpdated } from '@/lib/services/quick-jump';
+import {
+  executePurchaseQuickJump,
+  subscribeToPurchasesUpdated,
+  setTargetHomeTab,
+} from '@/lib/services/quick-jump';
 import { UserProfile } from '@/components/Header';
+
+const PDFReaderModal = dynamic(
+  () => import('@/components/PDFReaderModal').then((m) => m.PDFReaderModal),
+  { ssr: false }
+);
+const MarkdownReaderModal = dynamic(
+  () => import('@/components/MarkdownReaderModal').then((m) => m.MarkdownReaderModal),
+  { ssr: false }
+);
 import { processRazorpayPayment, loadRazorpayScript } from '@/lib/services/razorpay';
 import { recordUserPurchaseInFirestore, syncUserPurchases, subscribeToUserPurchases } from '@/lib/services/purchases';
 import { syncUserProfileToFirestore } from '@/lib/services/users';
@@ -128,13 +140,13 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
   const [, startTransition] = useTransition();
 
   const totalCartCount = useMemo(() => {
-    return cart.reduce((acc, i) => acc + i.quantity, 0);
+    return (Array.isArray(cart) ? cart : []).reduce((acc, i) => acc + (i?.quantity || 1), 0);
   }, [cart]);
 
   // Prefetch critical destinations for ultra-fast instant transitions
   useEffect(() => {
-    router.prefetch('/purchased');
     router.prefetch('/');
+    router.prefetch('/purchased');
   }, [router]);
 
   const handleTabChange = (tab: TabKey) => {
@@ -142,17 +154,14 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
       setIsCartOpen(true);
       return;
     }
-    triggerNativeLoading(150);
+    triggerNativeLoading(120);
     startTransition(() => {
       if (tab === 'purchased') {
         router.push('/purchased');
         return;
       }
-      if (tab === 'home') {
-        router.push('/');
-        return;
-      }
-      router.push(`/?tab=${tab}`);
+      setTargetHomeTab(tab || 'home');
+      router.push('/');
     });
   };
 
@@ -276,7 +285,7 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
 
   const imgSrc = imgLoadFailed ? DEFAULT_BOOK_COVER : (book.cover || DEFAULT_BOOK_COVER);
   const isPurchased = purchasedBookIds.includes(book.id);
-  const isInCart = cart.some((i) => i.book.id === book.id);
+  const isInCart = (Array.isArray(cart) ? cart : []).some((i) => i?.book?.id === book.id);
 
   const showToast = (msg: string | null, duration = 2500) => {
     if (!msg) {
@@ -440,8 +449,8 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
     }
   };
 
-  const rating = book.rating && book.rating > 0 ? book.rating : 4.8;
-  const ratingCount = book.rating_count && book.rating_count > 0 ? book.rating_count : 120;
+  const rating = Number(book.rating && Number(book.rating) > 0 ? book.rating : 4.8);
+  const ratingCount = Number(book.rating_count && Number(book.rating_count) > 0 ? book.rating_count : 120);
   const formattedReviewsCount =
     ratingCount >= 1000 ? `${(ratingCount / 1000).toFixed(1)}K` : ratingCount.toString();
 

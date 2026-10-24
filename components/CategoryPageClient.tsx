@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useTransition } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
@@ -26,7 +27,7 @@ import { searchBooks } from '@/lib/search';
 import { BookCard } from '@/components/BookCard';
 import { BookListView } from '@/components/BookListView';
 import { CartDrawer } from '@/components/CartDrawer';
-import { PDFReaderModal } from '@/components/PDFReaderModal';
+import { BottomNav, TabKey } from '@/components/BottomNav';
 import { UserProfile } from '@/components/Header';
 import {
   getWishlistIdsFromLocal,
@@ -53,7 +54,17 @@ import {
 } from '@/lib/services/purchases';
 import { auth, signInWithGoogle } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { executePurchaseQuickJump, subscribeToPurchasesUpdated } from '@/lib/services/quick-jump';
+import {
+  executePurchaseQuickJump,
+  subscribeToPurchasesUpdated,
+  setTargetHomeTab,
+} from '@/lib/services/quick-jump';
+import { triggerNativeLoading } from '@/components/NativePageLoadingIndicator';
+
+const PDFReaderModal = dynamic(
+  () => import('@/components/PDFReaderModal').then((m) => m.PDFReaderModal),
+  { ssr: false }
+);
 
 interface CategoryPageClientProps {
   categoryTitle: string;
@@ -73,6 +84,7 @@ export const CategoryPageClient: React.FC<CategoryPageClientProps> = ({
   allCategories,
 }) => {
   const router = useRouter();
+  const [, startTransition] = useTransition();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'popular' | 'price-asc' | 'price-desc' | 'rating'>('popular');
@@ -90,11 +102,15 @@ export const CategoryPageClient: React.FC<CategoryPageClientProps> = ({
   };
 
   useEffect(() => {
+    router.prefetch('/');
+    router.prefetch('/purchased');
     try {
       setWishlistIds(getWishlistIdsFromLocal());
       setCart(getCartFromLocal());
       setPurchasedBookIds(getPurchasedBookIdsFromLocal());
-      const savedUser = localStorage.getItem('bookscircle_auth_user');
+      const savedUser =
+        localStorage.getItem('bookscircle_auth_user') ||
+        localStorage.getItem('bookscircle_user_session');
       if (savedUser) {
         setCurrentUser(JSON.parse(savedUser));
       }
@@ -129,10 +145,34 @@ export const CategoryPageClient: React.FC<CategoryPageClientProps> = ({
       unsubAuth();
       unsubPurchases();
     };
-  }, []);
+  }, [router]);
 
-  const cartBookIds = useMemo(() => new Set(cart.map((i) => i.book.id)), [cart]);
+  const cartBookIds = useMemo(
+    () =>
+      new Set(
+        (Array.isArray(cart) ? cart : [])
+          .filter((i) => i && i.book && i.book.id)
+          .map((i) => i.book.id)
+      ),
+    [cart]
+  );
   const wishlistSet = useMemo(() => new Set(wishlistIds), [wishlistIds]);
+
+  const handleTabChange = (tab: TabKey) => {
+    if (tab === 'cart') {
+      setIsCartOpen(true);
+      return;
+    }
+    triggerNativeLoading(120);
+    startTransition(() => {
+      if (tab === 'purchased') {
+        router.push('/purchased');
+        return;
+      }
+      setTargetHomeTab(tab || 'home');
+      router.push('/');
+    });
+  };
 
   const ITEMS_PER_PAGE = 12;
   const [currentPage, setCurrentPage] = useState(1);
@@ -572,11 +612,19 @@ export const CategoryPageClient: React.FC<CategoryPageClientProps> = ({
 
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-gray-950 text-white text-xs font-semibold px-4 py-2.5 rounded-full shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2 pointer-events-none">
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-gray-950 text-white text-xs font-semibold px-4 py-2.5 rounded-full shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2 pointer-events-none">
           <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
           <span>{toastMessage}</span>
         </div>
       )}
+
+      {/* Fixed Bottom Navigation */}
+      <BottomNav
+        activeTab="categories"
+        onTabChange={handleTabChange}
+        cartCount={cart.length}
+        purchasedCount={purchasedBookIds.length}
+      />
     </div>
   );
 };

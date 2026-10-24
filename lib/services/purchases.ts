@@ -691,12 +691,22 @@ export function subscribeToUserPurchases(
 
 const SALES_COUNT_CACHE_KEY = 'bookscircle_sales_count_map';
 
+let memorySalesCountMap: Record<string, number> | null = null;
+let memorySalesCountExpiresAt = 0;
+
 export function getCachedSalesCountMapSync(): Record<string, number> {
+  if (memorySalesCountMap && Object.keys(memorySalesCountMap).length > 0) {
+    return memorySalesCountMap;
+  }
   if (typeof window !== 'undefined') {
     try {
       const cached = localStorage.getItem(SALES_COUNT_CACHE_KEY);
       if (cached) {
-        return JSON.parse(cached);
+        const parsed = JSON.parse(cached);
+        if (parsed && typeof parsed === 'object') {
+          memorySalesCountMap = parsed;
+          return parsed;
+        }
       }
     } catch {}
   }
@@ -704,6 +714,8 @@ export function getCachedSalesCountMapSync(): Record<string, number> {
 }
 
 export function saveSalesCountMapLocal(map: Record<string, number>) {
+  memorySalesCountMap = map;
+  memorySalesCountExpiresAt = Date.now() + 5 * 60 * 1000;
   if (typeof window !== 'undefined') {
     try {
       localStorage.setItem(SALES_COUNT_CACHE_KEY, JSON.stringify(map));
@@ -712,11 +724,19 @@ export function saveSalesCountMapLocal(map: Record<string, number>) {
 }
 
 /**
- * Aggregates verified sales numbers per book directly from Firestore
- * (orders, purchases, and book_analytics) to ensure Best Sellers listing
- * is strictly ordered by sold items count.
+ * Aggregates verified sales numbers per book from Firestore with memory caching
  */
 export async function fetchTotalSalesCountMap(): Promise<Record<string, number>> {
+  const now = Date.now();
+  if (memorySalesCountMap && now < memorySalesCountExpiresAt && Object.keys(memorySalesCountMap).length > 0) {
+    return memorySalesCountMap;
+  }
+
+  // On server, avoid hanging client SDK calls
+  if (typeof window === 'undefined') {
+    return memorySalesCountMap || {};
+  }
+
   const salesMap: Record<string, number> = { ...getCachedSalesCountMapSync() };
 
   try {
@@ -726,10 +746,11 @@ export async function fetchTotalSalesCountMap(): Promise<Record<string, number>>
       getDocs(collection(db, 'book_analytics')).catch(() => null),
     ]);
 
+    const freshMap: Record<string, number> = {};
     function tally(idOrSlug: string, count: number = 1) {
       if (!idOrSlug) return;
       const clean = String(idOrSlug).trim();
-      salesMap[clean] = (salesMap[clean] || 0) + count;
+      freshMap[clean] = (freshMap[clean] || 0) + count;
     }
 
     if (purchasesSnap && !purchasesSnap.empty) {
@@ -758,7 +779,9 @@ export async function fetchTotalSalesCountMap(): Promise<Record<string, number>>
       });
     }
 
-    saveSalesCountMapLocal(salesMap);
+    const finalMap = Object.keys(freshMap).length > 0 ? freshMap : salesMap;
+    saveSalesCountMapLocal(finalMap);
+    return finalMap;
   } catch (err) {
     console.warn('Sales count fetch error:', err);
   }

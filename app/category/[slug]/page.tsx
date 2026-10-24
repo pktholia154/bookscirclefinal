@@ -1,12 +1,11 @@
 import { Metadata } from 'next';
-import { notFound } from 'next/navigation';
-import { getBooksFromFirestore, getCategoriesFromFirestore } from '@/lib/services/books';
+import { getBooksFromFirestore, getCategoriesFromFirestore, slimBookForList } from '@/lib/services/books';
 import { INITIAL_BOOKS, INITIAL_CATEGORIES } from '@/lib/data';
 import { Book, Category } from '@/lib/types';
 import { generateCategorySchema, SITE_URL, SITE_NAME } from '@/lib/seo';
 import { CategoryPageClient } from '@/components/CategoryPageClient';
 
-export const revalidate = 60; // ISR revalidate every 60 seconds
+export const revalidate = 300; // ISR revalidate every 5 minutes
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -16,25 +15,27 @@ function matchCategory(slug: string, categories: Category[]): Category | undefin
   const decoded = decodeURIComponent(slug).toLowerCase().trim();
   return categories.find(
     (c) =>
-      (c.seolsug && c.seolsug.toLowerCase() === decoded) ||
-      (c.id && c.id.toLowerCase() === decoded) ||
-      (c.title && c.title.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '') === decoded) ||
-      (c.title && c.title.toLowerCase() === decoded)
+      c &&
+      ((c.seolsug && c.seolsug.toLowerCase() === decoded) ||
+        (c.id && c.id.toLowerCase() === decoded) ||
+        (c.title && c.title.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '') === decoded) ||
+        (c.title && c.title.toLowerCase() === decoded))
   );
 }
 
 function filterBooksByCategory(category: Category, books: Book[]): Book[] {
-  const catTitleLower = category.title.toLowerCase().trim();
-  const catIdLower = category.id.toLowerCase().trim();
+  const catTitleLower = (category.title || '').toLowerCase().trim();
+  const catIdLower = (category.id || '').toLowerCase().trim();
   const catSlugLower = (category.seolsug || '').toLowerCase().trim();
 
   return books.filter((b) => {
+    if (!b) return false;
     const bookCat = (b.category || '').toLowerCase().trim();
     return (
       bookCat === catTitleLower ||
       bookCat === catIdLower ||
       bookCat === catSlugLower ||
-      (b.tags && b.tags.some((t) => t.toLowerCase() === catTitleLower))
+      (Array.isArray(b.tags) && b.tags.some((t) => String(t || '').toLowerCase() === catTitleLower))
     );
   });
 }
@@ -106,14 +107,16 @@ export default async function CategoryPage({ params }: Props) {
 
   const categoryBooks = category
     ? filterBooksByCategory(category, books)
-    : books.filter((b) => b.category?.toLowerCase() === decodeURIComponent(slug).toLowerCase());
+    : books.filter((b) => (b?.category || '').toLowerCase() === decodeURIComponent(slug).toLowerCase());
+
+  const targetBooks = (categoryBooks.length > 0 ? categoryBooks : books.slice(0, 72)).map(slimBookForList);
 
   // Schema.org JSON-LD for rich SEO
   const jsonLd = generateCategorySchema(
     categoryTitle,
     slug,
     seoCat,
-    categoryBooks.length > 0 ? categoryBooks : books.slice(0, 10)
+    targetBooks.slice(0, 24)
   );
 
   return (
@@ -126,7 +129,7 @@ export default async function CategoryPage({ params }: Props) {
         categoryTitle={categoryTitle}
         categorySlug={slug}
         seoCat={seoCat}
-        books={categoryBooks.length > 0 ? categoryBooks : books}
+        books={targetBooks}
         allCategories={categories}
       />
     </>

@@ -41,6 +41,7 @@ export async function GET(req: NextRequest) {
 
     try {
       const response = await fetch(resolvedUrl, {
+        cache: 'no-store',
         headers: {
           "User-Agent": "BooksCircle-Secure-PDF-Delivery/2.0",
           Accept: "application/pdf,application/octet-stream,*/*",

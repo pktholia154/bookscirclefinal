@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Image from 'next/image';
+import dynamic from 'next/dynamic';
 import {
   BookOpen,
   Check,
@@ -29,9 +30,16 @@ import {
   getAllReadingProgress,
 } from '@/lib/offline-storage';
 import { resolveBookPdfUrl, resolveBookSampleUrl, resolveBookMdUrl } from '@/lib/services/storage';
-import { PDFReaderModal } from '@/components/PDFReaderModal';
-import { MarkdownReaderModal } from '@/components/MarkdownReaderModal';
 import { UserProfile } from '@/components/Header';
+
+const PDFReaderModal = dynamic(
+  () => import('@/components/PDFReaderModal').then((m) => m.PDFReaderModal),
+  { ssr: false }
+);
+const MarkdownReaderModal = dynamic(
+  () => import('@/components/MarkdownReaderModal').then((m) => m.MarkdownReaderModal),
+  { ssr: false }
+);
 
 interface PurchasedViewProps {
   books: Book[];

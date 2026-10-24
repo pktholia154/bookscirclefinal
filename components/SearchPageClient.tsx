@@ -16,7 +16,12 @@ import { recordUserPurchaseInFirestore, syncUserPurchases } from '@/lib/services
 import { processRazorpayPayment } from '@/lib/services/razorpay';
 import { auth, signOutUser } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { executePurchaseQuickJump, subscribeToPurchasesUpdated } from '@/lib/services/quick-jump';
+import {
+  executePurchaseQuickJump,
+  subscribeToPurchasesUpdated,
+  setTargetHomeTab,
+} from '@/lib/services/quick-jump';
+import { getCartFromLocal, addToCartAction, subscribeToCartChanges } from '@/lib/services/cart';
 import { RefreshCw, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -53,11 +58,7 @@ function SearchPageContent({
   useEffect(() => {
     const timer = setTimeout(() => {
       try {
-        const savedCart = localStorage.getItem('bookscircle_cart');
-        if (savedCart) {
-          const parsed = JSON.parse(savedCart);
-          if (Array.isArray(parsed)) setCart(parsed);
-        }
+        setCart(getCartFromLocal());
       } catch {}
 
       try {
@@ -66,19 +67,24 @@ function SearchPageContent({
       } catch {}
 
       try {
-        const savedUser = localStorage.getItem('bookscircle_auth_user');
+        const savedUser =
+          localStorage.getItem('bookscircle_auth_user') ||
+          localStorage.getItem('bookscircle_user_session');
         if (savedUser) setCurrentUser(JSON.parse(savedUser));
       } catch {}
     }, 0);
 
+    router.prefetch('/');
     router.prefetch('/purchased');
 
+    const unsubCart = subscribeToCartChanges((updated) => setCart(updated));
     const unsubPurchases = subscribeToPurchasesUpdated((newIds) => {
       setPurchasedBookIds((prev) => Array.from(new Set([...prev, ...newIds])));
     });
 
     return () => {
       clearTimeout(timer);
+      unsubCart();
       unsubPurchases();
     };
   }, [router]);
@@ -133,14 +139,9 @@ function SearchPageContent({
 
   const handleAddToCart = (book: Book, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    setCart((prev) => {
-      const existing = prev.find((item) => item.book.id === book.id);
-      if (existing) {
-        return prev.map((item) => (item.book.id === book.id ? { ...item, quantity: item.quantity + 1 } : item));
-      }
-      return [...prev, { book, quantity: 1 }];
-    });
-    showToast(`Added "${book.title.slice(0, 20)}..." to Cart`);
+    const { updatedCart, message } = addToCartAction(book);
+    setCart(updatedCart);
+    showToast(message);
   };
 
   const executeRazorpayCheckout = async (itemsToBuy: CartItem[], userOverride?: UserProfile | null) => {
@@ -148,7 +149,7 @@ function SearchPageContent({
     const activeUser = userOverride || currentUser;
     const userEmail = activeUser?.email || '';
     const userName = activeUser?.displayName || 'Reader';
-    const totalAmount = itemsToBuy.reduce((sum, item) => sum + item.book.buy_price * item.quantity, 0);
+    const totalAmount = itemsToBuy.reduce((sum, item) => sum + (item?.book?.buy_price || 0) * (item?.quantity || 1), 0);
 
     showToast('Opening Razorpay Gateway...');
     try {
@@ -190,23 +191,27 @@ function SearchPageContent({
     }
   };
 
-  const cartBookIds = new Set(cart.map((i) => i.book.id));
-  const totalCartCount = cart.reduce((acc, i) => acc + i.quantity, 0);
+  const cartBookIds = new Set(
+    (Array.isArray(cart) ? cart : [])
+      .filter((i) => i && i.book && i.book.id)
+      .map((i) => i.book.id)
+  );
+  const totalCartCount = (Array.isArray(cart) ? cart : []).reduce(
+    (acc, i) => acc + (i?.quantity || 1),
+    0
+  );
 
   const handleTabChange = (tab: TabKey) => {
     if (tab === 'cart') {
       setIsCartOpen(true);
       return;
     }
-    if (tab === 'home') {
-      router.push('/');
-      return;
-    }
     if (tab === 'purchased') {
       router.push('/purchased');
       return;
     }
-    router.push(`/?tab=${tab}`);
+    setTargetHomeTab(tab || 'home');
+    router.push('/');
   };
 
   if (isLoading) {
