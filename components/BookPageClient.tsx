@@ -40,6 +40,7 @@ import { usePWAInstall } from '@/hooks/use-pwa-install';
 import { CartDrawer } from '@/components/CartDrawer';
 import { BottomNav, TabKey } from '@/components/BottomNav';
 import { triggerNativeLoading } from '@/components/NativePageLoadingIndicator';
+import { executePurchaseQuickJump, subscribeToPurchasesUpdated } from '@/lib/services/quick-jump';
 import { UserProfile } from '@/components/Header';
 import { processRazorpayPayment, loadRazorpayScript } from '@/lib/services/razorpay';
 import { recordUserPurchaseInFirestore, syncUserPurchases, subscribeToUserPurchases } from '@/lib/services/purchases';
@@ -239,11 +240,16 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
       }
     });
 
+    const unsubPurchasesUpdated = subscribeToPurchasesUpdated((newIds) => {
+      setPurchasedBookIds((prev) => Array.from(new Set([...prev, ...newIds])));
+    });
+
     return () => {
       clearTimeout(timer);
       unsubCart();
       unsubWishlist();
       unsub();
+      unsubPurchasesUpdated();
     };
   }, [book.id]);
 
@@ -349,33 +355,15 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
         userId,
         userName,
         userEmail,
-        onSuccess: async (paymentData) => {
-          const newPurchasedIds = itemsToBuy.map((item) => item.book.id);
-          // Instant local state update
-          savePurchasedBookIds(newPurchasedIds);
-          setPurchasedBookIds((prev) => Array.from(new Set([...prev, ...newPurchasedIds])));
-
-          // Firestore write in background
-          recordUserPurchaseInFirestore(
-            userId,
-            userEmail,
+        onSuccess: (paymentData) => {
+          executePurchaseQuickJump({
             itemsToBuy,
-            {
-              orderId: paymentData.order_id,
-              paymentId: paymentData.payment_id,
-              amount: paymentData.amountInRupees,
-            }
-          ).then((allPurchased) => {
-            if (allPurchased && allPurchased.length > 0) {
-              setPurchasedBookIds(allPurchased);
-            }
-          }).catch(() => {});
-
-          setCart((prev) => prev.filter((item) => !newPurchasedIds.includes(item.book.id)));
-          showToast(`Purchase successful! Opening your library...`, 3000);
-          setTimeout(() => {
-            router.push('/?tab=purchased');
-          }, 400);
+            paymentData,
+            currentUser: activeUser,
+            router,
+            onSuccessToast: (msg) => showToast(msg, 3000),
+            onBeforeRedirect: () => setIsCartOpen(false),
+          });
         },
         onError: (err) => showToast(err || 'Payment was cancelled.', 3500),
       });
@@ -907,11 +895,15 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
         onRemoveItem={(id) => setCart((prev) => prev.filter((i) => i.book.id !== id))}
         onClearCart={() => setCart([])}
         currentUser={currentUser}
-        onSuccessfulCheckout={(items) => {
-          const newIds = items.map((i) => i.book.id);
-          setPurchasedBookIds((prev) => [...prev, ...newIds]);
-          setIsCartOpen(false);
-          router.push('/?tab=purchased');
+        onSuccessfulCheckout={(items, paymentData) => {
+          executePurchaseQuickJump({
+            itemsToBuy: items,
+            paymentData,
+            currentUser,
+            router,
+            onSuccessToast: (msg) => showToast(msg, 3000),
+            onBeforeRedirect: () => setIsCartOpen(false),
+          });
         }}
       />
 

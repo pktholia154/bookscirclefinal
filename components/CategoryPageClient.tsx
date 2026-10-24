@@ -53,6 +53,7 @@ import {
 } from '@/lib/services/purchases';
 import { auth, signInWithGoogle } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
+import { executePurchaseQuickJump, subscribeToPurchasesUpdated } from '@/lib/services/quick-jump';
 
 interface CategoryPageClientProps {
   categoryTitle: string;
@@ -118,10 +119,15 @@ export const CategoryPageClient: React.FC<CategoryPageClientProps> = ({
       }
     });
 
+    const unsubPurchases = subscribeToPurchasesUpdated((newIds) => {
+      setPurchasedBookIds((prev) => Array.from(new Set([...prev, ...newIds])));
+    });
+
     return () => {
       unsubWishlist();
       unsubCart();
       unsubAuth();
+      unsubPurchases();
     };
   }, []);
 
@@ -223,18 +229,14 @@ export const CategoryPageClient: React.FC<CategoryPageClientProps> = ({
         userId,
         userName,
         userEmail,
-        onSuccess: async (paymentData) => {
-          savePurchasedBookIds([book.id]);
-          setPurchasedBookIds((prev) => Array.from(new Set([...prev, book.id])));
-
-          recordUserPurchaseInFirestore(userId, userEmail, [item], {
-            orderId: paymentData.order_id,
-            paymentId: paymentData.payment_id,
-            amount: paymentData.amountInRupees,
-          }).catch(() => {});
-
-          showToast(`Purchase successful! Opening "${book.title}"...`, 3000);
-          setActivePdfBook({ book, mode: 'full' });
+        onSuccess: (paymentData) => {
+          executePurchaseQuickJump({
+            itemsToBuy: [item],
+            paymentData,
+            currentUser,
+            router,
+            onSuccessToast: (msg) => showToast(msg, 3000),
+          });
         },
         onError: (err) => showToast(err || 'Payment was cancelled', 3500),
       });
@@ -542,13 +544,15 @@ export const CategoryPageClient: React.FC<CategoryPageClientProps> = ({
         currentUser={currentUser}
         userEmail={currentUser?.email || undefined}
         userName={currentUser?.displayName || undefined}
-        onSuccessfulCheckout={(purchasedItems) => {
-          const ids = purchasedItems.map((i) => i.book.id);
-          savePurchasedBookIds(ids);
-          setPurchasedBookIds((prev) => Array.from(new Set([...prev, ...ids])));
-          setCart([]);
-          setIsCartOpen(false);
-          showToast('Payment successful! E-books unlocked in your library.');
+        onSuccessfulCheckout={(purchasedItems, paymentData) => {
+          executePurchaseQuickJump({
+            itemsToBuy: purchasedItems,
+            paymentData,
+            currentUser,
+            router,
+            onSuccessToast: (msg) => showToast(msg, 3000),
+            onBeforeRedirect: () => setIsCartOpen(false),
+          });
         }}
       />
 

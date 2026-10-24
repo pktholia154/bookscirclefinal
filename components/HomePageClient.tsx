@@ -68,6 +68,7 @@ import { auth, signOutUser, signInWithGoogle } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { usePWAInstall } from '@/hooks/use-pwa-install';
 import { triggerNativeLoading } from '@/components/NativePageLoadingIndicator';
+import { executePurchaseQuickJump, subscribeToPurchasesUpdated } from '@/lib/services/quick-jump';
 import { Check, ShoppingBag, RefreshCw, Lock, Trash2, Tag, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -292,7 +293,13 @@ export default function HomePage({
     const unsubscribe = subscribeToCartChanges((updatedCart) => {
       setCart(updatedCart);
     });
-    return () => unsubscribe();
+    const unsubPurchases = subscribeToPurchasesUpdated((newIds) => {
+      setPurchasedBookIds((prev) => Array.from(new Set([...prev, ...newIds])));
+    });
+    return () => {
+      unsubscribe();
+      unsubPurchases();
+    };
   }, []);
 
   // Subscribe to real-time verified sales counts strictly from Firestore purchases and orders
@@ -338,69 +345,26 @@ export default function HomePage({
   }, [purchasedBookIds]);
 
   const handleSuccessfulCheckout = useCallback(
-    async (
+    (
       purchasedItems: CartItem[],
       paymentData?: { order_id?: string; payment_id?: string; amountInRupees?: number },
       userOverride?: UserProfile | null
     ) => {
-      const newPurchasedIds = purchasedItems.map((item) => item.book.id);
       const activeUser = userOverride || currentUserRef.current;
-      const effectiveUserId = activeUser?.uid || auth?.currentUser?.uid || 'guest_user';
-      const effectiveUserEmail = activeUser?.email || auth?.currentUser?.email || 'user@bookscircle.org';
-
-      // 1. Instant local state update & persistence
-      savePurchasedBookIds(newPurchasedIds);
-      setPurchasedBookIds((prev) => {
-        const next = Array.from(new Set([...prev, ...newPurchasedIds]));
-        if (next.length === prev.length) return prev;
-        return next;
-      });
-
-      // 2. Perform Firestore cloud purchase record asynchronously in background without blocking UI
-      recordUserPurchaseInFirestore(
-        effectiveUserId,
-        effectiveUserEmail,
-        purchasedItems,
-        {
-          orderId: paymentData?.order_id || `ord_${Date.now()}`,
-          paymentId: paymentData?.payment_id || `pay_${Date.now()}`,
-          amount: paymentData?.amountInRupees || 0,
-        }
-      )
-        .then((allPurchased) => {
-          if (allPurchased && allPurchased.length > 0) {
-            setPurchasedBookIds((prev) => {
-              const unique = Array.from(new Set([...prev, ...allPurchased]));
-              if (unique.length === prev.length) return prev;
-              return unique;
-            });
-          }
-        })
-        .catch((e) => {
-          console.warn('Purchase cloud record note:', e);
-        });
-
-      // Clean up purchased items from cart
-      newPurchasedIds.forEach((id) => removeFromCartAction(id));
-      setCart((prev) => prev.filter((item) => !newPurchasedIds.includes(item.book.id)));
-
-      showToast(`Purchase successful! ${purchasedItems.length} eBook(s) unlocked in your library.`, 3500);
-
-      // 3. Immediate redirect & tab switch to purchased library view
-      startTransition(() => {
-        setSelectedBook(null);
-        setActiveTab('purchased');
-        setIsCartOpen(false);
-        if (typeof window !== 'undefined') {
-          try {
-            const url = new URL(window.location.href);
-            url.searchParams.set('tab', 'purchased');
-            window.history.pushState({}, '', url.toString());
-          } catch {}
-        }
+      executePurchaseQuickJump({
+        itemsToBuy: purchasedItems,
+        paymentData,
+        currentUser: activeUser,
+        router,
+        onSuccessToast: (msg) => showToast(msg, 3500),
+        onBeforeRedirect: () => {
+          setSelectedBook(null);
+          setIsCartOpen(false);
+          setActiveTab('purchased');
+        },
       });
     },
-    [showToast]
+    [router, showToast]
   );
 
   // Central Razorpay checkout executor that supports instant auto-resume

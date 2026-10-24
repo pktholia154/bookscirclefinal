@@ -19,6 +19,7 @@ import { auth, signInWithGoogle } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { usePWAInstall } from '@/hooks/use-pwa-install';
 import { triggerNativeLoading } from '@/components/NativePageLoadingIndicator';
+import { executePurchaseQuickJump, subscribeToPurchasesUpdated } from '@/lib/services/quick-jump';
 import { AnimatePresence, motion } from 'motion/react';
 import { Check } from 'lucide-react';
 
@@ -134,10 +135,15 @@ export const PurchasedPageClient: React.FC<PurchasedPageClientProps> = ({
       }
     });
 
+    const unsubPurchasesUpdated = subscribeToPurchasesUpdated((newIds) => {
+      setPurchasedBookIds((prev) => Array.from(new Set([...prev, ...newIds, FREE_SAMPLE_BOOK_ID])));
+    });
+
     return () => {
       unsubCart();
       unsubBooks();
       unsubAuth();
+      unsubPurchasesUpdated();
     };
   }, []);
 
@@ -268,13 +274,15 @@ export const PurchasedPageClient: React.FC<PurchasedPageClientProps> = ({
           clearCartAction();
           setCart([]);
         }}
-        onSuccessfulCheckout={(purchasedItems) => {
-          const ids = purchasedItems.map((i) => i.book.id);
-          savePurchasedBookIds(ids);
-          setPurchasedBookIds((prev) => Array.from(new Set([...prev, ...ids])));
-          setCart([]);
-          setIsCartOpen(false);
-          showToast('Payment successful! Added to your library.');
+        onSuccessfulCheckout={(purchasedItems, paymentData) => {
+          executePurchaseQuickJump({
+            itemsToBuy: purchasedItems,
+            paymentData,
+            currentUser,
+            router,
+            onSuccessToast: (msg) => showToast(msg, 3000),
+            onBeforeRedirect: () => setIsCartOpen(false),
+          });
         }}
         currentUser={currentUser}
         userEmail={currentUser?.email || undefined}

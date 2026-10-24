@@ -191,14 +191,11 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
           setIsCheckingOut(false);
           setLastPaymentId(paymentData.payment_id);
           setOrderSuccess(true);
+          onClearCart();
+          onClose();
           if (onSuccessfulCheckout) {
             onSuccessfulCheckout(checkoutItems, paymentData);
           }
-          setTimeout(() => {
-            setOrderSuccess(false);
-            onClearCart();
-            onClose();
-          }, 800);
         },
         onError: (err) => {
           setIsCheckingOut(false);

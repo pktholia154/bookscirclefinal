@@ -16,6 +16,7 @@ import { recordUserPurchaseInFirestore, syncUserPurchases } from '@/lib/services
 import { processRazorpayPayment } from '@/lib/services/razorpay';
 import { auth, signOutUser } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
+import { executePurchaseQuickJump, subscribeToPurchasesUpdated } from '@/lib/services/quick-jump';
 import { RefreshCw, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -70,8 +71,17 @@ function SearchPageContent({
       } catch {}
     }, 0);
 
-    return () => clearTimeout(timer);
-  }, []);
+    router.prefetch('/purchased');
+
+    const unsubPurchases = subscribeToPurchasesUpdated((newIds) => {
+      setPurchasedBookIds((prev) => Array.from(new Set([...prev, ...newIds])));
+    });
+
+    return () => {
+      clearTimeout(timer);
+      unsubPurchases();
+    };
+  }, [router]);
 
   // Load books & categories from Firestore
   useEffect(() => {
@@ -148,27 +158,15 @@ function SearchPageContent({
         bookTitles: itemsToBuy.map((i) => i.book.title),
         userName,
         userEmail,
-        onSuccess: async (paymentData) => {
-          const newIds = itemsToBuy.map((i) => i.book.id);
-          try {
-            const allPurchased = await recordUserPurchaseInFirestore(
-              activeUser?.uid || 'guest_user',
-              userEmail,
-              itemsToBuy,
-              {
-                orderId: paymentData.order_id,
-                paymentId: paymentData.payment_id,
-                amount: paymentData.amountInRupees,
-              }
-            );
-            setPurchasedBookIds(allPurchased);
-          } catch {
-            savePurchasedBookIds(newIds);
-            setPurchasedBookIds((prev) => Array.from(new Set([...prev, ...newIds])));
-          }
-          setCart((prev) => prev.filter((item) => !newIds.includes(item.book.id)));
-          showToast('Payment successful! Ebook unlocked in your library.');
-          router.push('/');
+        onSuccess: (paymentData) => {
+          executePurchaseQuickJump({
+            itemsToBuy,
+            paymentData,
+            currentUser: activeUser,
+            router,
+            onSuccessToast: (msg) => showToast(msg),
+            onBeforeRedirect: () => setIsCartOpen(false),
+          });
         },
         onError: (err) => showToast(err || 'Payment cancelled.'),
       });
@@ -257,6 +255,16 @@ function SearchPageContent({
         onRemoveItem={(id) => setCart((prev) => prev.filter((i) => i.book.id !== id))}
         onClearCart={() => setCart([])}
         currentUser={currentUser}
+        onSuccessfulCheckout={(items, paymentData) => {
+          executePurchaseQuickJump({
+            itemsToBuy: items,
+            paymentData,
+            currentUser,
+            router,
+            onSuccessToast: (msg) => showToast(msg),
+            onBeforeRedirect: () => setIsCartOpen(false),
+          });
+        }}
       />
 
       {/* Login Modal */}
@@ -291,9 +299,9 @@ function SearchPageContent({
         )}
       </AnimatePresence>
 
-      {/* Fixed High Density Bottom Navigation - Keeps Purchased button in active mode on Book details view */}
+      {/* Fixed High Density Bottom Navigation */}
       <BottomNav
-        activeTab={selectedBook ? 'purchased' : 'search'}
+        activeTab={selectedBook ? 'book' : 'search'}
         onTabChange={handleTabChange}
         cartCount={totalCartCount}
         purchasedCount={purchasedBookIds.length}
