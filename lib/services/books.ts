@@ -1,11 +1,9 @@
 import {
   collection,
   getDocs,
-  getDoc,
   onSnapshot,
   doc,
   query,
-  where,
   limit,
 } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -19,52 +17,125 @@ import {
   resolveBookMdUrl,
 } from './storage';
 
-const LOCAL_STORAGE_BOOKS_KEY = 'bookscircle_live_books_cache';
-const LOCAL_STORAGE_CATEGORIES_KEY = 'bookscircle_live_categories_cache';
+const LOCAL_STORAGE_BOOKS_KEY = 'bookscircle_live_books_v3';
+const LOCAL_STORAGE_CATEGORIES_KEY = 'bookscircle_live_categories_v3';
+export const LOCAL_STORAGE_SOLD_COUNTS_KEY = 'bookscircle_sold_counts_v3';
+
+const LEGACY_STORAGE_KEYS = [
+  'bookscircle_local_books',
+  'bookscircle_local_categories',
+  'bookscircle_live_books_cache',
+  'bookscircle_live_categories_cache',
+  'bookscircle_sold_counts_cache',
+  'bookscircle_live_books_v2',
+  'bookscircle_live_categories_v2',
+];
+
 const FIREBASE_API_KEY = "AIzaSyB0unAiOkII7OK44Kx_oaJ6C68ey-javnk";
 const PROJECT_ID = "bookscircle-d579d";
 const FIRESTORE_DATABASE_ID = "bookscircle";
 
-// Helper to purge legacy demo cache
+// Purge any legacy or demo cache keys so old/demo data never pollutes the UI
 export function purgeLegacyDemoCache() {
   if (typeof window !== 'undefined') {
     try {
-      localStorage.removeItem('bookscircle_local_books');
-      localStorage.removeItem('bookscircle_local_categories');
+      for (const key of LEGACY_STORAGE_KEYS) {
+        localStorage.removeItem(key);
+      }
     } catch {}
   }
 }
 
-// Synchronous fast getter for immediate 0ms initial render
-export function getCachedBooksSync(): Book[] {
+// Complete cache flush for hard-syncing after PWA install or manual refresh
+export async function flushAllAppCachesAndStorage(): Promise<void> {
+  serverBooksCache = null;
+  serverBooksCacheExpiresAt = 0;
+  serverCategoriesCache = null;
+  serverCategoriesCacheExpiresAt = 0;
+  clientBooksMemoryCache = null;
+  clientBooksCacheExpiresAt = 0;
+  clientCategoriesMemoryCache = null;
+  clientCategoriesCacheExpiresAt = 0;
+  clientSoldCountsCache = null;
+  clientSoldCountsExpiresAt = 0;
+
   if (typeof window !== 'undefined') {
+    try {
+      for (const key of LEGACY_STORAGE_KEYS) {
+        localStorage.removeItem(key);
+      }
+      localStorage.removeItem(LOCAL_STORAGE_BOOKS_KEY);
+      localStorage.removeItem(LOCAL_STORAGE_CATEGORIES_KEY);
+      localStorage.removeItem(LOCAL_STORAGE_SOLD_COUNTS_KEY);
+      localStorage.removeItem('bookscircle_cart_tier_discount');
+    } catch {}
+
+    try {
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.allSettled(keys.map((k) => caches.delete(k)));
+      }
+    } catch {}
+
+    try {
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.allSettled(registrations.map((reg) => reg.update()));
+      }
+    } catch {}
+  }
+}
+
+// Synchronous getter for verified live cached books (returns empty array if no verified live cache exists, avoiding demo overwrite)
+export function getCachedBooksSync(): Book[] {
+  if (clientBooksMemoryCache && clientBooksMemoryCache.length > 0) {
+    return clientBooksMemoryCache;
+  }
+  if (typeof window !== 'undefined') {
+    purgeLegacyDemoCache();
     try {
       const cached = localStorage.getItem(LOCAL_STORAGE_BOOKS_KEY);
       if (cached) {
         const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
+        if (
+          parsed &&
+          Array.isArray(parsed.items) &&
+          parsed.items.length > 0 &&
+          typeof parsed.timestamp === 'number' &&
+          Date.now() - parsed.timestamp < 10 * 60 * 1000
+        ) {
+          return parsed.items;
         }
       }
     } catch {}
   }
-  return INITIAL_BOOKS;
+  return [];
 }
 
-// Synchronous fast getter for categories
+// Synchronous getter for verified live cached categories (returns empty array if no verified live cache exists)
 export function getCachedCategoriesSync(): Category[] {
+  if (clientCategoriesMemoryCache && clientCategoriesMemoryCache.length > 0) {
+    return clientCategoriesMemoryCache;
+  }
   if (typeof window !== 'undefined') {
+    purgeLegacyDemoCache();
     try {
       const cached = localStorage.getItem(LOCAL_STORAGE_CATEGORIES_KEY);
       if (cached) {
         const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
+        if (
+          parsed &&
+          Array.isArray(parsed.items) &&
+          parsed.items.length > 0 &&
+          typeof parsed.timestamp === 'number' &&
+          Date.now() - parsed.timestamp < 10 * 60 * 1000
+        ) {
+          return parsed.items;
         }
       }
     } catch {}
   }
-  return INITIAL_CATEGORIES;
+  return [];
 }
 
 function resolveIsoTimestamp(val: any): string | undefined {
@@ -136,7 +207,7 @@ export function parseBookDocument(docSnap: any): Book {
 
   const createdAtIso =
     resolveIsoTimestamp(data.createdAt ?? data.created_at ?? data._createTime) ||
-    resolveIsoTimestamp(data.published_date ?? data.publish_date);
+    resolveIsoTimestamp(data.published_date ?? data.published_date);
   const updatedAtIso =
     resolveIsoTimestamp(data.updatedAt ?? data.updated_at ?? data._updateTime) ||
     createdAtIso;
@@ -229,17 +300,17 @@ function parseFirestoreRestDocument(docObj: any): { id: string; [key: string]: a
   return res as { id: string; [key: string]: any };
 }
 
-// Server-side & Client-side in-memory caches for 0ms instant navigation & SSR response
+// Short-lived in-memory caches (30s) so data stays fresh and synced with Firestore
 let serverBooksCache: Book[] | null = null;
 let serverBooksCacheExpiresAt = 0;
-const SERVER_BOOKS_CACHE_TTL = 15 * 60 * 1000; // 15 minutes
+const SERVER_BOOKS_CACHE_TTL = 30 * 1000; // 30 seconds
 
 let serverCategoriesCache: Category[] | null = null;
 let serverCategoriesCacheExpiresAt = 0;
 
 let clientBooksMemoryCache: Book[] | null = null;
 let clientBooksCacheExpiresAt = 0;
-const CLIENT_BOOKS_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const CLIENT_BOOKS_CACHE_TTL = 60 * 1000; // 60 seconds
 
 let clientCategoriesMemoryCache: Category[] | null = null;
 let clientCategoriesCacheExpiresAt = 0;
@@ -247,11 +318,6 @@ let clientCategoriesCacheExpiresAt = 0;
 let inflightBooksPromise: Promise<Book[] | null> | null = null;
 let inflightCategoriesPromise: Promise<Category[] | null> | null = null;
 
-/**
- * Creates a lightweight version of a Book object for catalog grids, carousels, and SSR props.
- * Strips multi-kilobyte markdown full_description and embedded reviews arrays so Next.js RSC
- * payloads remain ~25KB instead of 6MB+, preventing Cloud Run 503 timeouts and making route transitions instant.
- */
 export function slimBookForList(book: Book): Book {
   if (!book) return book;
   const shortSeo = (book.seo_description || book.seoDescription || '').slice(0, 220);
@@ -267,31 +333,54 @@ export function slimBookForList(book: Book): Book {
   };
 }
 
-/**
- * Prepares a compact, high-priority list of books for initial SSR hydration.
- */
-export function slimBooksForSSR(books: Book[], maxCount = 96): Book[] {
+export function slimBooksForSSR(books: Book[], maxCount = 120): Book[] {
   if (!Array.isArray(books) || books.length === 0) return INITIAL_BOOKS.map(slimBookForList);
   const active = books.filter((b) => b && b.isActive !== false);
   const source = active.length > 0 ? active : books;
   return source.slice(0, maxCount).map(slimBookForList);
 }
 
-// Safely persist slimmed catalog to localStorage without exceeding 5MB browser quota
 function saveBooksToLocalStorageSafe(books: Book[]) {
   if (typeof window === 'undefined' || !Array.isArray(books) || books.length === 0) return;
+  purgeLegacyDemoCache();
   try {
     const slimmed = books.map(slimBookForList);
-    localStorage.setItem(LOCAL_STORAGE_BOOKS_KEY, JSON.stringify(slimmed));
+    localStorage.setItem(
+      LOCAL_STORAGE_BOOKS_KEY,
+      JSON.stringify({
+        timestamp: Date.now(),
+        items: slimmed,
+      })
+    );
   } catch {
     try {
       const topSlimmed = books.slice(0, 250).map(slimBookForList);
-      localStorage.setItem(LOCAL_STORAGE_BOOKS_KEY, JSON.stringify(topSlimmed));
+      localStorage.setItem(
+        LOCAL_STORAGE_BOOKS_KEY,
+        JSON.stringify({
+          timestamp: Date.now(),
+          items: topSlimmed,
+        })
+      );
     } catch {}
   }
 }
 
-// REST query for books fetching catalog with projection to keep payload compact and fast
+function saveCategoriesToLocalStorageSafe(categories: Category[]) {
+  if (typeof window === 'undefined' || !Array.isArray(categories) || categories.length === 0) return;
+  purgeLegacyDemoCache();
+  try {
+    localStorage.setItem(
+      LOCAL_STORAGE_CATEGORIES_KEY,
+      JSON.stringify({
+        timestamp: Date.now(),
+        items: categories,
+      })
+    );
+  } catch {}
+}
+
+// REST query for books fetching catalog with projection + SDK fallback
 async function fetchBooksFromFirestoreRest(): Promise<Book[] | null> {
   if (inflightBooksPromise) {
     return inflightBooksPromise;
@@ -302,8 +391,6 @@ async function fetchBooksFromFirestoreRest(): Promise<Book[] | null> {
     const timer = setTimeout(() => controller.abort(), 12000);
     try {
       const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/${FIRESTORE_DATABASE_ID}/documents:runQuery?key=${FIREBASE_API_KEY}`;
-      // Use select projection to omit heavy full_description and reviews arrays,
-      // shrinking Firestore REST payload from ~18.5MB down to ~300KB and resolving in <200ms
       const queryBody = {
         structuredQuery: {
           from: [{ collectionId: 'books' }],
@@ -383,40 +470,56 @@ async function fetchBooksFromFirestoreRest(): Promise<Book[] | null> {
         },
       };
 
-      // Explicitly set cache: 'no-store' to bypass Next.js 2MB fetch cache limit
       const res = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          Pragma: 'no-cache',
+        },
         body: JSON.stringify(queryBody),
         signal: controller.signal,
         cache: 'no-store',
       });
 
-      if (!res.ok) return null;
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        const books: Book[] = [];
-        for (const item of data) {
-          if (item && item.document) {
-            const parsed = parseFirestoreRestDocument(item.document);
-            books.push(parseBookDocument(parsed));
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          const books: Book[] = [];
+          for (const item of data) {
+            if (item && item.document) {
+              const parsed = parseFirestoreRestDocument(item.document);
+              books.push(parseBookDocument(parsed));
+            }
+          }
+          if (books.length > 0) {
+            return books;
           }
         }
-        return books.length > 0 ? books : null;
       }
-      return null;
-    } catch {
-      return null;
-    } finally {
+    } catch {} finally {
       clearTimeout(timer);
       inflightBooksPromise = null;
     }
+
+    // Fallback to Firebase Firestore SDK if REST query encountered network issue
+    try {
+      const snap = await getDocs(query(collection(db, 'books'), limit(1000)));
+      if (!snap.empty) {
+        const sdkBooks = snap.docs.map((d) => parseBookDocument(d));
+        if (sdkBooks.length > 0) {
+          return sdkBooks;
+        }
+      }
+    } catch {}
+
+    return null;
   })();
 
   return inflightBooksPromise;
 }
 
-// REST query for categories
+// REST query for categories + SDK fallback
 async function fetchCategoriesFromFirestoreRest(): Promise<Category[] | null> {
   if (inflightCategoriesPromise) {
     return inflightCategoriesPromise;
@@ -424,62 +527,77 @@ async function fetchCategoriesFromFirestoreRest(): Promise<Category[] | null> {
 
   inflightCategoriesPromise = (async () => {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 3500);
+    const timer = setTimeout(() => controller.abort(), 5000);
     try {
       const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/${FIRESTORE_DATABASE_ID}/documents/categories?pageSize=100&key=${FIREBASE_API_KEY}`;
       const res = await fetch(url, {
         signal: controller.signal,
         cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          Pragma: 'no-cache',
+        },
       });
-      if (!res.ok) return null;
-      const contentType = res.headers.get('content-type') || '';
-      if (!contentType.includes('application/json')) return null;
-      const text = await res.text();
-      if (text.trim().startsWith('<')) return null;
-      const json = JSON.parse(text);
-      if (json && Array.isArray(json.documents)) {
-        return json.documents.map((docObj: any) => {
-          const data = parseFirestoreRestDocument(docObj);
+      if (res.ok) {
+        const contentType = res.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          const text = await res.text();
+          if (!text.trim().startsWith('<')) {
+            const json = JSON.parse(text);
+            if (json && Array.isArray(json.documents)) {
+              const cats = json.documents.map((docObj: any) => {
+                const data = parseFirestoreRestDocument(docObj);
+                const seoCatVal = data.seoCat || data.seocat || data.seo_cat || '';
+                return {
+                  id: data.id,
+                  title: data.name || data.title || data.id,
+                  seolsug: data.seoslug || data.slug || data.id,
+                  seoCat: seoCatVal,
+                  seo_description: seoCatVal,
+                };
+              });
+              if (cats.length > 0) return cats;
+            }
+          }
+        }
+      }
+    } catch {} finally {
+      clearTimeout(timer);
+      inflightCategoriesPromise = null;
+    }
+
+    // Fallback to Firestore SDK
+    try {
+      const snap = await getDocs(collection(db, 'categories'));
+      if (!snap.empty) {
+        const sdkCats: Category[] = snap.docs.map((d) => {
+          const data = d.data();
           const seoCatVal = data.seoCat || data.seocat || data.seo_cat || '';
           return {
-            id: data.id,
-            title: data.name || data.title || data.id,
-            seolsug: data.seoslug || data.slug || data.id,
+            id: d.id,
+            title: data.name || data.title || d.id,
+            seolsug: data.seoslug || data.slug || d.id,
             seoCat: seoCatVal,
             seo_description: seoCatVal,
           };
         });
+        if (sdkCats.length > 0) return sdkCats;
       }
-      return null;
-    } catch {
-      return null;
-    } finally {
-      clearTimeout(timer);
-      inflightCategoriesPromise = null;
-    }
+    } catch {}
+
+    return null;
   })();
 
   return inflightCategoriesPromise;
 }
 
-// Fetch all books with instant memory cache + stale-while-revalidate + fast REST API
-export async function getBooksFromFirestore(): Promise<Book[]> {
+// Fetch all books with optional forceRefresh to bypass any cache
+export async function getBooksFromFirestore(forceRefresh = false): Promise<Book[]> {
   const isServer = typeof window === 'undefined';
   const now = Date.now();
 
   if (isServer) {
-    if (serverBooksCache && serverBooksCache.length > 0) {
-      if (now >= serverBooksCacheExpiresAt) {
-        // Stale-while-revalidate in background so SSR never blocks
-        fetchBooksFromFirestoreRest()
-          .then((fresh) => {
-            if (fresh && fresh.length > 0) {
-              serverBooksCache = fresh;
-              serverBooksCacheExpiresAt = Date.now() + SERVER_BOOKS_CACHE_TTL;
-            }
-          })
-          .catch(() => {});
-      }
+    if (!forceRefresh && serverBooksCache && serverBooksCache.length > 0 && now < serverBooksCacheExpiresAt) {
       return serverBooksCache;
     }
 
@@ -489,40 +607,32 @@ export async function getBooksFromFirestore(): Promise<Book[]> {
       serverBooksCacheExpiresAt = now + SERVER_BOOKS_CACHE_TTL;
       return restBooks;
     }
-    return INITIAL_BOOKS;
-  }
-
-  // Client side: return in-memory cache immediately if available
-  if (clientBooksMemoryCache && clientBooksMemoryCache.length > 0) {
-    if (now >= clientBooksCacheExpiresAt) {
-      fetchBooksFromFirestoreRest()
-        .then((fresh) => {
-          if (fresh && fresh.length > 0) {
-            clientBooksMemoryCache = fresh;
-            clientBooksCacheExpiresAt = Date.now() + CLIENT_BOOKS_CACHE_TTL;
-            saveBooksToLocalStorageSafe(fresh);
-          }
-        })
-        .catch(() => {});
-    }
-    return clientBooksMemoryCache;
+    return serverBooksCache && serverBooksCache.length > 0 ? serverBooksCache : INITIAL_BOOKS;
   }
 
   purgeLegacyDemoCache();
-  const fallback = getCachedBooksSync();
+
+  if (!forceRefresh && clientBooksMemoryCache && clientBooksMemoryCache.length > 0 && now < clientBooksCacheExpiresAt) {
+    return clientBooksMemoryCache;
+  }
 
   const restBooks = await fetchBooksFromFirestoreRest();
   if (restBooks && restBooks.length > 0) {
     clientBooksMemoryCache = restBooks;
-    clientBooksCacheExpiresAt = now + CLIENT_BOOKS_CACHE_TTL;
+    clientBooksCacheExpiresAt = Date.now() + CLIENT_BOOKS_CACHE_TTL;
     saveBooksToLocalStorageSafe(restBooks);
     return restBooks;
   }
 
-  return fallback;
+  const cached = getCachedBooksSync();
+  if (cached.length > 0) {
+    return cached;
+  }
+
+  return INITIAL_BOOKS;
 }
 
-// Fast catalog sync for components without opening a 3,000-doc WebChannel stream on every route change
+// Fast catalog sync for components with fresh Firestore fetch
 export function subscribeToFirestoreBooks(onUpdate: (books: Book[]) => void): () => void {
   let active = true;
 
@@ -530,7 +640,7 @@ export function subscribeToFirestoreBooks(onUpdate: (books: Book[]) => void): ()
     onUpdate(clientBooksMemoryCache);
   }
 
-  getBooksFromFirestore()
+  getBooksFromFirestore(true)
     .then((books) => {
       if (active && books && books.length > 0) {
         onUpdate(books);
@@ -553,7 +663,6 @@ export function subscribeToFirestoreBook(bookId: string, onUpdate: (book: Book |
       (snap) => {
         if (snap.exists()) {
           const parsed = parseBookDocument(snap);
-          // Also update in-memory cache if present
           if (clientBooksMemoryCache) {
             const idx = clientBooksMemoryCache.findIndex((b) => b.id === parsed.id);
             if (idx >= 0) clientBooksMemoryCache[idx] = parsed;
@@ -571,23 +680,13 @@ export function subscribeToFirestoreBook(bookId: string, onUpdate: (book: Book |
   }
 }
 
-// Fetch all categories with instant cache + fast REST API
-export async function getCategoriesFromFirestore(): Promise<Category[]> {
+// Fetch all categories with optional forceRefresh
+export async function getCategoriesFromFirestore(forceRefresh = false): Promise<Category[]> {
   const isServer = typeof window === 'undefined';
   const now = Date.now();
 
   if (isServer) {
-    if (serverCategoriesCache && serverCategoriesCache.length > 0) {
-      if (now >= serverCategoriesCacheExpiresAt) {
-        fetchCategoriesFromFirestoreRest()
-          .then((fresh) => {
-            if (fresh && fresh.length > 0) {
-              serverCategoriesCache = fresh;
-              serverCategoriesCacheExpiresAt = Date.now() + SERVER_BOOKS_CACHE_TTL;
-            }
-          })
-          .catch(() => {});
-      }
+    if (!forceRefresh && serverCategoriesCache && serverCategoriesCache.length > 0 && now < serverCategoriesCacheExpiresAt) {
       return serverCategoriesCache;
     }
 
@@ -597,43 +696,32 @@ export async function getCategoriesFromFirestore(): Promise<Category[]> {
       serverCategoriesCacheExpiresAt = now + SERVER_BOOKS_CACHE_TTL;
       return restCats;
     }
-    return INITIAL_CATEGORIES;
-  }
-
-  if (clientCategoriesMemoryCache && clientCategoriesMemoryCache.length > 0) {
-    if (now >= clientCategoriesCacheExpiresAt) {
-      fetchCategoriesFromFirestoreRest()
-        .then((fresh) => {
-          if (fresh && fresh.length > 0) {
-            clientCategoriesMemoryCache = fresh;
-            clientCategoriesCacheExpiresAt = Date.now() + CLIENT_BOOKS_CACHE_TTL;
-            try {
-              localStorage.setItem(LOCAL_STORAGE_CATEGORIES_KEY, JSON.stringify(fresh));
-            } catch {}
-          }
-        })
-        .catch(() => {});
-    }
-    return clientCategoriesMemoryCache;
+    return serverCategoriesCache && serverCategoriesCache.length > 0 ? serverCategoriesCache : INITIAL_CATEGORIES;
   }
 
   purgeLegacyDemoCache();
-  const fallback = getCachedCategoriesSync();
+
+  if (!forceRefresh && clientCategoriesMemoryCache && clientCategoriesMemoryCache.length > 0 && now < clientCategoriesCacheExpiresAt) {
+    return clientCategoriesMemoryCache;
+  }
 
   const restCats = await fetchCategoriesFromFirestoreRest();
   if (restCats && restCats.length > 0) {
     clientCategoriesMemoryCache = restCats;
-    clientCategoriesCacheExpiresAt = now + CLIENT_BOOKS_CACHE_TTL;
-    try {
-      localStorage.setItem(LOCAL_STORAGE_CATEGORIES_KEY, JSON.stringify(restCats));
-    } catch {}
+    clientCategoriesCacheExpiresAt = Date.now() + CLIENT_BOOKS_CACHE_TTL;
+    saveCategoriesToLocalStorageSafe(restCats);
     return restCats;
   }
 
-  return fallback;
+  const cached = getCachedCategoriesSync();
+  if (cached.length > 0) {
+    return cached;
+  }
+
+  return INITIAL_CATEGORIES;
 }
 
-// Fast category sync for components
+// Real-time category sync for components
 export function subscribeToFirestoreCategories(onUpdate: (categories: Category[]) => void): () => void {
   let active = true;
 
@@ -641,7 +729,7 @@ export function subscribeToFirestoreCategories(onUpdate: (categories: Category[]
     onUpdate(clientCategoriesMemoryCache);
   }
 
-  getCategoriesFromFirestore()
+  getCategoriesFromFirestore(true)
     .then((cats) => {
       if (active && cats && cats.length > 0) {
         onUpdate(cats);
@@ -649,12 +737,44 @@ export function subscribeToFirestoreCategories(onUpdate: (categories: Category[]
     })
     .catch(() => {});
 
+  // Also attach real-time snapshot listener on categories (small collection) so any category change reflects immediately
+  let unsubSnap: (() => void) | null = null;
+  if (typeof window !== 'undefined') {
+    try {
+      unsubSnap = onSnapshot(
+        collection(db, 'categories'),
+        (snap) => {
+          if (!active || snap.empty) return;
+          const liveCats: Category[] = snap.docs.map((d) => {
+            const data = d.data();
+            const seoCatVal = data.seoCat || data.seocat || data.seo_cat || '';
+            return {
+              id: d.id,
+              title: data.name || data.title || d.id,
+              seolsug: data.seoslug || data.slug || d.id,
+              seoCat: seoCatVal,
+              seo_description: seoCatVal,
+            };
+          });
+          if (liveCats.length > 0) {
+            clientCategoriesMemoryCache = liveCats;
+            clientCategoriesCacheExpiresAt = Date.now() + CLIENT_BOOKS_CACHE_TTL;
+            saveCategoriesToLocalStorageSafe(liveCats);
+            onUpdate(liveCats);
+          }
+        },
+        () => {}
+      );
+    } catch {}
+  }
+
   return () => {
     active = false;
+    if (unsubSnap) unsubSnap();
   };
 }
 
-// Dedicated category fetcher with memory-first lookup and targeted Firestore query
+// Dedicated category fetcher
 export async function getBooksByCategory(categorySlugOrTitle: string): Promise<Book[]> {
   if (!categorySlugOrTitle) return [];
   let decoded = categorySlugOrTitle;
@@ -684,7 +804,6 @@ export async function getBooksByCategory(categorySlugOrTitle: string): Promise<B
     );
   };
 
-  // 1. Check in-memory caches (0ms instant resolution)
   const isServer = typeof window === 'undefined';
   const cachedList = isServer ? serverBooksCache : clientBooksMemoryCache;
   if (cachedList && cachedList.length > 0) {
@@ -694,7 +813,6 @@ export async function getBooksByCategory(categorySlugOrTitle: string): Promise<B
     }
   }
 
-  // 2. Direct fast Firestore REST query for this specific category
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 4000);
@@ -770,20 +888,16 @@ export async function getBooksByCategory(categorySlugOrTitle: string): Promise<B
     }
   } catch {}
 
-  // 3. Fallback: get full catalog and filter
   const allBooks = await getBooksFromFirestore();
   return allBooks.filter(matchesBook);
 }
 
-// Helper to match a book in a list by ID, seoslug, slug, or title
 function findBookInList(books: Book[], target: string): Book | null {
   if (!Array.isArray(books) || books.length === 0 || !target) return null;
 
-  // Priority 1: Exact ID match
   const exactIdMatch = books.find((b) => b && b.id && b.id.toLowerCase() === target);
   if (exactIdMatch) return exactIdMatch;
 
-  // Priority 2: seoslug or slug match
   const slugMatch = books.find(
     (b) =>
       b &&
@@ -792,7 +906,6 @@ function findBookInList(books: Book[], target: string): Book | null {
   );
   if (slugMatch) return slugMatch;
 
-  // Priority 3: ID suffix / sub-match
   const suffixMatch = books.find(
     (b) =>
       b &&
@@ -801,14 +914,12 @@ function findBookInList(books: Book[], target: string): Book | null {
   );
   if (suffixMatch) return suffixMatch;
 
-  // Priority 4: Title match
   const titleMatch = books.find((b) => b && b.title && b.title.toLowerCase() === target);
   if (titleMatch) return titleMatch;
 
   return null;
 }
 
-// Fetch a single book by ID or Slug from Firestore with 0ms cache-first lookup
 export async function getFirestoreBookById(idOrSlug: string): Promise<Book | null> {
   if (!idOrSlug) return null;
   let decoded = idOrSlug;
@@ -819,20 +930,18 @@ export async function getFirestoreBookById(idOrSlug: string): Promise<Book | nul
   const target = rawTarget.toLowerCase();
   const isServer = typeof window === 'undefined';
 
-  // 1. Check in-memory full catalog cache FIRST (0ms instant resolution!)
   if (isServer && serverBooksCache && serverBooksCache.length > 0) {
     const cachedHit = findBookInList(serverBooksCache, target);
-    if (cachedHit) return cachedHit;
+    if (cachedHit && (cachedHit.full_description || cachedHit.fullDescription)) return cachedHit;
   }
   if (!isServer && clientBooksMemoryCache && clientBooksMemoryCache.length > 0) {
     const cachedHit = findBookInList(clientBooksMemoryCache, target);
-    if (cachedHit) return cachedHit;
+    if (cachedHit && (cachedHit.full_description || cachedHit.fullDescription)) return cachedHit;
   }
 
-  // 2. Direct REST single doc read if rawTarget looks like a document ID (no network hang)
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 2500);
+    const timer = setTimeout(() => controller.abort(), 3000);
     const res = await fetch(
       `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/${FIRESTORE_DATABASE_ID}/documents/books/${encodeURIComponent(rawTarget)}?key=${FIREBASE_API_KEY}`,
       { signal: controller.signal, cache: 'no-store' }
@@ -853,21 +962,17 @@ export async function getFirestoreBookById(idOrSlug: string): Promise<Book | nul
     }
   } catch {}
 
-  // 3. Search in full book list (populates serverBooksCache / clientBooksMemoryCache)
   const books = await getBooksFromFirestore();
   const listMatch = findBookInList(books, target);
   if (listMatch) return listMatch;
 
-  // 4. Fallback to cached sync data
   const fallbackList = getCachedBooksSync();
   return findBookInList(fallbackList, target);
 }
 
-export const LOCAL_STORAGE_SOLD_COUNTS_KEY = 'bookscircle_sold_counts_cache';
 let clientSoldCountsCache: Record<string, number> | null = null;
 let clientSoldCountsExpiresAt = 0;
 
-// Helper to normalize slug/ID for robust matching against order/purchase records
 function normalizeSlugKey(s: string): string {
   if (!s) return '';
   return s
@@ -879,9 +984,6 @@ function normalizeSlugKey(s: string): string {
     .replace(/[^a-z0-9]/g, '');
 }
 
-/**
- * Synchronous getter for cached book sales count map (0ms instant render)
- */
 export function getCachedSoldCountsSync(): Record<string, number> {
   if (clientSoldCountsCache && Object.keys(clientSoldCountsCache).length > 0) {
     return clientSoldCountsCache;
@@ -901,11 +1003,6 @@ export function getCachedSoldCountsSync(): Record<string, number> {
   return {};
 }
 
-/**
- * Lightweight aggregator for actual sold book items.
- * Uses cached counts first and performs a single non-blocking check every 5 minutes
- * instead of opening 3 concurrent unbounded WebChannel onSnapshot streams on every navigation.
- */
 export function subscribeToSoldBookCounts(
   onSoldCountsUpdated: (counts: Record<string, number>) => void
 ): () => void {
@@ -933,34 +1030,11 @@ export function subscribeToSoldBookCounts(
       if (!active) return;
 
       const books = clientBooksMemoryCache || getCachedBooksSync();
-      const countMap: Record<string, number> = { ...cached };
-
-      const recordSale = (rawKey: string, count = 1) => {
-        if (!rawKey) return;
-        const k = String(rawKey).trim();
-        const normK = normalizeSlugKey(k);
-
-        const matched = books.find(
-          (b) =>
-            b &&
-            (b.id === k ||
-              (b.id && b.id.toLowerCase() === k.toLowerCase()) ||
-              (b.seoslug && b.seoslug.toLowerCase() === k.toLowerCase()) ||
-              (b.slug && b.slug.toLowerCase() === k.toLowerCase()) ||
-              (normK.length > 8 && normalizeSlugKey(b.seoslug || '') === normK) ||
-              (normK.length > 8 && normalizeSlugKey(b.slug || '') === normK))
-        );
-
-        const targetBookId = matched ? matched.id : k;
-        countMap[targetBookId] = (countMap[targetBookId] || 0) + count;
-      };
-
       const currentPurchases: any[] = purchasesSnap ? purchasesSnap.docs.map((d) => ({ id: d.id, ...d.data() })) : [];
       const currentOrders: any[] = ordersSnap ? ordersSnap.docs.map((d) => ({ id: d.id, ...d.data() })) : [];
       const currentAnalytics: any[] = analyticsSnap ? analyticsSnap.docs.map((d) => ({ id: d.id, ...d.data() })) : [];
 
       if (currentPurchases.length > 0 || currentOrders.length > 0 || currentAnalytics.length > 0) {
-        // Reset fresh map when live data arrives
         const freshMap: Record<string, number> = {};
         const recordFresh = (rawKey: string, count = 1) => {
           if (!rawKey) return;
@@ -1002,7 +1076,7 @@ export function subscribeToSoldBookCounts(
         });
 
         clientSoldCountsCache = freshMap;
-        clientSoldCountsExpiresAt = Date.now() + 5 * 60 * 1000;
+        clientSoldCountsExpiresAt = Date.now() + 2 * 60 * 1000;
         if (typeof window !== 'undefined') {
           try {
             localStorage.setItem(LOCAL_STORAGE_SOLD_COUNTS_KEY, JSON.stringify(freshMap));
@@ -1019,4 +1093,3 @@ export function subscribeToSoldBookCounts(
     active = false;
   };
 }
-

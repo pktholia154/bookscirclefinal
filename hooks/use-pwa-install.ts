@@ -2,6 +2,11 @@
 
 import { useState, useEffect, useCallback, useSyncExternalStore } from 'react';
 import { requestPersistentStorage } from '@/lib/offline-storage';
+import {
+  flushAllAppCachesAndStorage,
+  getBooksFromFirestore,
+  getCategoriesFromFirestore,
+} from '@/lib/services/books';
 
 export interface BeforeInstallPromptEvent extends Event {
   readonly platforms: string[];
@@ -17,6 +22,7 @@ export type DevicePlatform = 'android' | 'ios' | 'windows' | 'mac' | 'desktop';
 declare global {
   interface Window {
     __pwaInstallPrompt?: BeforeInstallPromptEvent | null;
+    __pwaAppInstalled?: boolean;
     __pwaListenerAttached?: boolean;
   }
 }
@@ -25,24 +31,28 @@ interface PWAStoreState {
   deferredPrompt: BeforeInstallPromptEvent | null;
   hasPromptReceived: boolean;
   isInstalling: boolean;
+  isLaunching: boolean;
   installProgress: number;
   installStepText: string;
   isIOSPromptOpen: boolean;
   isInstallSuccessOpen: boolean;
-  isInstalledLocal: boolean;
+  isInstalledConfirmed: boolean;
   isDismissed: boolean;
+  isInIframe: boolean;
 }
 
 const initialStoreState: PWAStoreState = {
   deferredPrompt: null,
   hasPromptReceived: false,
   isInstalling: false,
+  isLaunching: false,
   installProgress: 0,
   installStepText: '',
   isIOSPromptOpen: false,
   isInstallSuccessOpen: false,
-  isInstalledLocal: false,
+  isInstalledConfirmed: false,
   isDismissed: false,
+  isInIframe: false,
 };
 
 let storeState: PWAStoreState = { ...initialStoreState };
@@ -122,101 +132,112 @@ export function detectDevicePlatform(): DevicePlatform {
   return 'desktop';
 }
 
-async function warmUpPWAAssets(): Promise<void> {
-  if (typeof window === 'undefined') return;
-  try {
-    await requestPersistentStorage();
-  } catch {}
+/**
+ * Waits up to `timeoutMs` for the browser to fire `beforeinstallprompt`
+ * (e.g. right after Service Worker registration completes).
+ */
+function waitForNativePromptEvent(timeoutMs = 1400): Promise<BeforeInstallPromptEvent | null> {
+  if (typeof window === 'undefined') return Promise.resolve(null);
+  if (storeState.deferredPrompt) return Promise.resolve(storeState.deferredPrompt);
+  if (window.__pwaInstallPrompt) return Promise.resolve(window.__pwaInstallPrompt);
 
-  try {
-    if ('serviceWorker' in navigator) {
-      await navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {});
-    }
-  } catch {}
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (ev: BeforeInstallPromptEvent | null) => {
+      if (settled) return;
+      settled = true;
+      window.removeEventListener('beforeinstallprompt', onPrompt);
+      window.removeEventListener('bookscircle:pwa-prompt-ready', onCustomPrompt);
+      clearTimeout(timer);
+      resolve(ev);
+    };
 
-  try {
-    if ('caches' in window) {
-      const cache = await caches.open('bookscircle-v14');
-      const coreAssets = [
-        '/manifest.json',
-        '/icon-192.png',
-        '/icon-512.png',
-        '/booksCircle%20(3).png',
-      ];
-      await Promise.allSettled(coreAssets.map((url) => cache.add(url)));
-    }
-  } catch {}
-}
+    const onPrompt = (e: Event) => {
+      e.preventDefault();
+      const promptEv = e as BeforeInstallPromptEvent;
+      window.__pwaInstallPrompt = promptEv;
+      updateStore({ deferredPrompt: promptEv, hasPromptReceived: true });
+      finish(promptEv);
+    };
 
-let activeProgressTimer: ReturnType<typeof setInterval> | null = null;
+    const onCustomPrompt = () => {
+      if (window.__pwaInstallPrompt) {
+        updateStore({
+          deferredPrompt: window.__pwaInstallPrompt,
+          hasPromptReceived: true,
+        });
+        finish(window.__pwaInstallPrompt);
+      }
+    };
 
-function clearProgressTimer() {
-  if (activeProgressTimer) {
-    clearInterval(activeProgressTimer);
-    activeProgressTimer = null;
-  }
-}
+    window.addEventListener('beforeinstallprompt', onPrompt);
+    window.addEventListener('bookscircle:pwa-prompt-ready', onCustomPrompt);
 
-function animateProgressToCompletion(onComplete: () => void, startFrom = 25) {
-  clearProgressTimer();
-  let current = Math.max(10, startFrom);
-
-  const getStepLabel = (pct: number) => {
-    if (pct < 35) return 'Preparing app package & manifest...';
-    if (pct < 70) return 'Caching offline reader & icons...';
-    if (pct < 95) return 'Configuring home screen launcher...';
-    return 'Installation complete!';
-  };
-
-  updateStore({
-    isInstalling: true,
-    installProgress: current,
-    installStepText: getStepLabel(current),
+    const timer = setTimeout(() => {
+      finish(storeState.deferredPrompt || window.__pwaInstallPrompt || null);
+    }, timeoutMs);
   });
-
-  // Trigger real background warmup concurrently
-  warmUpPWAAssets().catch(() => {});
-
-  activeProgressTimer = setInterval(() => {
-    // Non-linear smooth acceleration
-    const increment = current < 50 ? 7 : current < 85 ? 6 : 4;
-    current = Math.min(100, current + increment);
-
-    updateStore({
-      isInstalling: true,
-      installProgress: current,
-      installStepText: getStepLabel(current),
-    });
-
-    if (current >= 100) {
-      clearProgressTimer();
-      setTimeout(() => {
-        onComplete();
-      }, 280);
-    }
-  }, 85);
 }
 
-function finalizeInstallationSuccess() {
-  clearProgressTimer();
-  if (typeof window !== 'undefined') {
-    window.__pwaInstallPrompt = null;
+/**
+ * Waits for the OS `appinstalled` event after the user accepts the native prompt,
+ * with a fallback timeout in case the browser already fired it or runs WebAPK minting silently.
+ */
+function waitForOSAppInstalled(timeoutMs = 6000): Promise<boolean> {
+  if (typeof window === 'undefined') return Promise.resolve(false);
+  if (window.__pwaAppInstalled || getDisplayModeSnapshot()) {
+    return Promise.resolve(true);
+  }
+
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (installed: boolean) => {
+      if (settled) return;
+      settled = true;
+      window.removeEventListener('appinstalled', onInstalled);
+      window.removeEventListener('bookscircle:pwa-installed', onInstalled);
+      clearTimeout(timer);
+      resolve(installed);
+    };
+
+    const onInstalled = () => {
+      window.__pwaAppInstalled = true;
+      finish(true);
+    };
+
+    window.addEventListener('appinstalled', onInstalled);
+    window.addEventListener('bookscircle:pwa-installed', onInstalled);
+
+    const timer = setTimeout(() => {
+      finish(true);
+    }, timeoutMs);
+  });
+}
+
+/**
+ * Real multi-step synchronization that flushes stale caches and pulls fresh live
+ * books & categories from Firestore while updating the real progress bar.
+ */
+async function executeRealCacheFlushAndFirestoreSync(
+  onProgress: (pct: number, stepText: string) => void
+): Promise<void> {
+  onProgress(55, 'Flushing old caches & stale storage...');
+  await flushAllAppCachesAndStorage();
+
+  onProgress(70, 'Syncing live books & categories from Firestore...');
+  await Promise.allSettled([
+    getBooksFromFirestore(true),
+    getCategoriesFromFirestore(true),
+    requestPersistentStorage(),
+  ]);
+
+  onProgress(90, 'Verifying active Service Worker & offline reader...');
+  if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
     try {
-      localStorage.setItem('bookscircle_just_installed', 'true');
-      localStorage.setItem('bookscircle_pwa_installed', 'true');
-      localStorage.removeItem('bookscircle_install_ack');
+      const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+      await reg.update().catch(() => {});
     } catch {}
   }
-
-  updateStore({
-    deferredPrompt: null,
-    hasPromptReceived: false,
-    isInstalling: false,
-    installProgress: 100,
-    installStepText: 'App installed successfully!',
-    isInstalledLocal: true,
-    isInstallSuccessOpen: true,
-  });
 }
 
 export function usePWAInstall() {
@@ -242,33 +263,48 @@ export function usePWAInstall() {
 
     if (typeof window === 'undefined') return;
 
-    // Sync any globally captured prompt
-    if (window.__pwaInstallPrompt && !storeState.deferredPrompt) {
+    const inIframe = (() => {
+      try {
+        return window.self !== window.top;
+      } catch {
+        return true;
+      }
+    })();
+
+    // Sync any globally captured prompt from layout.tsx inline bootstrap script
+    const existingPrompt = window.__pwaInstallPrompt || storeState.deferredPrompt;
+    if (existingPrompt) {
       updateStore({
-        deferredPrompt: window.__pwaInstallPrompt,
+        deferredPrompt: existingPrompt,
         hasPromptReceived: true,
+        isInIframe: inIframe,
       });
+    } else {
+      updateStore({ isInIframe: inIframe });
     }
 
-    // Restore persisted install / dismissal states
+    // Check if OS already has related installed PWA (supported on Android Chrome / Windows Edge)
     try {
-      const justInstalled = localStorage.getItem('bookscircle_just_installed');
-      const acknowledged = localStorage.getItem('bookscircle_install_ack');
-      const installedFlag = localStorage.getItem('bookscircle_pwa_installed');
-      const dismissedFlag = sessionStorage.getItem('bookscircle_app_banner_dismissed');
+      const nav = window.navigator as Navigator & {
+        getInstalledRelatedApps?: () => Promise<Array<{ id?: string; platform?: string; url?: string }>>;
+      };
+      if (typeof nav.getInstalledRelatedApps === 'function') {
+        nav
+          .getInstalledRelatedApps()
+          .then((apps) => {
+            if (Array.isArray(apps) && apps.length > 0) {
+              updateStore({ isInstalledConfirmed: true });
+            }
+          })
+          .catch(() => {});
+      }
+    } catch {}
 
-      const updates: Partial<PWAStoreState> = {};
-      if (justInstalled === 'true' && acknowledged !== 'true') {
-        updates.isInstallSuccessOpen = true;
-      }
-      if (installedFlag === 'true') {
-        updates.isInstalledLocal = true;
-      }
+    // Restore session dismissal state
+    try {
+      const dismissedFlag = sessionStorage.getItem('bookscircle_app_banner_dismissed');
       if (dismissedFlag === 'true') {
-        updates.isDismissed = true;
-      }
-      if (Object.keys(updates).length > 0) {
-        updateStore(updates);
+        updateStore({ isDismissed: true });
       }
     } catch {}
 
@@ -280,65 +316,111 @@ export function usePWAInstall() {
         e.preventDefault();
         const promptEvent = e as BeforeInstallPromptEvent;
         window.__pwaInstallPrompt = promptEvent;
-        try {
-          localStorage.removeItem('bookscircle_pwa_installed');
-        } catch {}
         updateStore({
           deferredPrompt: promptEvent,
           hasPromptReceived: true,
-          isInstalledLocal: false,
+          isInstalledConfirmed: false,
         });
       };
 
-      const handleAppInstalled = () => {
-        window.__pwaInstallPrompt = null;
-        if (storeState.isInstalling) {
-          // Let the active progress bar smoothly finish to 100% if already running
-          if (storeState.installProgress < 35) {
-            animateProgressToCompletion(() => {
-              finalizeInstallationSuccess();
-            }, Math.max(40, storeState.installProgress));
-          }
-        } else {
-          animateProgressToCompletion(() => {
-            finalizeInstallationSuccess();
-          }, 30);
+      const handleCustomPromptReady = () => {
+        if (window.__pwaInstallPrompt) {
+          updateStore({
+            deferredPrompt: window.__pwaInstallPrompt,
+            hasPromptReceived: true,
+            isInstalledConfirmed: false,
+          });
         }
       };
 
+      const handleAppInstalled = async () => {
+        window.__pwaInstallPrompt = null;
+        window.__pwaAppInstalled = true;
+
+        // If OS triggered appinstalled (e.g. from browser menu or after prompt), run real cache flush & live sync
+        if (!storeState.isInstalling && !storeState.isInstallSuccessOpen) {
+          updateStore({
+            isInstalling: true,
+            installProgress: 50,
+            installStepText: 'OS installation detected — syncing live data...',
+          });
+          await executeRealCacheFlushAndFirestoreSync((pct, stepText) => {
+            updateStore({
+              isInstalling: true,
+              installProgress: pct,
+              installStepText: stepText,
+            });
+          });
+        }
+
+        updateStore({
+          deferredPrompt: null,
+          hasPromptReceived: false,
+          isInstalling: false,
+          installProgress: 100,
+          installStepText: 'App installed & synced!',
+          isInstalledConfirmed: true,
+          isInstallSuccessOpen: true,
+        });
+      };
+
       window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.addEventListener('bookscircle:pwa-prompt-ready', handleCustomPromptReady);
       window.addEventListener('appinstalled', handleAppInstalled);
     }
   }, []);
 
   const isIOS = platform === 'ios';
-  const isInstalled = isStandalone || shared.isInstalledLocal;
+  const isInstalled = isStandalone || shared.isInstalledConfirmed;
 
   // App is installable on client mount whenever not already running in standalone mode
-  const isInstallable = isMounted && !isStandalone && !shared.isInstalledLocal;
+  const isInstallable = isMounted && !isStandalone && !shared.isInstalledConfirmed;
 
+  /**
+   * Real Installation Trigger:
+   * 1. Verifies Service Worker registration (0% -> 20%)
+   * 2. Awaits real `beforeinstallprompt` and triggers OS dialog (20% -> 45%)
+   * 3. If accepted: flushes all stale caches, fetches fresh Firestore catalog, and awaits OS `appinstalled` event (45% -> 100%)
+   * 4. If native prompt is unavailable (e.g., iOS Safari or embedded iframe): flushes stale cache & opens real device instruction modal without faking installation!
+   */
   const promptInstall = useCallback(async () => {
     if (isStandalone || storeState.isInstalling) return;
 
-    const activePrompt =
-      storeState.deferredPrompt ||
-      (typeof window !== 'undefined' ? window.__pwaInstallPrompt : null);
-
-    // Immediately show circular progress bar at initial step
+    // Step 1: Real Service Worker & Manifest verification
     updateStore({
       isInstalling: true,
-      installProgress: 14,
-      installStepText: 'Initializing app installer...',
+      installProgress: 15,
+      installStepText: 'Verifying Service Worker & Web App Manifest...',
     });
+
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+      try {
+        await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+        await Promise.race([
+          navigator.serviceWorker.ready,
+          new Promise((r) => setTimeout(r, 1500)),
+        ]);
+      } catch {}
+    }
+
+    updateStore({
+      isInstalling: true,
+      installProgress: 28,
+      installStepText: 'Checking device Home Screen installer...',
+    });
+
+    // Step 2: Check for real native `beforeinstallprompt` event
+    const activePrompt = await waitForNativePromptEvent(900);
 
     if (activePrompt) {
       try {
         updateStore({
           isInstalling: true,
-          installProgress: 24,
-          installStepText: 'Confirm installation on your device...',
+          installProgress: 40,
+          installStepText: 'Confirm installation in your device dialog...',
         });
 
+        // Trigger the REAL OS installation prompt
         await activePrompt.prompt();
         const choice = await activePrompt.userChoice;
 
@@ -349,13 +431,32 @@ export function usePWAInstall() {
           updateStore({
             deferredPrompt: null,
             hasPromptReceived: false,
+            isInstalling: true,
+            installProgress: 55,
+            installStepText: 'Installing on device & flushing stale cache...',
           });
-          animateProgressToCompletion(() => {
-            finalizeInstallationSuccess();
-          }, 36);
+
+          // Run real cache flush + live Firestore sync AND wait for OS appinstalled handshake in parallel
+          await Promise.all([
+            executeRealCacheFlushAndFirestoreSync((pct, stepText) => {
+              updateStore({
+                isInstalling: true,
+                installProgress: pct,
+                installStepText: stepText,
+              });
+            }),
+            waitForOSAppInstalled(4500),
+          ]);
+
+          updateStore({
+            isInstalling: false,
+            installProgress: 100,
+            installStepText: 'Installed & synced with live catalog!',
+            isInstalledConfirmed: true,
+            isInstallSuccessOpen: true,
+          });
         } else {
-          // User dismissed the native OS prompt — reset cleanly without glitches
-          clearProgressTimer();
+          // User cancelled/dismissed the OS dialog — abort immediately, NEVER show fake install!
           updateStore({
             isInstalling: false,
             installProgress: 0,
@@ -363,16 +464,31 @@ export function usePWAInstall() {
           });
         }
       } catch {
-        // Fallback to smooth managed installation if prompt was already used or blocked
-        animateProgressToCompletion(() => {
-          finalizeInstallationSuccess();
-        }, 28);
+        // Prompt could not be invoked — reset and show real device guide
+        updateStore({
+          isInstalling: false,
+          installProgress: 0,
+          installStepText: '',
+          isIOSPromptOpen: true,
+        });
       }
     } else {
-      // Managed cross-platform installation with circular progress bar (works on Android, iOS, Windows, macOS)
-      animateProgressToCompletion(() => {
-        finalizeInstallationSuccess();
-      }, 18);
+      // Native `beforeinstallprompt` is not supported in this context (e.g. iOS Safari, or inside preview iframe, or already installed).
+      // Still flush stale cache & sync live data so the user never sees old demo data, then open the honest Device Install Guide modal!
+      await executeRealCacheFlushAndFirestoreSync((pct, stepText) => {
+        updateStore({
+          isInstalling: true,
+          installProgress: pct,
+          installStepText: stepText,
+        });
+      });
+
+      updateStore({
+        isInstalling: false,
+        installProgress: 0,
+        installStepText: '',
+        isIOSPromptOpen: true,
+      });
     }
   }, [isStandalone]);
 
@@ -407,29 +523,32 @@ export function usePWAInstall() {
     }
   }, []);
 
-  const launchInstalledApp = useCallback(() => {
+  /**
+   * Real Launch & Hard-Sync Action:
+   * Flushes all stale local/SW caches, fetches fresh live data, and performs a hard reload
+   * to `/?source=pwa&_sync=<timestamp>` so the launched app is 100% in sync with live Firestore.
+   */
+  const launchInstalledApp = useCallback(async () => {
+    if (storeState.isLaunching) return;
+
     updateStore({
-      isInstallSuccessOpen: false,
-      isInstalledLocal: true,
-      installProgress: 0,
-      installStepText: '',
+      isLaunching: true,
+      installStepText: 'Flushing cache & launching live synced app...',
     });
+
+    try {
+      await flushAllAppCachesAndStorage();
+    } catch {}
 
     if (typeof window !== 'undefined') {
       try {
         localStorage.setItem('bookscircle_install_ack', 'true');
-        localStorage.setItem('bookscircle_pwa_installed', 'true');
         localStorage.removeItem('bookscircle_just_installed');
         sessionStorage.setItem('bookscircle_app_banner_dismissed', 'true');
       } catch {}
 
-      try {
-        const url = new URL(window.location.href);
-        url.searchParams.set('source', 'pwa');
-        window.history.replaceState({}, '', url.toString());
-      } catch {}
-
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      const targetUrl = `${window.location.origin}/?source=pwa&_sync=${Date.now()}`;
+      window.location.replace(targetUrl);
     }
   }, []);
 
@@ -440,8 +559,10 @@ export function usePWAInstall() {
     isStandalone,
     isIOS,
     platform,
+    isInIframe: shared.isInIframe,
     hasNativePrompt: shared.hasPromptReceived,
     isInstalling: shared.isInstalling,
+    isLaunching: shared.isLaunching,
     installProgress: shared.installProgress,
     installStepText: shared.installStepText,
     isDismissed: shared.isDismissed,

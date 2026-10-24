@@ -132,6 +132,44 @@ export default function RootLayout({
   return (
     <html lang="en" className={roboto.variable}>
       <head>
+        {/* Synchronous Early PWA Install & Cache Hygiene Bootstrap (Runs before React Hydration) */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+(function() {
+  try {
+    var legacyKeys = [
+      'bookscircle_local_books',
+      'bookscircle_local_categories',
+      'bookscircle_live_books_cache',
+      'bookscircle_live_categories_cache',
+      'bookscircle_sold_counts_cache'
+    ];
+    for (var i = 0; i < legacyKeys.length; i++) {
+      localStorage.removeItem(legacyKeys[i]);
+    }
+  } catch (e) {}
+
+  window.addEventListener('beforeinstallprompt', function(e) {
+    e.preventDefault();
+    window.__pwaInstallPrompt = e;
+    window.dispatchEvent(new CustomEvent('bookscircle:pwa-prompt-ready', { detail: e }));
+  });
+
+  window.addEventListener('appinstalled', function() {
+    window.__pwaInstallPrompt = null;
+    window.__pwaAppInstalled = true;
+    window.dispatchEvent(new CustomEvent('bookscircle:pwa-installed'));
+  });
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(function() {});
+  }
+})();
+            `,
+          }}
+        />
+
         {/* RSS Feed & Sitemaps Auto-Discovery */}
         <link rel="alternate" type="application/rss+xml" title="BooksCircle - Latest E-Books Feed" href="/feed.xml" />
         <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml" />

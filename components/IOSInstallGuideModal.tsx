@@ -11,6 +11,7 @@ import {
   Monitor,
   MoreVertical,
   Download,
+  RefreshCw,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { usePWAInstall } from '@/hooks/use-pwa-install';
@@ -26,7 +27,13 @@ export const IOSInstallGuideModal: React.FC<IOSInstallGuideModalProps> = ({
   isOpen,
   onClose,
 }) => {
-  const { platform, isIOSPromptOpen, closeIOSPrompt } = usePWAInstall();
+  const {
+    platform,
+    isIOSPromptOpen,
+    isLaunching,
+    closeIOSPrompt,
+    launchInstalledApp,
+  } = usePWAInstall();
   const [activeTab, setActiveTab] = useState<GuideTab>('ios');
 
   useEffect(() => {
@@ -80,10 +87,10 @@ export const IOSInstallGuideModal: React.FC<IOSInstallGuideModalProps> = ({
               </div>
               <div>
                 <h3 className="text-base font-black text-gray-950">
-                  Add to Device Home Screen
+                  Install on Device Home Screen
                 </h3>
                 <p className="text-xs text-gray-500 font-medium">
-                  Quick instructions for Android, iOS &amp; Windows
+                  Direct browser installation steps for your device
                 </p>
               </div>
             </div>
@@ -192,10 +199,10 @@ export const IOSInstallGuideModal: React.FC<IOSInstallGuideModalProps> = ({
                 </div>
                 <div className="flex-1 text-xs">
                   <p className="font-bold text-gray-900 flex items-center gap-1.5">
-                    Select &quot;Install App&quot; or &quot;Add to Home screen&quot; <Download className="w-3.5 h-3.5 text-[#4029AB]" />
+                    Tap &quot;Install App&quot; or &quot;Add to Home screen&quot; <Download className="w-3.5 h-3.5 text-[#4029AB]" />
                   </p>
                   <p className="text-gray-500 text-[11px] mt-0.5">
-                    Confirm the prompt to place the BooksCircle app icon directly on your launcher.
+                    Confirm the prompt to install the BooksCircle WebAPK directly on your launcher.
                   </p>
                 </div>
               </div>
@@ -227,7 +234,7 @@ export const IOSInstallGuideModal: React.FC<IOSInstallGuideModalProps> = ({
                     Click &quot;Install&quot; to Pin to Taskbar / Start Menu
                   </p>
                   <p className="text-gray-500 text-[11px] mt-0.5">
-                    Launches in a dedicated standalone window with full offline PDF support.
+                    If already installed, open BooksCircle from your desktop or click Sync &amp; Launch below.
                   </p>
                 </div>
               </div>
@@ -240,21 +247,33 @@ export const IOSInstallGuideModal: React.FC<IOSInstallGuideModalProps> = ({
             </div>
             <div className="flex-1 text-xs">
               <p className="font-bold text-[#4029AB]">
-                Full-Screen Native Experience
+                Live Catalog Cache Flushed &amp; Synced
               </p>
               <p className="text-gray-600 text-[11px] mt-0.5">
-                Opens without browser bars with instant offline access to your purchased eBooks.
+                Stale cache has been cleared so your app is 100% in sync with the live BooksCircle database.
               </p>
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={handleClose}
-            className="w-full py-3 bg-[#4029AB] hover:bg-[#34208e] active:scale-98 text-white rounded-2xl text-xs font-bold transition-all shadow-xs cursor-pointer text-center"
-          >
-            Close Guide
-          </button>
+          <div className="grid grid-cols-2 gap-2 pt-1">
+            <button
+              type="button"
+              disabled={isLaunching}
+              onClick={launchInstalledApp}
+              className="w-full py-3 bg-[#4029AB] hover:bg-[#34208e] active:scale-98 text-white rounded-2xl text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-75"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isLaunching ? 'animate-spin' : ''}`} />
+              <span>{isLaunching ? 'Syncing...' : 'Sync & Launch'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleClose}
+              className="w-full py-3 bg-gray-100 hover:bg-gray-200 active:scale-98 text-gray-800 rounded-2xl text-xs font-bold transition-all cursor-pointer text-center"
+            >
+              Close
+            </button>
+          </div>
         </motion.div>
       </div>
     </AnimatePresence>

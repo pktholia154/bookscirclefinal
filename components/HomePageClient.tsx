@@ -221,12 +221,12 @@ export default function HomePage({
     const timer = setTimeout(() => {
       try {
         const cachedBooks = getCachedBooksSync();
-        if (cachedBooks && cachedBooks.length > 0) {
-          setBooks((prev) => (cachedBooks.length >= prev.length ? cachedBooks : prev));
+        if (cachedBooks && cachedBooks.length > 1) {
+          setBooks((prev) => (prev.length <= 1 ? cachedBooks : prev));
         }
         const cachedCats = getCachedCategoriesSync();
         if (cachedCats && cachedCats.length > 0) {
-          setCategories(cachedCats);
+          setCategories((prev) => (prev === INITIAL_CATEGORIES ? cachedCats : prev));
         }
       } catch {}
 
@@ -577,15 +577,15 @@ export default function HomePage({
     };
   }, [currentUser?.uid, currentUser?.email]);
 
-  // Fetch live books & categories from Firestore
+  // Fetch live books & categories from Firestore (bypassing stale caches)
   const loadData = useCallback(async (showLoadingSpinner = false) => {
     if (showLoadingSpinner) {
       setIsRefreshing(true);
     }
     try {
       const [fetchedBooks, fetchedCats] = await Promise.all([
-        getBooksFromFirestore(),
-        getCategoriesFromFirestore(),
+        getBooksFromFirestore(true),
+        getCategoriesFromFirestore(true),
       ]);
 
       if (fetchedBooks.length > 0) {
@@ -608,8 +608,8 @@ export default function HomePage({
     async function init() {
       try {
         const [fetchedBooks, fetchedCats] = await Promise.all([
-          getBooksFromFirestore(),
-          getCategoriesFromFirestore(),
+          getBooksFromFirestore(true),
+          getCategoriesFromFirestore(true),
         ]);
         if (!isMounted) return;
         if (fetchedBooks && fetchedBooks.length > 0) {

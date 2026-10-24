@@ -4,7 +4,8 @@ import { getBooksFromFirestore, getCategoriesFromFirestore, slimBooksForSSR } fr
 import { INITIAL_BOOKS, INITIAL_CATEGORIES } from '@/lib/data';
 import { generateHomePageSchema, SITE_URL, SITE_NAME } from '@/lib/seo';
 
-export const revalidate = 300; // 5-minute ISR for fast edge response + fresh catalog
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export const metadata: Metadata = {
   title: 'BooksCircle - Buy PDF E-Books & Competitive Exam Guides',
@@ -30,8 +31,8 @@ export default async function Page() {
 
   try {
     const [fetchedBooks, fetchedCategories] = await Promise.all([
-      getBooksFromFirestore().catch(() => INITIAL_BOOKS),
-      getCategoriesFromFirestore().catch(() => INITIAL_CATEGORIES),
+      getBooksFromFirestore(true).catch(() => INITIAL_BOOKS),
+      getCategoriesFromFirestore(true).catch(() => INITIAL_CATEGORIES),
     ]);
 
     if (fetchedBooks && fetchedBooks.length > 0) {
@@ -43,7 +44,7 @@ export default async function Page() {
   } catch {}
 
   const homeSchema = generateHomePageSchema(books, categories);
-  const ssrBooks = slimBooksForSSR(books, 96);
+  const ssrBooks = slimBooksForSSR(books, 120);
 
   return (
     <>
