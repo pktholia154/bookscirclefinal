@@ -98,7 +98,11 @@ export default async function CollectionPage({ params }: Props) {
     try {
       salesMap = await fetchTotalSalesCountMap();
     } catch {}
-    const withSales = collectionBooks
+
+    // Rank strictly according to verified purchases and orders in Firestore:
+    // 1. Books with verified purchases appear first (ordered by highest sold units)
+    // 2. High-demand books with top student reviews & ratings follow seamlessly
+    collectionBooks = collectionBooks
       .map((b) => ({
         ...b,
         sold_count:
@@ -108,9 +112,13 @@ export default async function CollectionPage({ params }: Props) {
           b.sold_count ||
           0,
       }))
-      .filter((b) => (b.sold_count || 0) > 0)
-      .sort((a, b) => (b.sold_count || 0) - (a.sold_count || 0));
-    collectionBooks = withSales.length > 0 ? withSales : collectionBooks;
+      .sort((a, b) => {
+        const salesDiff = (b.sold_count || 0) - (a.sold_count || 0);
+        if (salesDiff !== 0) return salesDiff;
+        const reviewDiff = (b.rating_count || 0) - (a.rating_count || 0);
+        if (reviewDiff !== 0) return reviewDiff;
+        return (b.rating || 0) - (a.rating || 0);
+      });
   }
 
   const slimmedBooks = collectionBooks.slice(0, 120).map(slimBookForList);

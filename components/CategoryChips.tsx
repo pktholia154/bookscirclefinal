@@ -25,10 +25,13 @@ export const CategoryChips: React.FC<CategoryChipsProps> = ({
   const hasMore = categories.length > initialVisibleCount;
 
   const handleCategoryClick = (cat: Category, e: React.MouseEvent) => {
-    const slug = cat.seolsug || cat.id;
     if (onSelectCategory) {
-      onSelectCategory(cat.title);
+      e.preventDefault();
+      const isAlreadySelected = selectedCategory.toLowerCase() === cat.title.toLowerCase();
+      onSelectCategory(isAlreadySelected ? 'all' : cat.title);
+      return;
     }
+    const slug = cat.seolsug || cat.id;
     router.push(`/category/${encodeURIComponent(slug)}`);
   };
 
@@ -40,6 +43,12 @@ export const CategoryChips: React.FC<CategoryChipsProps> = ({
         <Link
           id="chip-all"
           href="/"
+          onClick={(e) => {
+            if (onSelectCategory) {
+              e.preventDefault();
+              onSelectCategory('all');
+            }
+          }}
           className={`shrink-0 px-4 py-2 rounded-full text-sm sm:text-[15px] font-bold transition-all duration-200 active:scale-95 whitespace-nowrap cursor-pointer ${
             selectedCategory.toLowerCase() === 'all'
               ? 'bg-[#5e17eb] text-white border border-[#5e17eb] shadow-xs'
@@ -60,6 +69,7 @@ export const CategoryChips: React.FC<CategoryChipsProps> = ({
               key={cat.id}
               id={`chip-${slug}`}
               href={`/category/${encodeURIComponent(slug)}`}
+              onClick={(e) => handleCategoryClick(cat, e)}
               className={`${isHiddenWhenCollapsed ? 'hidden' : 'shrink-0'} px-4 py-2 rounded-full text-sm sm:text-[15px] font-bold transition-all duration-200 active:scale-95 whitespace-nowrap cursor-pointer ${
                 isSelected
                   ? 'bg-[#5e17eb] text-white border border-[#5e17eb] shadow-xs'

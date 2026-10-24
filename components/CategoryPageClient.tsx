@@ -59,6 +59,7 @@ import {
   subscribeToPurchasesUpdated,
   setTargetHomeTab,
 } from '@/lib/services/quick-jump';
+import { subscribeToSoldBookCounts, getCachedSoldCountsSync } from '@/lib/services/books';
 import { triggerNativeLoading } from '@/components/NativePageLoadingIndicator';
 
 const PDFReaderModal = dynamic(
@@ -178,14 +179,45 @@ export const CategoryPageClient: React.FC<CategoryPageClientProps> = ({
   const [currentPage, setCurrentPage] = useState(1);
   const resultsTopRef = React.useRef<HTMLDivElement>(null);
 
+  const [salesMap, setSalesMap] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    try {
+      const cached = getCachedSoldCountsSync();
+      if (cached && Object.keys(cached).length > 0) {
+        setSalesMap(cached);
+      }
+    } catch {}
+
+    const unsub = subscribeToSoldBookCounts((live) => {
+      if (live && Object.keys(live).length > 0) {
+        setSalesMap(live);
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  const booksWithSales = useMemo(() => {
+    if (Object.keys(salesMap).length === 0) return books;
+    return books.map((b) => ({
+      ...b,
+      sold_count:
+        salesMap[b.id] ||
+        salesMap[b.slug] ||
+        salesMap[b.seoslug || ''] ||
+        b.sold_count ||
+        0,
+    }));
+  }, [books, salesMap]);
+
   // Filter and Sort Books with tokenized order-independent fuzzy search
   const filteredAndSortedBooks = useMemo(() => {
-    return searchBooks(books, searchQuery, {
+    return searchBooks(booksWithSales, searchQuery, {
       sortBy: sortBy as any,
       includePartialMatches: true,
       minScore: 40,
     });
-  }, [books, searchQuery, sortBy]);
+  }, [booksWithSales, searchQuery, sortBy]);
 
   // Pagination calculations
   const totalItems = filteredAndSortedBooks.length;

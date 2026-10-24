@@ -4,11 +4,11 @@ export const DEFAULT_BOOK_COVER = 'https://images.unsplash.com/photo-1544716278-
 
 export const INITIAL_CATEGORIES: Category[] = [
   {
-    id: 'banking-exams',
-    title: 'Banking Exams',
-    seolsug: 'banking-exams',
-    seoCat: '',
-    seo_description: '',
+    id: 'banking',
+    title: 'Banking',
+    seolsug: 'banking',
+    seoCat: 'Download Banking exam preparation books, previous year solved question papers, and study material for IBPS, SBI, RBI, and bank clerical/PO exams.',
+    seo_description: 'Download Banking exam preparation books, previous year solved question papers, and study material for IBPS, SBI, RBI, and bank clerical/PO exams.',
   },
   {
     id: 'cuet-pg',

@@ -59,11 +59,25 @@ export const CategoriesView: React.FC<CategoriesViewProps> = ({
   // Filtered books by category only (no search box)
   const filteredBooks = useMemo(() => {
     if (selectedCat === 'all') return books;
-    const target = selectedCat.toLowerCase();
+    const target = selectedCat.toLowerCase().trim();
+    const cleanTarget = target.replace(/-exams?$/, '').replace(/\s+exams?$/, '');
     return books.filter((b) => {
-      const cat = (b.category || '').toLowerCase();
-      const slug = (b.categorySlug || '').toLowerCase();
-      return cat === target || slug === target || target.includes(slug) || slug.includes(target);
+      if (!b) return false;
+      const cat = (b.category || '').toLowerCase().trim();
+      const slug = (b.categorySlug || '').toLowerCase().trim();
+      return (
+        cat === target ||
+        cat === cleanTarget ||
+        slug === target ||
+        slug === cleanTarget ||
+        (cleanTarget.length > 3 && cat.includes(cleanTarget)) ||
+        (cleanTarget.length > 3 && cleanTarget.includes(cat)) ||
+        (Array.isArray(b.tags) &&
+          b.tags.some((t) => {
+            const tLower = String(t || '').toLowerCase().trim();
+            return tLower === target || tLower === cleanTarget;
+          }))
+      );
     });
   }, [books, selectedCat]);
 

@@ -483,16 +483,25 @@ export function searchBooks(
   // 1. Filter by category if specified
   if (category && category !== 'all') {
     const target = normalizeSearchText(category);
+    const cleanTarget = target.replace(/-exams?$/, '').replace(/\s+exams?$/, '');
     list = list.filter((b) => {
       const cat = normalizeSearchText(b.category);
       const slug = normalizeSearchText(b.categorySlug);
       return (
         cat === target ||
+        cat === cleanTarget ||
         slug === target ||
+        slug === cleanTarget ||
         cat.includes(target) ||
         target.includes(cat) ||
         slug.includes(target) ||
-        target.includes(slug)
+        target.includes(slug) ||
+        (cleanTarget.length > 3 && (cat.includes(cleanTarget) || cleanTarget.includes(cat))) ||
+        (Array.isArray(b.tags) &&
+          b.tags.some((t) => {
+            const tNorm = normalizeSearchText(t);
+            return tNorm === target || tNorm === cleanTarget;
+          }))
       );
     });
   }
@@ -561,7 +570,19 @@ function sortBookList(
       list.sort((a, b) => (b.buy_price || 0) - (a.buy_price || 0));
       break;
     case 'popular':
-      list.sort((a, b) => (b.sold_count || b.rating_count || 0) - (a.sold_count || a.rating_count || 0));
+      list.sort((a, b) => {
+        const bSold = Number(b.sold_count || 0);
+        const aSold = Number(a.sold_count || 0);
+        if (bSold !== aSold) {
+          return bSold - aSold; // highest sales count first!
+        }
+        const bReviews = Number(b.rating_count || 0);
+        const aReviews = Number(a.rating_count || 0);
+        if (bReviews !== aReviews) {
+          return bReviews - aReviews;
+        }
+        return Number(b.rating || 0) - Number(a.rating || 0);
+      });
       break;
     case 'relevance':
     default:

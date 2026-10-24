@@ -723,8 +723,66 @@ export function saveSalesCountMapLocal(map: Record<string, number>) {
   }
 }
 
+const FIREBASE_API_KEY = "AIzaSyB0unAiOkII7OK44Kx_oaJ6C68ey-javnk";
+const PROJECT_ID = "bookscircle-d579d";
+const FIRESTORE_DATABASE_ID = "bookscircle";
+
+async function fetchSalesMapFromRest(): Promise<Record<string, number>> {
+  const map: Record<string, number> = {};
+  function tally(idOrSlug: string, count = 1) {
+    if (!idOrSlug) return;
+    const clean = String(idOrSlug).trim();
+    map[clean] = (map[clean] || 0) + count;
+  }
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 4000);
+    const pUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/${FIRESTORE_DATABASE_ID}/documents/purchases?pageSize=100&key=${FIREBASE_API_KEY}`;
+    const oUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/${FIRESTORE_DATABASE_ID}/documents/orders?pageSize=100&key=${FIREBASE_API_KEY}`;
+    const aUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/${FIRESTORE_DATABASE_ID}/documents/book_analytics?pageSize=100&key=${FIREBASE_API_KEY}`;
+
+    const [pRes, oRes, aRes] = await Promise.all([
+      fetch(pUrl, { signal: controller.signal, cache: 'no-store' }).catch(() => null),
+      fetch(oUrl, { signal: controller.signal, cache: 'no-store' }).catch(() => null),
+      fetch(aUrl, { signal: controller.signal, cache: 'no-store' }).catch(() => null),
+    ]);
+    clearTimeout(timer);
+
+    if (pRes && pRes.ok) {
+      const pData = await pRes.json().catch(() => null);
+      if (pData?.documents) {
+        for (const d of pData.documents) {
+          const bIds = d.fields?.bookIds?.arrayValue?.values || [];
+          for (const v of bIds) if (v?.stringValue) tally(v.stringValue);
+        }
+      }
+    }
+    if (oRes && oRes.ok) {
+      const oData = await oRes.json().catch(() => null);
+      if (oData?.documents) {
+        for (const d of oData.documents) {
+          const bIds = d.fields?.bookIds?.arrayValue?.values || [];
+          for (const v of bIds) if (v?.stringValue) tally(v.stringValue);
+        }
+      }
+    }
+    if (aRes && aRes.ok) {
+      const aData = await aRes.json().catch(() => null);
+      if (aData?.documents) {
+        for (const d of aData.documents) {
+          const id = (d.name || '').split('/').pop();
+          const tp = parseInt(d.fields?.totalPurchases?.integerValue || d.fields?.salesCount?.integerValue || '0', 10);
+          if (id && tp > 0) map[id] = Math.max(map[id] || 0, tp);
+        }
+      }
+    }
+  } catch {}
+  return map;
+}
+
 /**
  * Aggregates verified sales numbers per book from Firestore with memory caching
+ * Works on both server-side SSR and client-side rendering.
  */
 export async function fetchTotalSalesCountMap(): Promise<Record<string, number>> {
   const now = Date.now();
@@ -732,59 +790,12 @@ export async function fetchTotalSalesCountMap(): Promise<Record<string, number>>
     return memorySalesCountMap;
   }
 
-  // On server, avoid hanging client SDK calls
-  if (typeof window === 'undefined') {
-    return memorySalesCountMap || {};
+  // Fetch via fast REST API (works on both Server SSR and Client with 0ms memory cache)
+  const restSales = await fetchSalesMapFromRest();
+  if (Object.keys(restSales).length > 0) {
+    saveSalesCountMapLocal(restSales);
+    return restSales;
   }
 
-  const salesMap: Record<string, number> = { ...getCachedSalesCountMapSync() };
-
-  try {
-    const [purchasesSnap, ordersSnap, analyticsSnap] = await Promise.all([
-      getDocs(collection(db, 'purchases')).catch(() => null),
-      getDocs(collection(db, 'orders')).catch(() => null),
-      getDocs(collection(db, 'book_analytics')).catch(() => null),
-    ]);
-
-    const freshMap: Record<string, number> = {};
-    function tally(idOrSlug: string, count: number = 1) {
-      if (!idOrSlug) return;
-      const clean = String(idOrSlug).trim();
-      freshMap[clean] = (freshMap[clean] || 0) + count;
-    }
-
-    if (purchasesSnap && !purchasesSnap.empty) {
-      purchasesSnap.forEach((d) => {
-        const data = d.data();
-        if (Array.isArray(data.bookIds)) data.bookIds.forEach((id: string) => tally(id));
-        if (Array.isArray(data.books)) data.books.forEach((b: any) => tally(b.id || b.slug));
-      });
-    }
-
-    if (ordersSnap && !ordersSnap.empty) {
-      ordersSnap.forEach((d) => {
-        const data = d.data();
-        if (Array.isArray(data.bookIds)) data.bookIds.forEach((id: string) => tally(id));
-        if (Array.isArray(data.books)) data.books.forEach((b: any) => tally(b.id || b.slug));
-      });
-    }
-
-    if (analyticsSnap && !analyticsSnap.empty) {
-      analyticsSnap.forEach((d) => {
-        const data = d.data();
-        const total = Number(data.totalPurchases || data.salesCount || 0);
-        if (total > 0) {
-          tally(d.id, total);
-        }
-      });
-    }
-
-    const finalMap = Object.keys(freshMap).length > 0 ? freshMap : salesMap;
-    saveSalesCountMapLocal(finalMap);
-    return finalMap;
-  } catch (err) {
-    console.warn('Sales count fetch error:', err);
-  }
-
-  return salesMap;
+  return memorySalesCountMap || getCachedSalesCountMapSync();
 }
