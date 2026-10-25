@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { Search, ShoppingCart, X, LogIn, Sparkles, Download } from 'lucide-react';
+import { Search, ShoppingCart, X, LogIn, Sparkles, Download, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { usePWAInstall } from '@/hooks/use-pwa-install';
 
@@ -57,6 +57,8 @@ export const Header: React.FC<HeaderProps> = ({
     isInstalledOnDevice,
     isIOS,
     canShowNativeInstallUI,
+    isStandalone,
+    launchInstalledApp,
   } = usePWAInstall();
 
   // Cycling animated placeholder to entice user attention
@@ -161,10 +163,10 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Right Actions (Install Now + Login / Account + Cart) */}
         <div className="flex items-center gap-1.5 sm:gap-2">
           {/* Native PWA Install Button: Visible ONLY on Android/Windows/Supported non-iOS browsers */}
-          {!isIOS && (canShowNativeInstallUI || isInstalling) && !isInstalled && onInstall && (
+          {!isIOS && !isStandalone && (canShowNativeInstallUI || isInstalling || isInstalledOnDevice) && onInstall && (
             <button
               id="header-install-app-btn"
-              onClick={onInstall}
+              onClick={isInstalledOnDevice ? launchInstalledApp : onInstall}
               disabled={isInstalling}
               className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full text-xs font-black text-[#4029AB] bg-[#4029AB]/10 hover:bg-[#4029AB]/20 active:scale-95 transition-all shadow-2xs border border-[#4029AB]/20 cursor-pointer disabled:opacity-90 whitespace-nowrap shrink-0"
               title={isInstalledOnDevice ? 'Open Installed BooksCircle App' : 'Install BooksCircle App'}
@@ -175,10 +177,13 @@ export const Header: React.FC<HeaderProps> = ({
                     className="w-3.5 h-3.5 rounded-full border-2 border-[#4029AB]/25 border-t-[#4029AB] animate-spin shrink-0"
                     aria-hidden="true"
                   />
-                  <span className="leading-none">Prompting...</span>
+                  <span className="leading-none">Installing...</span>
                 </>
               ) : isInstalledOnDevice ? (
-                <span className="leading-none">Open App</span>
+                <span className="leading-none flex items-center gap-1 text-emerald-700">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Open App</span>
+                </span>
               ) : (
                 <>
                   <Download className="w-3.5 h-3.5 text-[#4029AB] shrink-0 stroke-[2.5]" />

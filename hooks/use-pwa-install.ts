@@ -755,7 +755,7 @@ export function usePWAInstall() {
           installStepText: '',
           isInstalledOnDevice: true,
           isInstalledVerified: true,
-          isInstallSuccessOpen: false,
+          isInstallSuccessOpen: true,
           isIOSPromptOpen: false,
           showInlineFallbackHint: false,
         });
@@ -790,7 +790,12 @@ export function usePWAInstall() {
     !isInstalled &&
     !isIOS &&
     !env.isDesktopFirefox &&
-    (hasNativePrompt || env.isChromiumCapable || env.isMacOSSafari || env.isAndroidFirefox);
+    (hasNativePrompt ||
+      env.isChromiumCapable ||
+      env.isMacOSSafari ||
+      env.isAndroidFirefox ||
+      env.platform === 'android' ||
+      env.platform === 'windows');
 
   const shouldShowIOSSmartPointer =
     isMounted &&
@@ -905,15 +910,29 @@ export function usePWAInstall() {
         }
 
         if (choice.outcome === 'accepted') {
+          // Keep isInstalling true and wait for native 'appinstalled' event before marking completed.
+          // This eliminates premature success notifications before Android / Windows finishes installing.
           updateStore({
             deferredPrompt: null,
             hasPromptReceived: false,
             machineState: 'OS_HANDOFF_IN_PROGRESS',
-            isInstalling: false,
-            installStepText: '',
-            isInstalledOnDevice: true,
+            isInstalling: true,
+            installStepText: 'Installing BooksCircle on your device...',
+            isInstalledOnDevice: false,
+            isInstallSuccessOpen: false,
           });
           syncLiveCatalogInBackground();
+
+          // Safe fallback timeout (25 seconds) in case browser does not dispatch appinstalled
+          setTimeout(() => {
+            if (storeState.isInstalling) {
+              updateStore({
+                isInstalling: false,
+                installStepText: '',
+                isInstalledOnDevice: true,
+              });
+            }
+          }, 25000);
         } else {
           try {
             localStorage.setItem(
@@ -1048,7 +1067,7 @@ export function usePWAInstall() {
     installStepText: shared.installStepText,
     isDismissed: shared.isDismissed,
     isIOSPromptOpen: shared.isIOSPromptOpen,
-    isInstallSuccessOpen: false,
+    isInstallSuccessOpen: shared.isInstallSuccessOpen,
     promptInstall,
     dismissBanner,
     dismissIOSPointer,

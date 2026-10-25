@@ -3,7 +3,6 @@ import { Roboto } from 'next/font/google';
 import './globals.css';
 import { generateWebsiteSchema, SITE_URL, SITE_NAME } from '@/lib/seo';
 import { PWARegister } from '@/components/PWARegister';
-import { IOSSmartInstallPointer } from '@/components/IOSSmartInstallPointer';
 import { NativePageLoadingProvider } from '@/components/NativePageLoadingIndicator';
 
 const roboto = Roboto({
@@ -217,7 +216,6 @@ export default function RootLayout({
         <div className="w-full max-w-2xl lg:max-w-3xl min-h-screen bg-white md:shadow-2xl md:shadow-gray-300/40 md:border-x md:border-gray-200/80 flex flex-col relative">
           <NativePageLoadingProvider>
             <PWARegister />
-            <IOSSmartInstallPointer />
             {children}
           </NativePageLoadingProvider>
         </div>

@@ -21,6 +21,7 @@ import { InstallSuccessModal } from '@/components/InstallSuccessModal';
 import { Footer } from '@/components/Footer';
 import { DiscountBanner } from '@/components/DiscountBanner';
 import { InstallAppBanner } from '@/components/InstallAppBanner';
+import { IOSHomeInstallBanner } from '@/components/IOSHomeInstallBanner';
 import { Book, Category, CartItem, CartTierDiscount } from '@/lib/types';
 import { DEFAULT_BOOK_COVER, INITIAL_BOOKS, INITIAL_CATEGORIES, FREE_SAMPLE_BOOK_ID } from '@/lib/data';
 import { searchBooks } from '@/lib/search';
@@ -970,11 +971,14 @@ export default function HomePage({
             {/* TAB 1: HOME PAGE */}
             {activeTab === 'home' && (
               <>
-                {/* Full Banner Style Install App Banner */}
+                {/* Full Banner Style Install App Banner for Android / Windows */}
                 <InstallAppBanner
                   onInstall={promptInstall}
                   isInstallable={isInstallable}
                 />
+
+                {/* Permanent Minimal Banner for iOS Devices directly above Categories */}
+                <IOSHomeInstallBanner />
 
                 {/* Flexible Category Chips */}
                 <div id="category-chips-section">
