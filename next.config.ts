@@ -143,7 +143,58 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        source: '/:icon(icon-192x192\\.png|icon-512x512\\.png|icon-maskable-192x192\\.png|icon-maskable-512x512\\.png|icon-192\\.png|icon-512\\.png|icon-maskable-512\\.png)',
+        source: '/icon-192x192.png',
+        headers: [
+          {
+            key: 'Content-Type',
+            value: 'image/png',
+          },
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=604800',
+          },
+          {
+            key: 'Access-Control-Allow-Origin',
+            value: '*',
+          },
+        ],
+      },
+      {
+        source: '/icon-512x512.png',
+        headers: [
+          {
+            key: 'Content-Type',
+            value: 'image/png',
+          },
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=604800',
+          },
+          {
+            key: 'Access-Control-Allow-Origin',
+            value: '*',
+          },
+        ],
+      },
+      {
+        source: '/icon-maskable-192x192.png',
+        headers: [
+          {
+            key: 'Content-Type',
+            value: 'image/png',
+          },
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=604800',
+          },
+          {
+            key: 'Access-Control-Allow-Origin',
+            value: '*',
+          },
+        ],
+      },
+      {
+        source: '/icon-maskable-512x512.png',
         headers: [
           {
             key: 'Content-Type',

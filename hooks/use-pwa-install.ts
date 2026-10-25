@@ -26,6 +26,25 @@ export type DevicePlatform =
   | 'chromeos'
   | 'desktop';
 
+export type IOSBrowserType =
+  | 'safari'
+  | 'chrome'
+  | 'edge'
+  | 'firefox'
+  | 'brave'
+  | 'opera'
+  | 'webview'
+  | 'other'
+  | null;
+
+export type IOSPointerPosition =
+  | 'top-right'
+  | 'bottom-center'
+  | 'bottom-right'
+  | 'top-left';
+
+export type ScreenOrientationType = 'portrait' | 'landscape';
+
 export type InstallMechanism =
   | 'chromium-native'
   | 'ios-manual'
@@ -34,6 +53,13 @@ export type InstallMechanism =
   | 'android-firefox'
   | 'desktop-firefox'
   | 'in-app-webview';
+
+export type PWAInstallUIMode =
+  | 'hidden-standalone'
+  | 'ios-smart-pointer'
+  | 'native-install'
+  | 'browser-fallback'
+  | 'unsupported';
 
 export type PWAInstallMachineState =
   | 'RUNNING_STANDALONE'
@@ -50,6 +76,8 @@ export interface InstallEnvironment {
   platform: DevicePlatform;
   mechanism: InstallMechanism;
   browserName: string;
+  iosBrowser: IOSBrowserType;
+  isIPad: boolean;
   isInAppWebView: boolean;
   isDesktopFirefox: boolean;
   isMacOSSafari: boolean;
@@ -57,7 +85,19 @@ export interface InstallEnvironment {
   isIOSLegacyNonSafari: boolean;
   isIOSChrome: boolean;
   isIOSSafari: boolean;
+  isIOSEdge: boolean;
+  isIOSFirefox: boolean;
+  isChromiumCapable: boolean;
   iosMajorVersion: number | null;
+  defaultIOSPointerPosition: IOSPointerPosition;
+}
+
+export interface ViewportMetrics {
+  width: number;
+  height: number;
+  orientation: ScreenOrientationType;
+  isCompactHeight: boolean;
+  safariToolbarLayout: 'bottom' | 'top';
 }
 
 export async function forceHardFlushAndReloadApp(): Promise<void> {
@@ -81,7 +121,8 @@ export async function forceHardFlushAndReloadApp(): Promise<void> {
     localStorage.removeItem('bookscircle_sold_counts_v3');
     localStorage.removeItem('bookscircle_app_banner_dismissed');
     localStorage.removeItem('bookscircle_pwa_dismissed_until');
-    localStorage.setItem('bookscircle_app_build', '2026.10.25.v17');
+    localStorage.removeItem('bookscircle_ios_pointer_dismissed');
+    localStorage.setItem('bookscircle_app_build', '2026.10.25.v18');
   } catch {}
   window.location.replace(`${window.location.pathname}?_flush=${Date.now()}`);
 }
@@ -96,8 +137,10 @@ declare global {
 
 const DISMISS_COOLDOWN_KEY = 'bookscircle_pwa_dismissed_until';
 const DISMISS_SESSION_KEY = 'bookscircle_app_banner_dismissed';
+const IOS_POINTER_DISMISS_KEY = 'bookscircle_ios_pointer_dismissed';
+const IOS_POINTER_POS_KEY = 'bookscircle_ios_pointer_pos';
 const INSTALLED_ON_DEVICE_KEY = 'bookscircle_installed_on_device';
-const DISMISS_COOLDOWN_MS = 1000 * 60 * 60 * 6; // 6 hours cooldown after user dismisses native prompt
+const DISMISS_COOLDOWN_MS = 1000 * 60 * 60 * 6; // 6 hours cooldown
 
 interface PWAStoreState {
   deferredPrompt: BeforeInstallPromptEvent | null;
@@ -107,6 +150,10 @@ interface PWAStoreState {
   isLaunching: boolean;
   installStepText: string;
   isIOSPromptOpen: boolean;
+  isIOSPointerDismissed: boolean;
+  iosPointerMinimized: boolean;
+  manualIOSPointerPosition: IOSPointerPosition | null;
+  showInlineFallbackHint: boolean;
   isInstallSuccessOpen: boolean;
   isInstalledOnDevice: boolean;
   isInstalledVerified: boolean;
@@ -122,6 +169,10 @@ const initialStoreState: PWAStoreState = {
   isLaunching: false,
   installStepText: '',
   isIOSPromptOpen: false,
+  isIOSPointerDismissed: false,
+  iosPointerMinimized: false,
+  manualIOSPointerPosition: null,
+  showInlineFallbackHint: false,
   isInstallSuccessOpen: false,
   isInstalledOnDevice: false,
   isInstalledVerified: false,
@@ -156,8 +207,6 @@ function getPWAStoreServerSnapshot(): PWAStoreState {
   return initialStoreState;
 }
 
-// Standalone mode subscriber using useSyncExternalStore
-// Listens in real time for immediate desktop window reparenting (Windows, macOS, Linux, ChromeOS)
 function subscribeToDisplayMode(callback: () => void) {
   if (typeof window === 'undefined') return () => {};
   const standaloneQuery = window.matchMedia('(display-mode: standalone)');
@@ -175,6 +224,7 @@ function subscribeToDisplayMode(callback: () => void) {
         isInstalledOnDevice: true,
         isInstalledVerified: true,
         isIOSPromptOpen: false,
+        showInlineFallbackHint: false,
       });
     }
     callback();
@@ -210,12 +260,46 @@ function getDisplayModeServerSnapshot(): boolean {
   return false;
 }
 
+export function detectViewportMetrics(): ViewportMetrics {
+  if (typeof window === 'undefined') {
+    return {
+      width: 390,
+      height: 844,
+      orientation: 'portrait',
+      isCompactHeight: false,
+      safariToolbarLayout: 'bottom',
+    };
+  }
+
+  const width = window.innerWidth || document.documentElement.clientWidth || 390;
+  const height = window.innerHeight || document.documentElement.clientHeight || 844;
+  const orientation: ScreenOrientationType = width > height ? 'landscape' : 'portrait';
+  const isCompactHeight = height < 500;
+
+  // Heuristic for Safari toolbar layout:
+  // On iPad (width >= 768) or in landscape orientation, Safari places the unified address/share toolbar at the TOP.
+  // On iPhone in portrait mode, iOS 15-18+ defaults to the bottom Tab Bar.
+  const isIPadSize = width >= 768 || (window.navigator.platform === 'MacIntel' && window.navigator.maxTouchPoints > 1);
+  const safariToolbarLayout: 'bottom' | 'top' =
+    isIPadSize || orientation === 'landscape' ? 'top' : 'bottom';
+
+  return {
+    width,
+    height,
+    orientation,
+    isCompactHeight,
+    safariToolbarLayout,
+  };
+}
+
 export function detectInstallEnvironment(): InstallEnvironment {
   if (typeof window === 'undefined') {
     return {
       platform: 'desktop',
       mechanism: 'chromium-native',
       browserName: 'Browser',
+      iosBrowser: null,
+      isIPad: false,
       isInAppWebView: false,
       isDesktopFirefox: false,
       isMacOSSafari: false,
@@ -223,14 +307,19 @@ export function detectInstallEnvironment(): InstallEnvironment {
       isIOSLegacyNonSafari: false,
       isIOSChrome: false,
       isIOSSafari: false,
+      isIOSEdge: false,
+      isIOSFirefox: false,
+      isChromiumCapable: false,
       iosMajorVersion: null,
+      defaultIOSPointerPosition: 'bottom-center',
     };
   }
 
   const ua = window.navigator.userAgent || '';
   const uaLower = ua.toLowerCase();
   const isIPadOS =
-    window.navigator.platform === 'MacIntel' && window.navigator.maxTouchPoints > 1;
+    /ipad/.test(uaLower) ||
+    (window.navigator.platform === 'MacIntel' && window.navigator.maxTouchPoints > 1);
 
   // 1. Detect OS Platform
   let platform: DevicePlatform = 'desktop';
@@ -248,14 +337,14 @@ export function detectInstallEnvironment(): InstallEnvironment {
     platform = 'linux';
   }
 
-  // 2. Detect Sandboxed In-App WebViews (Instagram, Facebook, LinkedIn, WhatsApp, X/Twitter, TikTok, WeChat, Line, generic wv)
+  // 2. Detect Sandboxed In-App WebViews
   const isInAppWebView =
     /instagram|fban|fbav|fb_iab|linkedinapp|whatsapp|twitter|bytedancewebview|musical_ly|micromessenger|line\/|snapchat/.test(
       uaLower
     ) ||
     (platform === 'android' && /; wv\)/.test(uaLower));
 
-  // 3. Detect iOS version & browser engine
+  // 3. Detect iOS version & specific iOS browser
   let iosMajorVersion: number | null = null;
   if (platform === 'ios') {
     const match = ua.match(/OS (\d+)_(\d+)/i) || ua.match(/Version\/(\d+)\.(\d+)/i);
@@ -264,13 +353,37 @@ export function detectInstallEnvironment(): InstallEnvironment {
     }
   }
 
+  const isIOSChrome = platform === 'ios' && /crios/i.test(uaLower);
+  const isIOSEdge = platform === 'ios' && /edgios/i.test(uaLower);
+  const isIOSFirefox = platform === 'ios' && /fxios/i.test(uaLower);
+  const isIOSOpera = platform === 'ios' && /opios|opt\//i.test(uaLower);
+  const isIOSBrave = platform === 'ios' && /brave/i.test(uaLower);
+
+  const isSafariEngine =
+    /safari/i.test(uaLower) &&
+    !/chrome|chromium|crios|edg|edgios|opr|opios|opt\/|brave|fxios|firefox|samsungbrowser/i.test(
+      uaLower
+    );
+
+  const isIOSSafari = platform === 'ios' && isSafariEngine && !isInAppWebView;
   const isIOSNonSafari =
-    platform === 'ios' && /crios|edgios|fxios|opios|brave/i.test(uaLower);
+    platform === 'ios' && (isIOSChrome || isIOSEdge || isIOSFirefox || isIOSOpera || isIOSBrave);
   const isIOSLegacyNonSafari =
     isIOSNonSafari && iosMajorVersion !== null && iosMajorVersion < 16;
-  const isIOSChrome = platform === 'ios' && /crios/i.test(uaLower);
 
-  // 4. Detect Firefox (Android vs Desktop)
+  let iosBrowser: IOSBrowserType = null;
+  if (platform === 'ios') {
+    if (isInAppWebView) iosBrowser = 'webview';
+    else if (isIOSChrome) iosBrowser = 'chrome';
+    else if (isIOSSafari) iosBrowser = 'safari';
+    else if (isIOSEdge) iosBrowser = 'edge';
+    else if (isIOSFirefox) iosBrowser = 'firefox';
+    else if (isIOSBrave) iosBrowser = 'brave';
+    else if (isIOSOpera) iosBrowser = 'opera';
+    else iosBrowser = 'other';
+  }
+
+  // 4. Detect Firefox & Safari on non-iOS
   const isFirefox = /firefox|fxios/i.test(uaLower) && !/seamonkey/i.test(uaLower);
   const isAndroidFirefox = platform === 'android' && isFirefox;
   const isDesktopFirefox =
@@ -279,28 +392,35 @@ export function detectInstallEnvironment(): InstallEnvironment {
       platform === 'linux' ||
       platform === 'desktop') &&
     isFirefox;
-
-  // 5. Detect macOS Safari (Sonoma+ supports File -> Add to Dock) & iOS Safari
-  const isSafariEngine =
-    /safari/i.test(uaLower) &&
-    !/chrome|chromium|crios|edg|edgios|opr|opios|brave|fxios|firefox|samsungbrowser/i.test(
-      uaLower
-    );
   const isMacOSSafari = platform === 'mac' && isSafariEngine;
-  const isIOSSafari = platform === 'ios' && isSafariEngine;
+
+  // 5. Detect Chromium Native Install Capability ( strictly false on iOS )
+  const isChromiumCapable =
+    platform !== 'ios' &&
+    !isInAppWebView &&
+    !isFirefox &&
+    !isMacOSSafari &&
+    (/chrome|chromium|edg|opr|brave|samsungbrowser/i.test(uaLower) ||
+      'onbeforeinstallprompt' in window);
 
   // 6. Friendly Browser Name
   let browserName = 'Browser';
   if (isInAppWebView) browserName = 'In-App Browser';
-  else if (/edg|edgios/i.test(uaLower)) browserName = 'Microsoft Edge';
+  else if (isIOSChrome) browserName = 'Chrome on iOS';
+  else if (isIOSSafari) browserName = isIPadOS ? 'Safari on iPadOS' : 'Safari on iOS';
+  else if (isIOSEdge) browserName = 'Edge on iOS';
+  else if (isIOSFirefox) browserName = 'Firefox on iOS';
+  else if (isIOSOpera) browserName = 'Opera on iOS';
+  else if (isIOSBrave) browserName = 'Brave on iOS';
+  else if (/edg/i.test(uaLower)) browserName = 'Microsoft Edge';
   else if (/samsungbrowser/i.test(uaLower)) browserName = 'Samsung Internet';
-  else if (/opr|opios/i.test(uaLower)) browserName = 'Opera';
+  else if (/opr/i.test(uaLower)) browserName = 'Opera';
   else if (/brave/i.test(uaLower)) browserName = 'Brave';
-  else if (/chrome|chromium|crios/i.test(uaLower)) browserName = isIOSChrome ? 'Chrome on iOS' : 'Chrome';
+  else if (/chrome|chromium/i.test(uaLower)) browserName = 'Chrome';
   else if (isFirefox) browserName = 'Firefox';
   else if (isSafariEngine) browserName = 'Safari';
 
-  // 7. Determine exact Installation Mechanism per Section 3 Matrix
+  // 7. Determine Installation Mechanism
   let mechanism: InstallMechanism = 'chromium-native';
   if (isInAppWebView) {
     mechanism = 'in-app-webview';
@@ -318,10 +438,31 @@ export function detectInstallEnvironment(): InstallEnvironment {
     mechanism = 'chromium-native';
   }
 
+  // 8. Compute Default iOS Smart Pointer Target Position
+  const viewport = detectViewportMetrics();
+  let defaultIOSPointerPosition: IOSPointerPosition = 'bottom-center';
+  if (platform === 'ios') {
+    if (iosBrowser === 'chrome') {
+      // Chrome on iOS places the Share icon [↑] inside the top-right address bar
+      defaultIOSPointerPosition = 'top-right';
+    } else if (iosBrowser === 'safari') {
+      // Safari on iPad or Landscape places Share at top-right; iPhone Portrait places Share at bottom-center
+      defaultIOSPointerPosition =
+        viewport.safariToolbarLayout === 'top' ? 'top-right' : 'bottom-center';
+    } else if (iosBrowser === 'webview') {
+      defaultIOSPointerPosition = 'top-right';
+    } else {
+      // Edge, Firefox, Brave, Opera on iOS place their menu/share control at bottom-right
+      defaultIOSPointerPosition = 'bottom-right';
+    }
+  }
+
   return {
     platform,
     mechanism,
     browserName,
+    iosBrowser,
+    isIPad: isIPadOS,
     isInAppWebView,
     isDesktopFirefox,
     isMacOSSafari,
@@ -329,7 +470,11 @@ export function detectInstallEnvironment(): InstallEnvironment {
     isIOSLegacyNonSafari,
     isIOSChrome,
     isIOSSafari,
+    isIOSEdge,
+    isIOSFirefox,
+    isChromiumCapable,
     iosMajorVersion,
+    defaultIOSPointerPosition,
   };
 }
 
@@ -337,10 +482,7 @@ export function detectDevicePlatform(): DevicePlatform {
   return detectInstallEnvironment().platform;
 }
 
-/**
- * Waits briefly if `beforeinstallprompt` is just about to fire after SW registration.
- */
-function waitForNativePromptEvent(timeoutMs = 600): Promise<BeforeInstallPromptEvent | null> {
+function waitForNativePromptEvent(timeoutMs = 350): Promise<BeforeInstallPromptEvent | null> {
   if (typeof window === 'undefined') return Promise.resolve(null);
   if (storeState.deferredPrompt) return Promise.resolve(storeState.deferredPrompt);
   if (window.__pwaInstallPrompt) return Promise.resolve(window.__pwaInstallPrompt);
@@ -388,60 +530,6 @@ function waitForNativePromptEvent(timeoutMs = 600): Promise<BeforeInstallPromptE
   });
 }
 
-/**
- * Waits for genuine OS verification (`appinstalled` event or `display-mode: standalone` change).
- * Never fakes success on timeout!
- */
-function waitForVerifiedOSInstall(timeoutMs = 12000): Promise<boolean> {
-  if (typeof window === 'undefined') return Promise.resolve(false);
-  if (window.__pwaAppInstalled || getDisplayModeSnapshot()) {
-    return Promise.resolve(true);
-  }
-
-  return new Promise((resolve) => {
-    let settled = false;
-    const standaloneMql = window.matchMedia('(display-mode: standalone)');
-    const wcoMql = window.matchMedia('(display-mode: window-controls-overlay)');
-
-    const finish = (verified: boolean) => {
-      if (settled) return;
-      settled = true;
-      window.removeEventListener('appinstalled', onVerified);
-      window.removeEventListener('bookscircle:pwa-installed', onVerified);
-      standaloneMql.removeEventListener('change', onDisplayChange);
-      wcoMql.removeEventListener('change', onDisplayChange);
-      clearTimeout(timer);
-      resolve(verified);
-    };
-
-    const onVerified = () => {
-      window.__pwaAppInstalled = true;
-      finish(true);
-    };
-
-    const onDisplayChange = (e: MediaQueryListEvent) => {
-      if (e.matches) {
-        window.__pwaAppInstalled = true;
-        finish(true);
-      }
-    };
-
-    window.addEventListener('appinstalled', onVerified);
-    window.addEventListener('bookscircle:pwa-installed', onVerified);
-    standaloneMql.addEventListener('change', onDisplayChange);
-    wcoMql.addEventListener('change', onDisplayChange);
-
-    // If WebAPK minting takes longer than timeoutMs in background, resolve false for now;
-    // the global `appinstalled` listener will still catch it when the OS completes!
-    const timer = setTimeout(() => {
-      finish(Boolean(window.__pwaAppInstalled || getDisplayModeSnapshot()));
-    }, timeoutMs);
-  });
-}
-
-/**
- * Non-blocking background synchronization of live catalog & persistent storage.
- */
 async function syncLiveCatalogInBackground(): Promise<void> {
   try {
     await flushAllAppCachesAndStorage();
@@ -471,6 +559,8 @@ export function usePWAInstall() {
     platform: 'desktop',
     mechanism: 'chromium-native',
     browserName: 'Browser',
+    iosBrowser: null,
+    isIPad: false,
     isInAppWebView: false,
     isDesktopFirefox: false,
     isMacOSSafari: false,
@@ -478,15 +568,41 @@ export function usePWAInstall() {
     isIOSLegacyNonSafari: false,
     isIOSChrome: false,
     isIOSSafari: false,
+    isIOSEdge: false,
+    isIOSFirefox: false,
+    isChromiumCapable: false,
     iosMajorVersion: null,
+    defaultIOSPointerPosition: 'bottom-center',
+  }));
+
+  const [viewport, setViewport] = useState<ViewportMetrics>(() => ({
+    width: 390,
+    height: 844,
+    orientation: 'portrait',
+    isCompactHeight: false,
+    safariToolbarLayout: 'bottom',
   }));
 
   useEffect(() => {
     setIsMounted(true);
     const detectedEnv = detectInstallEnvironment();
+    const detectedViewport = detectViewportMetrics();
     setEnv(detectedEnv);
+    setViewport(detectedViewport);
 
     if (typeof window === 'undefined') return;
+
+    // Reactive screen size, orientation, and visualViewport listener
+    const handleViewportResize = () => {
+      setViewport(detectViewportMetrics());
+      setEnv(detectInstallEnvironment());
+    };
+
+    window.addEventListener('resize', handleViewportResize, { passive: true });
+    window.addEventListener('orientationchange', handleViewportResize, { passive: true });
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleViewportResize, { passive: true });
+    }
 
     const inIframe = (() => {
       try {
@@ -496,18 +612,41 @@ export function usePWAInstall() {
       }
     })();
 
-    // 1. Evaluate Standalone Mode immediately
+    // Restore manual iOS pointer position preference if set by user
+    try {
+      const savedPos = localStorage.getItem(IOS_POINTER_POS_KEY) as IOSPointerPosition | null;
+      if (
+        savedPos &&
+        ['top-right', 'bottom-center', 'bottom-right', 'top-left'].includes(savedPos)
+      ) {
+        updateStore({ manualIOSPointerPosition: savedPos });
+      }
+      const iosDismissed = sessionStorage.getItem(IOS_POINTER_DISMISS_KEY) === 'true';
+      if (iosDismissed) {
+        updateStore({ isIOSPointerDismissed: true });
+      }
+    } catch {}
+
+    // 1. Evaluate Standalone Mode immediately — Suppress all installation UI
     if (getDisplayModeSnapshot()) {
       updateStore({
         machineState: 'RUNNING_STANDALONE',
         isInIframe: inIframe,
         isInstalledOnDevice: true,
         isInstalledVerified: true,
+        isIOSPromptOpen: false,
+        showInlineFallbackHint: false,
       });
-      return;
+      return () => {
+        window.removeEventListener('resize', handleViewportResize);
+        window.removeEventListener('orientationchange', handleViewportResize);
+        if (window.visualViewport) {
+          window.visualViewport.removeEventListener('resize', handleViewportResize);
+        }
+      };
     }
 
-    // 2. Evaluate Unsupported Desktop Firefox (Section 3 Matrix: Do not show fake install buttons)
+    // 2. Evaluate Unsupported Desktop Firefox
     if (detectedEnv.isDesktopFirefox) {
       updateStore({
         machineState: 'UNSUPPORTED_BROWSER',
@@ -515,9 +654,9 @@ export function usePWAInstall() {
       });
     }
 
-    // 3. Sync any globally captured `beforeinstallprompt` from layout.tsx inline script
+    // 3. Sync globally captured `beforeinstallprompt` ONLY on non-iOS devices
     const existingPrompt = window.__pwaInstallPrompt || storeState.deferredPrompt;
-    if (existingPrompt) {
+    if (existingPrompt && detectedEnv.platform !== 'ios') {
       updateStore({
         deferredPrompt: existingPrompt,
         hasPromptReceived: true,
@@ -537,30 +676,32 @@ export function usePWAInstall() {
       }
     } catch {}
 
-    // 5. Browser-Tab Duplicate Prevention via `navigator.getInstalledRelatedApps()` (Section 4.2.2)
-    try {
-      const nav = window.navigator as Navigator & {
-        getInstalledRelatedApps?: () => Promise<
-          Array<{ id?: string; platform?: string; url?: string }>
-        >;
-      };
-      if (typeof nav.getInstalledRelatedApps === 'function') {
-        nav
-          .getInstalledRelatedApps()
-          .then((apps) => {
-            if (Array.isArray(apps) && apps.length > 0) {
-              try {
-                localStorage.setItem(INSTALLED_ON_DEVICE_KEY, 'true');
-              } catch {}
-              updateStore({
-                isInstalledOnDevice: true,
-                machineState: 'INSTALLED_ON_DEVICE',
-              });
-            }
-          })
-          .catch(() => {});
-      }
-    } catch {}
+    // 5. Browser-Tab Duplicate Prevention via `navigator.getInstalledRelatedApps()`
+    if (detectedEnv.platform !== 'ios') {
+      try {
+        const nav = window.navigator as Navigator & {
+          getInstalledRelatedApps?: () => Promise<
+            Array<{ id?: string; platform?: string; url?: string }>
+          >;
+        };
+        if (typeof nav.getInstalledRelatedApps === 'function') {
+          nav
+            .getInstalledRelatedApps()
+            .then((apps) => {
+              if (Array.isArray(apps) && apps.length > 0) {
+                try {
+                  localStorage.setItem(INSTALLED_ON_DEVICE_KEY, 'true');
+                } catch {}
+                updateStore({
+                  isInstalledOnDevice: true,
+                  machineState: 'INSTALLED_ON_DEVICE',
+                });
+              }
+            })
+            .catch(() => {});
+        }
+      } catch {}
+    }
 
     // 6. Attach global window listeners once across the application lifecycle
     if (!window.__pwaListenerAttached) {
@@ -568,6 +709,10 @@ export function usePWAInstall() {
 
       const handleBeforeInstallPrompt = (e: Event) => {
         e.preventDefault();
+        const currentCheck = detectInstallEnvironment();
+        // Never use Android/Chromium install prompt on iOS (even in DevTools emulation)
+        if (currentCheck.platform === 'ios') return;
+
         const promptEvent = e as BeforeInstallPromptEvent;
         window.__pwaInstallPrompt = promptEvent;
         updateStore({
@@ -575,16 +720,20 @@ export function usePWAInstall() {
           hasPromptReceived: true,
           machineState: 'NATIVE_PROMPT_READY',
           isInstalledOnDevice: false,
+          showInlineFallbackHint: false,
         });
       };
 
       const handleCustomPromptReady = () => {
+        const currentCheck = detectInstallEnvironment();
+        if (currentCheck.platform === 'ios') return;
         if (window.__pwaInstallPrompt) {
           updateStore({
             deferredPrompt: window.__pwaInstallPrompt,
             hasPromptReceived: true,
             machineState: 'NATIVE_PROMPT_READY',
             isInstalledOnDevice: false,
+            showInlineFallbackHint: false,
           });
         }
       };
@@ -603,11 +752,12 @@ export function usePWAInstall() {
           hasPromptReceived: false,
           machineState: 'INSTALLED_VERIFIED',
           isInstalling: false,
-          installStepText: 'Installation verified by your operating system.',
+          installStepText: '',
           isInstalledOnDevice: true,
           isInstalledVerified: true,
-          isInstallSuccessOpen: true,
+          isInstallSuccessOpen: false,
           isIOSPromptOpen: false,
+          showInlineFallbackHint: false,
         });
       };
 
@@ -615,39 +765,106 @@ export function usePWAInstall() {
       window.addEventListener('bookscircle:pwa-prompt-ready', handleCustomPromptReady);
       window.addEventListener('appinstalled', handleAppInstalled);
     }
+
+    return () => {
+      window.removeEventListener('resize', handleViewportResize);
+      window.removeEventListener('orientationchange', handleViewportResize);
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleViewportResize);
+      }
+    };
   }, []);
 
   const isIOS = env.platform === 'ios';
   const isInstalled = isStandalone || shared.isInstalledVerified;
 
-  // Hide install triggers if running standalone OR on standard Firefox Desktop (which has no standalone PWA engine)
-  const isInstallable =
+  // Determine UI Mode strictly based on OS, Browser, Capabilities, and Standalone state:
+  // - Standalone: suppress all installation UI
+  // - iOS: strictly use Smart Installation Pointer (NEVER show Android-style Install Now buttons/banners)
+  // - Android / Windows / Supported Browsers: show contextual Install Now buttons/banners when native prompt is available (or supported fallback)
+  const hasNativePrompt = !isIOS && Boolean(shared.hasPromptReceived || shared.deferredPrompt);
+
+  const canShowNativeInstallUI =
     isMounted &&
     !isStandalone &&
-    !shared.isInstalledVerified &&
-    !env.isDesktopFirefox;
+    !isInstalled &&
+    !isIOS &&
+    !env.isDesktopFirefox &&
+    (hasNativePrompt || env.isChromiumCapable || env.isMacOSSafari || env.isAndroidFirefox);
+
+  const shouldShowIOSSmartPointer =
+    isMounted &&
+    !isStandalone &&
+    !isInstalled &&
+    isIOS &&
+    (!shared.isIOSPointerDismissed || shared.isIOSPromptOpen);
+
+  const uiMode: PWAInstallUIMode =
+    isStandalone || isInstalled
+      ? 'hidden-standalone'
+      : isIOS
+      ? 'ios-smart-pointer'
+      : hasNativePrompt
+      ? 'native-install'
+      : canShowNativeInstallUI
+      ? 'browser-fallback'
+      : 'unsupported';
+
+  // Effective iOS Pointer Position: manual user override takes precedence, otherwise adaptive default
+  const iosPointerPosition: IOSPointerPosition =
+    shared.manualIOSPointerPosition || env.defaultIOSPointerPosition;
+
+  const setIOSPointerPosition = useCallback((pos: IOSPointerPosition) => {
+    updateStore({ manualIOSPointerPosition: pos });
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(IOS_POINTER_POS_KEY, pos);
+      } catch {}
+    }
+  }, []);
+
+  const cycleIOSPointerPosition = useCallback(() => {
+    const order: IOSPointerPosition[] = [
+      'top-right',
+      'bottom-center',
+      'bottom-right',
+      'top-left',
+    ];
+    const current = storeState.manualIOSPointerPosition || detectInstallEnvironment().defaultIOSPointerPosition;
+    const nextIdx = (order.indexOf(current) + 1) % order.length;
+    const nextPos = order[nextIdx];
+    setIOSPointerPosition(nextPos);
+  }, [setIOSPointerPosition]);
 
   /**
-   * Deterministic Event-Synchronized Installation Trigger (Section 4.1 & 4.2):
-   * - ZERO fake percentage bars.
-   * - If `INSTALLED_ON_DEVICE`: opens the installed app directly (`/?source=pwa`).
-   * - If `beforeinstallprompt` is available:
-   *   1. Transitions to `AWAITING_USER_CHOICE` ("Waiting for confirmation in the browser dialog...")
-   *   2. If `outcome === 'dismissed'`: immediately resets to `PROMPT_DISMISSED` with cooldown and stops spinner.
-   *   3. If `outcome === 'accepted'`: transitions to `OS_HANDOFF_IN_PROGRESS` ("Finalizing installation with your operating system...")
-   *      and waits for genuine `appinstalled` or `display-mode: standalone` transition before showing `INSTALLED_VERIFIED`.
-   * - If manual platform (iOS, macOS Safari, Android Firefox, In-App WebView, or preview iframe):
-   *   Opens the platform-accurate instruction modal WITHOUT ever claiming "Installation Successful".
+   * Triggers genuine browser installation prompt on Android / Windows / Supported Browsers.
+   * Never shows fake progress or misleading success modals.
    */
   const promptInstall = useCallback(async () => {
     if (isStandalone || storeState.isInstalling) return;
 
-    // Proactive Cache Hygiene: prune any stale caches from previous versions before install flow
+    const currentEnv = detectInstallEnvironment();
+
+    // On iOS, never run Android prompt flow — reveal the iOS Smart Installation Pointer if dismissed/minimized
+    if (currentEnv.platform === 'ios') {
+      updateStore({
+        isIOSPointerDismissed: false,
+        iosPointerMinimized: false,
+        isIOSPromptOpen: true,
+      });
+      return;
+    }
+
+    if (currentEnv.isDesktopFirefox) {
+      return;
+    }
+
+    // Proactive Cache Hygiene: remove any stale non-v18 caches
     try {
       if (typeof window !== 'undefined' && 'caches' in window) {
         const keys = await caches.keys();
         const staleKeys = keys.filter(
-          (k) => !k.includes('bookscircle-v17') && !k.includes('bookscircle-shell-v17')
+          (k) => !k.includes('bookscircle-v18') && !k.includes('bookscircle-shell-v18')
         );
         if (staleKeys.length > 0) {
           await Promise.allSettled(staleKeys.map((k) => caches.delete(k)));
@@ -655,32 +872,10 @@ export function usePWAInstall() {
       }
     } catch {}
 
-    // If already detected as installed on device via getInstalledRelatedApps(), launch directly
+    // If already installed on device and no prompt event, launch directly
     if (storeState.isInstalledOnDevice && !storeState.deferredPrompt) {
       const targetUrl = `${window.location.origin}/?source=pwa`;
       window.location.assign(targetUrl);
-      return;
-    }
-
-    const currentEnv = detectInstallEnvironment();
-
-    // Route manual platforms and sandboxed WebViews directly to the accurate platform guide
-    if (
-      currentEnv.mechanism === 'in-app-webview' ||
-      currentEnv.mechanism === 'ios-manual' ||
-      currentEnv.mechanism === 'ios-legacy-non-safari' ||
-      currentEnv.mechanism === 'macos-safari' ||
-      currentEnv.mechanism === 'android-firefox'
-    ) {
-      updateStore({
-        isInstalling: false,
-        installStepText: '',
-        isIOSPromptOpen: true,
-      });
-      return;
-    }
-
-    if (currentEnv.mechanism === 'desktop-firefox') {
       return;
     }
 
@@ -691,61 +886,35 @@ export function usePWAInstall() {
       } catch {}
     }
 
-    // Check for captured `beforeinstallprompt` event
-    const activePrompt = await waitForNativePromptEvent(500);
+    const activePrompt = await waitForNativePromptEvent(350);
 
     if (activePrompt) {
       try {
-        // STATE 1: AWAITING_USER_CHOICE (Indeterminate spinner)
         updateStore({
           machineState: 'AWAITING_USER_CHOICE',
           isInstalling: true,
-          installStepText: 'Waiting for confirmation in the browser dialog...',
+          installStepText: 'Confirm installation in your browser dialog...',
+          showInlineFallbackHint: false,
         });
 
         await activePrompt.prompt();
         const choice = await activePrompt.userChoice;
 
-        // Clear consumed prompt reference immediately per Chromium spec
         if (typeof window !== 'undefined') {
           window.__pwaInstallPrompt = null;
         }
 
         if (choice.outcome === 'accepted') {
-          // STATE 2: OS_HANDOFF_IN_PROGRESS (Indeterminate spinner while OS compiles WebAPK / reparents window)
           updateStore({
             deferredPrompt: null,
             hasPromptReceived: false,
             machineState: 'OS_HANDOFF_IN_PROGRESS',
-            isInstalling: true,
-            installStepText: 'Finalizing installation with your operating system...',
+            isInstalling: false,
+            installStepText: '',
+            isInstalledOnDevice: true,
           });
-
           syncLiveCatalogInBackground();
-
-          const verified = await waitForVerifiedOSInstall(12000);
-          if (verified) {
-            try {
-              localStorage.setItem(INSTALLED_ON_DEVICE_KEY, 'true');
-            } catch {}
-            updateStore({
-              machineState: 'INSTALLED_VERIFIED',
-              isInstalling: false,
-              installStepText: 'Installation verified by your operating system.',
-              isInstalledOnDevice: true,
-              isInstalledVerified: true,
-              isInstallSuccessOpen: true,
-            });
-          } else {
-            // OS WebAPK compilation is still finishing in the background; global `appinstalled` listener will catch it
-            updateStore({
-              machineState: 'OS_HANDOFF_IN_PROGRESS',
-              isInstalling: false,
-              installStepText: 'Completing background OS installation...',
-            });
-          }
         } else {
-          // STATE 3: PROMPT_DISMISSED — Stop all loading indicators immediately & apply dismissal cooldown
           try {
             localStorage.setItem(
               DISMISS_COOLDOWN_KEY,
@@ -761,28 +930,31 @@ export function usePWAInstall() {
           });
         }
       } catch {
-        // Native prompt invocation failed — reset spinner and show manual guide
         updateStore({
           deferredPrompt: null,
           hasPromptReceived: false,
           machineState: 'IDLE_ELIGIBLE',
           isInstalling: false,
           installStepText: '',
-          isIOSPromptOpen: true,
+          showInlineFallbackHint: true,
         });
       }
     } else {
-      // No `beforeinstallprompt` available (e.g., preview iframe or already installed) -> show manual guide without faking install
+      // Appropriate lightweight inline fallback when native prompt event is unavailable
       updateStore({
         isInstalling: false,
         installStepText: '',
-        isIOSPromptOpen: true,
+        showInlineFallbackHint: !storeState.showInlineFallbackHint,
       });
     }
   }, [isStandalone]);
 
   const dismissBanner = useCallback(() => {
-    updateStore({ isDismissed: true, machineState: 'PROMPT_DISMISSED' });
+    updateStore({
+      isDismissed: true,
+      showInlineFallbackHint: false,
+      machineState: 'PROMPT_DISMISSED',
+    });
     if (typeof window !== 'undefined') {
       try {
         sessionStorage.setItem(DISMISS_SESSION_KEY, 'true');
@@ -794,12 +966,39 @@ export function usePWAInstall() {
     }
   }, []);
 
+  const dismissIOSPointer = useCallback(() => {
+    updateStore({
+      isIOSPointerDismissed: true,
+      isIOSPromptOpen: false,
+      iosPointerMinimized: false,
+    });
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.setItem(IOS_POINTER_DISMISS_KEY, 'true');
+      } catch {}
+    }
+  }, []);
+
+  const toggleIOSPointerMinimized = useCallback(() => {
+    updateStore({
+      iosPointerMinimized: !storeState.iosPointerMinimized,
+    });
+  }, []);
+
+  const closeInlineFallbackHint = useCallback(() => {
+    updateStore({ showInlineFallbackHint: false });
+  }, []);
+
   const closeIOSPrompt = useCallback(() => {
-    updateStore({ isIOSPromptOpen: false });
+    updateStore({ isIOSPromptOpen: false, isIOSPointerDismissed: true });
   }, []);
 
   const openIOSPrompt = useCallback(() => {
-    updateStore({ isIOSPromptOpen: true });
+    updateStore({
+      isIOSPromptOpen: true,
+      isIOSPointerDismissed: false,
+      iosPointerMinimized: false,
+    });
   }, []);
 
   const closeInstallSuccess = useCallback(() => {
@@ -807,35 +1006,15 @@ export function usePWAInstall() {
       isInstallSuccessOpen: false,
       installStepText: '',
     });
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem('bookscircle_install_ack', 'true');
-      } catch {}
-    }
   }, []);
 
-  /**
-   * Opens / focuses the installed PWA via the manifest `start_url` (`/?source=pwa`),
-   * triggering Android Declarative Link Capturing or desktop `launch_handler` window focus.
-   */
   const launchInstalledApp = useCallback(async () => {
     if (storeState.isLaunching) return;
-
-    updateStore({
-      isLaunching: true,
-      installStepText: 'Opening BooksCircle App...',
-    });
-
+    updateStore({ isLaunching: true });
     try {
       await flushAllAppCachesAndStorage();
     } catch {}
-
     if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem('bookscircle_install_ack', 'true');
-        sessionStorage.setItem(DISMISS_SESSION_KEY, 'true');
-      } catch {}
-
       const targetUrl = `${window.location.origin}/?source=pwa`;
       window.location.assign(targetUrl);
     }
@@ -843,7 +1022,11 @@ export function usePWAInstall() {
 
   return {
     isMounted,
-    isInstallable,
+    // Strictly false on iOS so Android-style buttons/banners never appear on iOS
+    isInstallable: canShowNativeInstallUI,
+    canShowNativeInstallUI,
+    shouldShowIOSSmartPointer,
+    uiMode,
     isInstalled,
     isInstalledOnDevice: shared.isInstalledOnDevice,
     isInstalledVerified: shared.isInstalledVerified,
@@ -851,19 +1034,28 @@ export function usePWAInstall() {
     isIOS,
     platform: env.platform,
     environment: env,
+    viewport,
+    iosPointerPosition,
+    iosPointerMinimized: shared.iosPointerMinimized,
+    isIOSPointerDismissed: shared.isIOSPointerDismissed,
+    showInlineFallbackHint: shared.showInlineFallbackHint,
     machineState: isStandalone ? 'RUNNING_STANDALONE' : shared.machineState,
     isInIframe: shared.isInIframe,
-    hasNativePrompt: shared.hasPromptReceived,
+    hasNativePrompt,
     isInstalling: shared.isInstalling,
     isLaunching: shared.isLaunching,
-    // Kept as 0 for backward compatibility; UI now uses strict indeterminate spinners per Section 4.1
     installProgress: 0,
     installStepText: shared.installStepText,
     isDismissed: shared.isDismissed,
     isIOSPromptOpen: shared.isIOSPromptOpen,
-    isInstallSuccessOpen: shared.isInstallSuccessOpen,
+    isInstallSuccessOpen: false,
     promptInstall,
     dismissBanner,
+    dismissIOSPointer,
+    toggleIOSPointerMinimized,
+    setIOSPointerPosition,
+    cycleIOSPointerPosition,
+    closeInlineFallbackHint,
     closeIOSPrompt,
     openIOSPrompt,
     closeInstallSuccess,

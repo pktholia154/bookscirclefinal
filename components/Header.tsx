@@ -55,8 +55,8 @@ export const Header: React.FC<HeaderProps> = ({
     isInstalling,
     isInstalled,
     isInstalledOnDevice,
-    machineState,
-    environment,
+    isIOS,
+    canShowNativeInstallUI,
   } = usePWAInstall();
 
   // Cycling animated placeholder to entice user attention
@@ -158,15 +158,15 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* Right Actions (Install + Login / Account + Cart) */}
+        {/* Right Actions (Install Now + Login / Account + Cart) */}
         <div className="flex items-center gap-1.5 sm:gap-2">
-          {/* PWA Install Button: Visible only when not running standalone and not on Firefox Desktop */}
-          {(isInstallable || isInstalling) && !isInstalled && !environment.isDesktopFirefox && onInstall && (
+          {/* Native PWA Install Button: Visible ONLY on Android/Windows/Supported non-iOS browsers */}
+          {!isIOS && (canShowNativeInstallUI || isInstalling) && !isInstalled && onInstall && (
             <button
               id="header-install-app-btn"
               onClick={onInstall}
               disabled={isInstalling}
-              className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs font-black text-[#4029AB] bg-[#4029AB]/10 hover:bg-[#4029AB]/20 active:scale-95 transition-all shadow-2xs border border-[#4029AB]/20 cursor-pointer disabled:opacity-90"
+              className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full text-xs font-black text-[#4029AB] bg-[#4029AB]/10 hover:bg-[#4029AB]/20 active:scale-95 transition-all shadow-2xs border border-[#4029AB]/20 cursor-pointer disabled:opacity-90 whitespace-nowrap shrink-0"
               title={isInstalledOnDevice ? 'Open Installed BooksCircle App' : 'Install BooksCircle App'}
             >
               {isInstalling ? (
@@ -175,16 +175,14 @@ export const Header: React.FC<HeaderProps> = ({
                     className="w-3.5 h-3.5 rounded-full border-2 border-[#4029AB]/25 border-t-[#4029AB] animate-spin shrink-0"
                     aria-hidden="true"
                   />
-                  <span className="leading-none">
-                    {machineState === 'OS_HANDOFF_IN_PROGRESS' ? 'Finalizing...' : 'Confirming...'}
-                  </span>
+                  <span className="leading-none">Prompting...</span>
                 </>
               ) : isInstalledOnDevice ? (
                 <span className="leading-none">Open App</span>
               ) : (
                 <>
                   <Download className="w-3.5 h-3.5 text-[#4029AB] shrink-0 stroke-[2.5]" />
-                  <span className="leading-none">Install App</span>
+                  <span className="leading-none">Install Now</span>
                 </>
               )}
             </button>

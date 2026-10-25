@@ -327,7 +327,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             </h3>
           </div>
           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#5e17eb]/10 text-[#5e17eb]">
-            Build v17.0 Live
+            Build v18.0 Live
           </span>
         </div>
         <p className="text-xs text-gray-500">

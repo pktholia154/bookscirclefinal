@@ -1,12 +1,12 @@
-// BooksCircle Universal Enterprise Service Worker (v17)
+// BooksCircle Universal Enterprise Service Worker (v18)
 // Implements:
 // 1. Automatic version invalidation & immediate cache flushing
 // 2. Offline Navigation App-Shell Fallback (Required for Chromium beforeinstallprompt & Airplane Mode launch)
 // 3. Stale-While-Revalidate for Identity & Icon Assets (Android WebAPK, iOS SpringBoard, Windows/macOS)
 // 4. Client message listeners for instant remote cache flush
 
-const CACHE_NAME = 'bookscircle-v17';
-const SHELL_CACHE_NAME = 'bookscircle-shell-v17';
+const CACHE_NAME = 'bookscircle-v18';
+const SHELL_CACHE_NAME = 'bookscircle-shell-v18';
 
 const IDENTITY_AND_SHELL_ASSETS = [
   '/',
