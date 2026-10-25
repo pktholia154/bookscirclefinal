@@ -33,6 +33,7 @@ import { DEFAULT_BOOK_COVER, BOOK_FAQS, FREE_SAMPLE_BOOK_ID } from '@/lib/data';
 import { BookReviewsSection } from '@/components/BookReviewsSection';
 import { SampleSwitcher } from '@/components/SampleSwitcher';
 import { InstallAppBanner } from '@/components/InstallAppBanner';
+import { IOSHomeInstallBanner } from '@/components/IOSHomeInstallBanner';
 import { IOSInstallGuideModal } from '@/components/IOSInstallGuideModal';
 import { InstallSuccessModal } from '@/components/InstallSuccessModal';
 import { usePWAInstall } from '@/hooks/use-pwa-install';
@@ -712,13 +713,15 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
           </div>
         </section>
 
-        {/* App Install Banner (Same as home page, below Sample and Buy/Full Edition button row) */}
+        {/* App Install Banner for Android & Windows */}
         <div className="pt-2">
           <InstallAppBanner
             onInstall={promptInstall}
             isInstallable={isInstallable}
             className="!px-0 !pt-0 !pb-0"
           />
+          {/* Permanent iOS Installation Banner */}
+          <IOSHomeInstallBanner className="!px-0 !pt-0 !pb-0" />
         </div>
 
         {/* Book Overview & Highlights */}
