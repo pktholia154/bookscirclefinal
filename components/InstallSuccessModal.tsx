@@ -9,7 +9,7 @@ import {
   ShieldCheck,
   Smartphone,
   Monitor,
-  RefreshCw,
+  Loader2,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { usePWAInstall } from '@/hooks/use-pwa-install';
@@ -28,8 +28,8 @@ export const InstallSuccessModal: React.FC<InstallSuccessModalProps> = ({
   const {
     isInstalling,
     isLaunching,
-    installProgress,
     installStepText,
+    machineState,
     isInstallSuccessOpen,
     platform,
     launchInstalledApp,
@@ -66,22 +66,28 @@ export const InstallSuccessModal: React.FC<InstallSuccessModalProps> = ({
     launchInstalledApp();
   };
 
-  // Circular progress SVG parameters (r = 38 -> circumference ≈ 238.76)
-  const radius = 38;
-  const circumference = 2 * Math.PI * radius;
-  const clampedProgress = Math.max(0, Math.min(100, installProgress));
-  const strokeDashoffset = circumference - (clampedProgress / 100) * circumference;
-
   const deviceName =
     platform === 'android'
-      ? 'Android Home Screen'
+      ? 'Android Home Screen & App Drawer'
       : platform === 'ios'
-      ? 'iPhone / iPad'
+      ? 'iPhone / iPad Home Screen'
       : platform === 'windows'
-      ? 'Windows Desktop'
+      ? 'Windows Desktop & Start Menu'
       : platform === 'mac'
-      ? 'macOS Dock'
+      ? 'macOS Applications & Dock'
+      : platform === 'chromeos'
+      ? 'ChromeOS Shelf'
       : 'Device Home Screen';
+
+  const statusHeadline =
+    machineState === 'AWAITING_USER_CHOICE'
+      ? 'Confirm in Browser Dialog'
+      : 'Finalizing OS Installation';
+
+  const statusDescription =
+    machineState === 'AWAITING_USER_CHOICE'
+      ? 'Waiting for confirmation in the browser dialog...'
+      : installStepText || 'Finalizing installation with your operating system...';
 
   return (
     <AnimatePresence>
@@ -101,7 +107,7 @@ export const InstallSuccessModal: React.FC<InstallSuccessModalProps> = ({
           transition={{ type: 'spring', damping: 26, stiffness: 360 }}
           className="relative w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl border border-gray-100 z-10 flex flex-col items-center text-center"
         >
-          {/* Top-right Close Cross Button (Available once installed) */}
+          {/* Top-right Close Cross Button (Available once verified installed) */}
           {!isInstalling && !isLaunching && (
             <button
               type="button"
@@ -115,47 +121,24 @@ export const InstallSuccessModal: React.FC<InstallSuccessModalProps> = ({
           )}
 
           {isInstalling ? (
-            /* STATE 1: REAL EVENT-SYNCED CIRCULAR PROGRESS BAR DURING INSTALLATION */
+            /* STATE 1: EVENT-SYNCHRONIZED INDETERMINATE SPINNER (ZERO FAKE PERCENTAGES) */
             <div className="w-full py-2 flex flex-col items-center space-y-4">
               <div
                 className="relative w-24 h-24 flex items-center justify-center"
-                role="progressbar"
-                aria-valuenow={clampedProgress}
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-label="Installing BooksCircle App"
+                role="status"
+                aria-live="polite"
+                aria-label={statusDescription}
               >
-                <svg className="w-24 h-24 -rotate-90 transform" viewBox="0 0 92 92">
-                  <circle
-                    cx="46"
-                    cy="46"
-                    r={radius}
-                    fill="transparent"
-                    stroke="#F3F4F6"
-                    strokeWidth="6"
-                  />
-                  <circle
-                    cx="46"
-                    cy="46"
-                    r={radius}
-                    fill="transparent"
-                    stroke="#4029AB"
-                    strokeWidth="6"
-                    strokeLinecap="round"
-                    strokeDasharray={circumference}
-                    strokeDashoffset={strokeDashoffset}
-                    className="transition-all duration-200 ease-out"
-                  />
-                </svg>
+                <div className="w-24 h-24 rounded-full border-4 border-gray-100 border-t-[#4029AB] animate-spin" />
 
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <div className="w-11 h-11 rounded-xl overflow-hidden bg-white shadow-xs flex items-center justify-center">
+                  <div className="w-12 h-12 rounded-xl overflow-hidden bg-white shadow-xs flex items-center justify-center border border-gray-100">
                     <Image
-                      src="/booksCircle%20(3).png"
+                      src="/icon-192x192.png"
                       alt="BooksCircle"
-                      width={40}
-                      height={40}
-                      unoptimized
+                      width={44}
+                      height={44}
+                      referrerPolicy="no-referrer"
                       className="object-contain rounded-xl"
                       priority
                     />
@@ -164,31 +147,36 @@ export const InstallSuccessModal: React.FC<InstallSuccessModalProps> = ({
               </div>
 
               <div className="space-y-1.5 px-2">
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#4029AB]/10 text-[#4029AB] text-xs font-black tabular-nums">
-                  <span>Installing • {clampedProgress}%</span>
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#4029AB]/10 text-[#4029AB] text-xs font-black">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  <span>
+                    {machineState === 'AWAITING_USER_CHOICE'
+                      ? 'Awaiting Confirmation'
+                      : 'OS Handoff in Progress'}
+                  </span>
                 </div>
                 <h3
                   id="install-success-title"
                   className="text-base sm:text-lg font-black text-gray-950 tracking-tight"
                 >
-                  Installing BooksCircle App
+                  {statusHeadline}
                 </h3>
                 <p className="text-xs text-gray-500 font-medium leading-relaxed">
-                  {installStepText || 'Verifying device installer & syncing live catalog...'}
+                  {statusDescription}
                 </p>
               </div>
             </div>
           ) : (
-            /* STATE 2: APP INSTALLED SUCCESSFULLY & HARD-SYNC LAUNCH POPUP */
+            /* STATE 2: VERIFIED INSTALLATION (`INSTALLED_VERIFIED` via `appinstalled` or `display-mode: standalone`) */
             <div className="w-full flex flex-col items-center space-y-4 pt-1">
               <div className="relative flex items-center justify-center">
                 <div className="w-20 h-20 rounded-2xl bg-[#4029AB]/[0.06] border border-[#4029AB]/20 flex items-center justify-center p-2 shadow-xs">
                   <Image
-                    src="/booksCircle%20(3).png"
+                    src="/icon-192x192.png"
                     alt="BooksCircle"
                     width={60}
                     height={60}
-                    unoptimized
+                    referrerPolicy="no-referrer"
                     className="object-contain rounded-xl"
                     priority
                   />
@@ -200,58 +188,64 @@ export const InstallSuccessModal: React.FC<InstallSuccessModalProps> = ({
 
               <div className="space-y-1.5 px-1">
                 <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-800 text-[10px] font-bold">
-                  {platform === 'windows' || platform === 'mac' || platform === 'desktop' ? (
+                  {platform === 'windows' ||
+                  platform === 'mac' ||
+                  platform === 'linux' ||
+                  platform === 'chromeos' ||
+                  platform === 'desktop' ? (
                     <Monitor className="w-3 h-3 text-[#4029AB]" />
                   ) : (
                     <Smartphone className="w-3 h-3 text-[#4029AB]" />
                   )}
-                  <span>Installed on {deviceName}</span>
+                  <span>Verified on {deviceName}</span>
                 </div>
 
                 <h3
                   id="install-success-title"
                   className="text-lg sm:text-xl font-black text-gray-950 tracking-tight"
                 >
-                  App Installed Successfully
+                  Installation Verified
                 </h3>
 
                 <p className="text-xs sm:text-sm text-gray-600 font-medium leading-relaxed">
-                  BooksCircle has been added to your home screen and synced with the live catalog.
+                  BooksCircle is now available in your {deviceName}. You can open it directly anytime.
                 </p>
               </div>
 
               <div className="w-full grid grid-cols-2 gap-2 pt-0.5">
                 <div className="px-2.5 py-2 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center gap-1.5 text-[11px] font-bold text-gray-800">
                   <ShieldCheck className="w-3.5 h-3.5 text-[#4029AB] shrink-0" />
-                  <span>Cache Flushed</span>
+                  <span>Standalone Ready</span>
                 </div>
                 <div className="px-2.5 py-2 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center gap-1.5 text-[11px] font-bold text-gray-800">
                   <CheckCircle2 className="w-3.5 h-3.5 text-[#4029AB] shrink-0" />
-                  <span>Live DB Synced</span>
+                  <span>Offline Shell Cached</span>
                 </div>
               </div>
 
-              {/* Primary CTA: Launch App (Performs Full Cache Flush + Hard Reload) & Secondary: Close */}
+              {/* Primary CTA: Open App targeting manifest start_url (/?source=pwa) */}
               <div className="w-full space-y-2 pt-1">
-                <button
-                  type="button"
+                <a
                   id="install-success-launch-btn"
-                  disabled={isLaunching}
-                  onClick={handleLaunchApp}
-                  className="w-full py-3 px-4 rounded-2xl bg-[#4029AB] hover:bg-[#34208e] active:scale-[0.98] text-white text-xs sm:text-sm font-black shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-80"
+                  href="/?source=pwa"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleLaunchApp();
+                  }}
+                  className="w-full py-3 px-4 rounded-2xl bg-[#4029AB] hover:bg-[#34208e] active:scale-[0.98] text-white text-xs sm:text-sm font-black shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
                   {isLaunching ? (
                     <>
-                      <RefreshCw className="w-4 h-4 text-white animate-spin shrink-0" />
-                      <span>Syncing &amp; Launching App...</span>
+                      <Loader2 className="w-4 h-4 text-white animate-spin shrink-0" />
+                      <span>Opening App...</span>
                     </>
                   ) : (
                     <>
-                      <span>Launch App</span>
+                      <span>Open App</span>
                       <ExternalLink className="w-4 h-4 text-white shrink-0" />
                     </>
                   )}
-                </button>
+                </a>
 
                 <button
                   type="button"
@@ -260,7 +254,7 @@ export const InstallSuccessModal: React.FC<InstallSuccessModalProps> = ({
                   onClick={handleClose}
                   className="w-full py-2.5 px-4 rounded-2xl bg-gray-100 hover:bg-gray-200 active:scale-[0.98] text-gray-700 hover:text-gray-950 text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
                 >
-                  Close
+                  Done
                 </button>
               </div>
             </div>
