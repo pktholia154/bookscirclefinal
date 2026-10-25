@@ -35,7 +35,7 @@ export function PWARegister() {
         window.addEventListener('load', registerSW, { once: true });
       }
 
-      // Clean up outdated cache buckets while preserving current v15 static media & shell caches
+      // Clean up outdated cache buckets while preserving current v17 static media & shell caches
       if ('caches' in window) {
         caches
           .keys()
@@ -43,8 +43,8 @@ export function PWARegister() {
             for (const key of keys) {
               if (
                 key.startsWith('bookscircle') &&
-                key !== 'bookscircle-v15' &&
-                key !== 'bookscircle-shell-v15'
+                key !== 'bookscircle-v17' &&
+                key !== 'bookscircle-shell-v17'
               ) {
                 caches.delete(key).catch(() => {});
               }

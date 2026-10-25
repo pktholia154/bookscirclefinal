@@ -19,8 +19,8 @@ export const viewport: Viewport = {
   userScalable: false,
   viewportFit: 'cover',
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#4029AB' },
-    { media: '(prefers-color-scheme: dark)', color: '#4029AB' },
+    { media: '(prefers-color-scheme: light)', color: '#FFFFFF' },
+    { media: '(prefers-color-scheme: dark)', color: '#FFFFFF' },
   ],
 };
 
@@ -49,7 +49,7 @@ export const metadata: Metadata = {
   applicationName: 'BooksCircle',
   appleWebApp: {
     capable: true,
-    statusBarStyle: 'black-translucent',
+    statusBarStyle: 'default',
     title: 'BooksCircle',
   },
   icons: {
@@ -68,11 +68,11 @@ export const metadata: Metadata = {
   other: {
     'mobile-web-app-capable': 'yes',
     'apple-mobile-web-app-capable': 'yes',
-    'apple-mobile-web-app-status-bar-style': 'black-translucent',
+    'apple-mobile-web-app-status-bar-style': 'default',
     'apple-mobile-web-app-title': 'BooksCircle',
-    'theme-color': '#4029AB',
-    'msapplication-navbutton-color': '#4029AB',
-    'msapplication-TileColor': '#4029AB',
+    'theme-color': '#FFFFFF',
+    'msapplication-navbutton-color': '#FFFFFF',
+    'msapplication-TileColor': '#FFFFFF',
   },
   alternates: {
     canonical: SITE_URL,
@@ -130,13 +130,33 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{
             __html: `
 (function() {
+  var APP_BUILD_VERSION = '2026.10.25.v17';
+  try {
+    var lastBuild = localStorage.getItem('bookscircle_app_build');
+    if (lastBuild !== APP_BUILD_VERSION) {
+      localStorage.setItem('bookscircle_app_build', APP_BUILD_VERSION);
+      if ('caches' in window) {
+        caches.keys().then(function(keys) {
+          keys.forEach(function(k) { caches.delete(k); });
+        });
+      }
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(regs) {
+          regs.forEach(function(r) { r.unregister(); });
+        });
+      }
+    }
+  } catch (e) {}
+
   try {
     var legacyKeys = [
       'bookscircle_local_books',
       'bookscircle_local_categories',
       'bookscircle_live_books_cache',
       'bookscircle_live_categories_cache',
-      'bookscircle_sold_counts_cache'
+      'bookscircle_sold_counts_cache',
+      'bookscircle_live_books_v2',
+      'bookscircle_live_categories_v2'
     ];
     for (var i = 0; i < legacyKeys.length; i++) {
       localStorage.removeItem(legacyKeys[i]);
@@ -156,7 +176,15 @@ export default function RootLayout({
   });
 
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(function() {});
+    navigator.serviceWorker
+      .register('/sw.js', { scope: '/' })
+      .then(function(reg) {
+        reg.update().catch(function() {});
+        if (reg.waiting) {
+          reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+        }
+      })
+      .catch(function() {});
   }
 })();
             `,
@@ -181,7 +209,7 @@ export default function RootLayout({
         />
       </head>
       <body
-        className="bg-neutral-100/80 sm:bg-slate-100/70 text-gray-900 antialiased min-h-screen selection:bg-[#4029AB]/10 selection:text-[#4029AB] flex flex-col items-center justify-start"
+        className="bg-white text-gray-900 antialiased min-h-screen selection:bg-[#4029AB]/10 selection:text-[#4029AB] flex flex-col items-center justify-start"
         suppressHydrationWarning
       >
         {/* Standard Boxed Limits Container for PC/Desktop screens */}

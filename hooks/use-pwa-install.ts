@@ -55,7 +55,35 @@ export interface InstallEnvironment {
   isMacOSSafari: boolean;
   isAndroidFirefox: boolean;
   isIOSLegacyNonSafari: boolean;
+  isIOSChrome: boolean;
+  isIOSSafari: boolean;
   iosMajorVersion: number | null;
+}
+
+export async function forceHardFlushAndReloadApp(): Promise<void> {
+  if (typeof window === 'undefined') return;
+  try {
+    if ('caches' in window) {
+      const keys = await caches.keys();
+      await Promise.allSettled(keys.map((k) => caches.delete(k)));
+    }
+  } catch {}
+  try {
+    if ('serviceWorker' in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      await Promise.allSettled(registrations.map((r) => r.unregister()));
+    }
+  } catch {}
+  try {
+    sessionStorage.clear();
+    localStorage.removeItem('bookscircle_live_books_v3');
+    localStorage.removeItem('bookscircle_live_categories_v3');
+    localStorage.removeItem('bookscircle_sold_counts_v3');
+    localStorage.removeItem('bookscircle_app_banner_dismissed');
+    localStorage.removeItem('bookscircle_pwa_dismissed_until');
+    localStorage.setItem('bookscircle_app_build', '2026.10.25.v17');
+  } catch {}
+  window.location.replace(`${window.location.pathname}?_flush=${Date.now()}`);
 }
 
 declare global {
@@ -193,6 +221,8 @@ export function detectInstallEnvironment(): InstallEnvironment {
       isMacOSSafari: false,
       isAndroidFirefox: false,
       isIOSLegacyNonSafari: false,
+      isIOSChrome: false,
+      isIOSSafari: false,
       iosMajorVersion: null,
     };
   }
@@ -238,6 +268,7 @@ export function detectInstallEnvironment(): InstallEnvironment {
     platform === 'ios' && /crios|edgios|fxios|opios|brave/i.test(uaLower);
   const isIOSLegacyNonSafari =
     isIOSNonSafari && iosMajorVersion !== null && iosMajorVersion < 16;
+  const isIOSChrome = platform === 'ios' && /crios/i.test(uaLower);
 
   // 4. Detect Firefox (Android vs Desktop)
   const isFirefox = /firefox|fxios/i.test(uaLower) && !/seamonkey/i.test(uaLower);
@@ -249,13 +280,14 @@ export function detectInstallEnvironment(): InstallEnvironment {
       platform === 'desktop') &&
     isFirefox;
 
-  // 5. Detect macOS Safari (Sonoma+ supports File -> Add to Dock)
+  // 5. Detect macOS Safari (Sonoma+ supports File -> Add to Dock) & iOS Safari
   const isSafariEngine =
     /safari/i.test(uaLower) &&
     !/chrome|chromium|crios|edg|edgios|opr|opios|brave|fxios|firefox|samsungbrowser/i.test(
       uaLower
     );
   const isMacOSSafari = platform === 'mac' && isSafariEngine;
+  const isIOSSafari = platform === 'ios' && isSafariEngine;
 
   // 6. Friendly Browser Name
   let browserName = 'Browser';
@@ -264,7 +296,7 @@ export function detectInstallEnvironment(): InstallEnvironment {
   else if (/samsungbrowser/i.test(uaLower)) browserName = 'Samsung Internet';
   else if (/opr|opios/i.test(uaLower)) browserName = 'Opera';
   else if (/brave/i.test(uaLower)) browserName = 'Brave';
-  else if (/chrome|chromium|crios/i.test(uaLower)) browserName = 'Chrome';
+  else if (/chrome|chromium|crios/i.test(uaLower)) browserName = isIOSChrome ? 'Chrome on iOS' : 'Chrome';
   else if (isFirefox) browserName = 'Firefox';
   else if (isSafariEngine) browserName = 'Safari';
 
@@ -295,6 +327,8 @@ export function detectInstallEnvironment(): InstallEnvironment {
     isMacOSSafari,
     isAndroidFirefox,
     isIOSLegacyNonSafari,
+    isIOSChrome,
+    isIOSSafari,
     iosMajorVersion,
   };
 }
@@ -442,6 +476,8 @@ export function usePWAInstall() {
     isMacOSSafari: false,
     isAndroidFirefox: false,
     isIOSLegacyNonSafari: false,
+    isIOSChrome: false,
+    isIOSSafari: false,
     iosMajorVersion: null,
   }));
 
@@ -605,6 +641,19 @@ export function usePWAInstall() {
    */
   const promptInstall = useCallback(async () => {
     if (isStandalone || storeState.isInstalling) return;
+
+    // Proactive Cache Hygiene: prune any stale caches from previous versions before install flow
+    try {
+      if (typeof window !== 'undefined' && 'caches' in window) {
+        const keys = await caches.keys();
+        const staleKeys = keys.filter(
+          (k) => !k.includes('bookscircle-v17') && !k.includes('bookscircle-shell-v17')
+        );
+        if (staleKeys.length > 0) {
+          await Promise.allSettled(staleKeys.map((k) => caches.delete(k)));
+        }
+      }
+    } catch {}
 
     // If already detected as installed on device via getInstalledRelatedApps(), launch directly
     if (storeState.isInstalledOnDevice && !storeState.deferredPrompt) {
@@ -819,5 +868,6 @@ export function usePWAInstall() {
     openIOSPrompt,
     closeInstallSuccess,
     launchInstalledApp,
+    forceHardFlushAndReloadApp,
   };
 }

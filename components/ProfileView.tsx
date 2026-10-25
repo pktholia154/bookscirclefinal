@@ -26,6 +26,7 @@ import {
   removeFromWishlistAction,
   subscribeToWishlistChanges,
 } from '@/lib/services/wishlist';
+import { forceHardFlushAndReloadApp } from '@/hooks/use-pwa-install';
 
 interface ProfileViewProps {
   currentUser: UserProfile | null;
@@ -54,6 +55,13 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [wishlistIds, setWishlistIds] = useState<string[]>([]);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isFlushingCache, setIsFlushingCache] = useState(false);
+
+  const handleFlushCache = async () => {
+    if (isFlushingCache) return;
+    setIsFlushingCache(true);
+    await forceHardFlushAndReloadApp();
+  };
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -307,6 +315,32 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             <span>Email</span>
           </button>
         </div>
+      </section>
+
+      {/* 3. App Version & Cache Management */}
+      <section id="profile-cache-section" className="space-y-3 pb-6 border-b border-gray-100">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <RefreshCw className={`w-4 h-4 text-[#5e17eb] ${isFlushingCache ? 'animate-spin' : ''}`} />
+            <h3 className="text-sm font-bold text-gray-950">
+              App Version &amp; Cache
+            </h3>
+          </div>
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#5e17eb]/10 text-[#5e17eb]">
+            Build v17.0 Live
+          </span>
+        </div>
+        <p className="text-xs text-gray-500">
+          If your device or browser is displaying outdated pages, perform a clean flush to wipe cache storage and load the latest verified build.
+        </p>
+        <button
+          onClick={handleFlushCache}
+          disabled={isFlushingCache}
+          className="w-full py-2.5 px-3 rounded-xl border border-[#5e17eb]/30 bg-[#5e17eb]/5 hover:bg-[#5e17eb]/10 active:scale-[0.98] text-[#5e17eb] text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 text-[#5e17eb] ${isFlushingCache ? 'animate-spin' : ''}`} />
+          <span>{isFlushingCache ? 'Flushing cache & reloading app...' : 'Flush All Caches & Hard Reload'}</span>
+        </button>
       </section>
 
       {/* 3. My Saved Wishlist (Unboxed, Continuous Placement at the Bottom) */}

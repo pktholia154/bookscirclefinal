@@ -1,11 +1,12 @@
-// BooksCircle Universal Enterprise Service Worker (v15)
+// BooksCircle Universal Enterprise Service Worker (v17)
 // Implements:
-// 1. Offline Navigation App-Shell Fallback (Required for Chromium beforeinstallprompt & Airplane Mode launch)
-// 2. Stale-While-Revalidate for Identity & Icon Assets (Android WebAPK, iOS SpringBoard, Windows/macOS)
-// 3. Non-disruptive lifecycle & cache hygiene
+// 1. Automatic version invalidation & immediate cache flushing
+// 2. Offline Navigation App-Shell Fallback (Required for Chromium beforeinstallprompt & Airplane Mode launch)
+// 3. Stale-While-Revalidate for Identity & Icon Assets (Android WebAPK, iOS SpringBoard, Windows/macOS)
+// 4. Client message listeners for instant remote cache flush
 
-const CACHE_NAME = 'bookscircle-v15';
-const SHELL_CACHE_NAME = 'bookscircle-shell-v15';
+const CACHE_NAME = 'bookscircle-v17';
+const SHELL_CACHE_NAME = 'bookscircle-shell-v17';
 
 const IDENTITY_AND_SHELL_ASSETS = [
   '/',
@@ -39,7 +40,7 @@ const OFFLINE_FALLBACK_HTML = `<!DOCTYPE html>
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#4029AB" />
+  <meta name="theme-color" content="#FFFFFF" />
   <title>BooksCircle - Offline Library</title>
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
@@ -142,6 +143,19 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
+self.addEventListener('message', (event) => {
+  if (event.data === 'SKIP_WAITING' || event.data?.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+  if (event.data === 'FLUSH_ALL_CACHES' || event.data?.type === 'FLUSH_ALL_CACHES') {
+    caches.keys().then((keys) => {
+      keys.forEach((key) => {
+        caches.delete(key);
+      });
+    });
+  }
+});
+
 function isIdentityOrIconAsset(pathname) {
   return (
     pathname === '/manifest.webmanifest' ||
@@ -181,6 +195,31 @@ self.addEventListener('fetch', (event) => {
   // 1. Navigation requests: Network-First with Offline App-Shell Fallback
   // Required by Chromium for PWA installability qualification & Airplane Mode launches
   if (event.request.mode === 'navigate') {
+    const isForcedFlush =
+      parsedUrl.searchParams.has('_flush') ||
+      parsedUrl.searchParams.has('_v') ||
+      parsedUrl.searchParams.has('_sync');
+
+    if (isForcedFlush) {
+      event.respondWith(
+        fetch(event.request, { cache: 'reload' })
+          .then((networkResponse) => {
+            if (networkResponse && networkResponse.status === 200) {
+              const clone = networkResponse.clone();
+              caches.open(SHELL_CACHE_NAME).then((cache) => {
+                cache.put(event.request, clone);
+                if (parsedUrl.pathname === '/') {
+                  cache.put('/', networkResponse.clone());
+                }
+              });
+            }
+            return networkResponse;
+          })
+          .catch(() => caches.match(event.request))
+      );
+      return;
+    }
+
     event.respondWith(
       fetch(event.request)
         .then((networkResponse) => {

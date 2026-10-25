@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import {
   Download,
   Star,
@@ -200,14 +201,14 @@ export const InstallAppBanner: React.FC<InstallAppBannerProps> = ({
               </div>
             ) : isInstalledOnDevice ? (
               <>
-                <a
+                <Link
                   id="home-open-installed-app-link"
                   href="/?source=pwa"
                   className="px-3.5 py-2 sm:px-4 sm:py-2 rounded-lg sm:rounded-xl bg-[#4029AB] hover:bg-[#34208e] text-white text-xs sm:text-sm font-bold shadow-xs active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap min-h-[36px]"
                 >
                   <span>Already Installed — Open App</span>
                   <ExternalLink className="w-3.5 h-3.5 text-white shrink-0" />
-                </a>
+                </Link>
                 <button
                   type="button"
                   id="home-install-app-dismiss-btn"

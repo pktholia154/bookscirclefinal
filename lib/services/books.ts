@@ -75,7 +75,7 @@ export async function flushAllAppCachesAndStorage(): Promise<void> {
         const keys = await caches.keys();
         await Promise.allSettled(
           keys
-            .filter((k) => k !== 'bookscircle-v15' && k !== 'bookscircle-shell-v15')
+            .filter((k) => k !== 'bookscircle-v17' && k !== 'bookscircle-shell-v17')
             .map((k) => caches.delete(k))
         );
       }

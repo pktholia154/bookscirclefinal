@@ -2,6 +2,7 @@
 
 import React, { useEffect } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import {
   X,
   CheckCircle2,
@@ -225,7 +226,7 @@ export const InstallSuccessModal: React.FC<InstallSuccessModalProps> = ({
 
               {/* Primary CTA: Open App targeting manifest start_url (/?source=pwa) */}
               <div className="w-full space-y-2 pt-1">
-                <a
+                <Link
                   id="install-success-launch-btn"
                   href="/?source=pwa"
                   onClick={(e) => {
@@ -245,7 +246,7 @@ export const InstallSuccessModal: React.FC<InstallSuccessModalProps> = ({
                       <ExternalLink className="w-4 h-4 text-white shrink-0" />
                     </>
                   )}
-                </a>
+                </Link>
 
                 <button
                   type="button"
