@@ -65,8 +65,14 @@ import {
   toggleWishlistAction,
   subscribeToWishlistChanges,
 } from '@/lib/services/wishlist';
-import { auth, signOutUser, signInWithGoogle } from '@/lib/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
+import {
+  auth,
+  signOutUser,
+  signInWithGoogle,
+  getCachedAuthUserSync,
+  subscribeToUnifiedAuthState,
+  persistAndBroadcastAuthUser,
+} from '@/lib/firebase';
 import { usePWAInstall } from '@/hooks/use-pwa-install';
 import { triggerNativeLoading } from '@/components/NativePageLoadingIndicator';
 import {
@@ -232,11 +238,9 @@ export default function HomePage({
       } catch {}
 
       try {
-        const savedUser =
-          localStorage.getItem('bookscircle_auth_user') ||
-          localStorage.getItem('bookscircle_user_session');
-        if (savedUser) {
-          setCurrentUser(JSON.parse(savedUser));
+        const cachedUser = getCachedAuthUserSync();
+        if (cachedUser) {
+          setCurrentUser(cachedUser);
         }
       } catch {}
 
@@ -450,17 +454,10 @@ export default function HomePage({
     [showToast]
   );
 
-  // Listen to Firebase Auth state for real Google Sign-In & cloud purchase sync (Mounted ONCE)
+  // Listen to unified Auth state for real Google Sign-In & cloud purchase sync across Web & Installed PWA (Mounted ONCE)
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user && !user.isAnonymous) {
-        const profile: UserProfile = {
-          uid: user.uid,
-          email: user.email,
-          displayName: user.displayName || user.email?.split('@')[0] || 'Google User',
-          photoURL: user.photoURL,
-        };
-
+    const unsubscribe = subscribeToUnifiedAuthState((profile) => {
+      if (profile && profile.uid) {
         // Guard against state reference churn
         setCurrentUser((prev) => {
           if (
@@ -475,24 +472,8 @@ export default function HomePage({
           return profile;
         });
 
-        if (typeof window !== 'undefined') {
-          try {
-            localStorage.setItem('bookscircle_auth_user', JSON.stringify(profile));
-            localStorage.removeItem('bookscircle_user_session');
-          } catch {}
-        }
-
-        // Non-blocking background sync of user profile document to Firestore /users/{uid}
-        syncUserProfileToFirestore({
-          uid: user.uid,
-          email: user.email,
-          displayName: user.displayName,
-          photoURL: user.photoURL,
-          providerId: user.providerData?.[0]?.providerId || 'google.com',
-        }).catch((err) => console.warn('User profile sync on auth state change note:', err));
-
         // Non-blocking sync of cloud purchases
-        syncUserPurchases(user.uid, user.email || undefined)
+        syncUserPurchases(profile.uid, profile.email || undefined)
           .then((syncedIds) => {
             if (syncedIds && syncedIds.length > 0) {
               setPurchasedBookIds((prev) => {
@@ -703,12 +684,7 @@ export default function HomePage({
       return profile;
     });
 
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem('bookscircle_auth_user', JSON.stringify(profile));
-        localStorage.setItem('bookscircle_user_session', JSON.stringify(profile));
-      } catch {}
-    }
+    persistAndBroadcastAuthUser(profile, 'local');
     showToast(`Signed in as ${profile.displayName || profile.email}`, 3000);
 
     // Non-blocking user profile document sync
@@ -753,13 +729,9 @@ export default function HomePage({
     } catch (e) {
       console.warn('Firebase signout note:', (e as any)?.message || String(e));
     }
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.removeItem('bookscircle_auth_user');
-        localStorage.removeItem('bookscircle_user_session');
-      } catch {}
-    }
     setCurrentUser(null);
+    setPurchasedBookIds([FREE_SAMPLE_BOOK_ID]);
+    savePurchasedBookIds([FREE_SAMPLE_BOOK_ID]).catch(() => {});
     showToast('Signed out successfully.', 2500);
   };
 

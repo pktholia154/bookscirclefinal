@@ -64,8 +64,13 @@ import { getWishlistIdsFromLocal, toggleWishlistAction, subscribeToWishlistChang
 import { subscribeToFirestoreBook } from '@/lib/services/books';
 import { getCachedCartTierDiscountSync } from '@/lib/services/discounts';
 import { calculateCartSummary } from '@/lib/services/cart';
-import { auth, signInWithGoogle } from '@/lib/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
+import {
+  auth,
+  signInWithGoogle,
+  getCachedAuthUserSync,
+  subscribeToUnifiedAuthState,
+  persistAndBroadcastAuthUser,
+} from '@/lib/firebase';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
@@ -204,8 +209,8 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
   useEffect(() => {
     const timer = setTimeout(() => {
       try {
-        const savedUser = localStorage.getItem('bookscircle_auth_user');
-        if (savedUser) setCurrentUser(JSON.parse(savedUser));
+        const cachedUser = getCachedAuthUserSync();
+        if (cachedUser) setCurrentUser(cachedUser);
       } catch {}
 
       try {
@@ -234,17 +239,11 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
       setIsWishlisted(wishlistIds.includes(book.id));
     });
 
-    const unsub = onAuthStateChanged(auth, async (user) => {
-      if (user && !user.isAnonymous) {
-        const profile: UserProfile = {
-          uid: user.uid,
-          email: user.email,
-          displayName: user.displayName || user.email?.split('@')[0] || 'Google User',
-          photoURL: user.photoURL,
-        };
-        setCurrentUser(profile);
+    const unsub = subscribeToUnifiedAuthState(async (profile) => {
+      setCurrentUser(profile);
+      if (profile?.uid) {
         try {
-          const synced = await syncUserPurchases(user.uid, user.email || undefined);
+          const synced = await syncUserPurchases(profile.uid, profile.email || undefined);
           setPurchasedBookIds(synced);
         } catch {}
       }
@@ -387,16 +386,14 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
       showToast('Initiating Google sign in...', 2500);
       const res = await signInWithGoogle();
       if (res.user) {
-        const profile: UserProfile = {
+        const profile: UserProfile = res.profile || {
           uid: res.user.uid,
           email: res.user.email,
           displayName: res.user.displayName || (res.user.email ? res.user.email.split('@')[0] : 'Google User'),
           photoURL: res.user.photoURL,
         };
         setCurrentUser(profile);
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('bookscircle_user_session', JSON.stringify(profile));
-        }
+        persistAndBroadcastAuthUser(profile, 'local');
         showToast(`Signed in as ${profile.displayName || profile.email}`, 3000);
         syncUserProfileToFirestore({
           uid: profile.uid,
@@ -713,8 +710,19 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
           </div>
         </section>
 
-        {/* App Install Banner for Android & Windows */}
-        <div className="pt-2">
+        {/* Animated Green Notice + App Install Banner */}
+        <div className="pt-0.5 space-y-1.5">
+          <motion.p
+            id="book-ssr-my-books-notice"
+            onClick={() => handleTabChange('purchased')}
+            initial={{ opacity: 0.75 }}
+            animate={{ opacity: [0.65, 1, 0.65], y: [0, -1.5, 0] }}
+            transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
+            className="text-xs sm:text-[13px] font-semibold text-emerald-600 leading-snug cursor-pointer select-none"
+          >
+            Read/Access your purchased books in the &quot;My Books&quot; menu.
+          </motion.p>
+
           <InstallAppBanner
             onInstall={promptInstall}
             isInstallable={isInstallable}
@@ -907,6 +915,9 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
         onRemoveItem={(id) => setCart((prev) => prev.filter((i) => i.book.id !== id))}
         onClearCart={() => setCart([])}
         currentUser={currentUser}
+        onRequireLogin={(cb) => triggerDirectGoogleSignIn(cb)}
+        userEmail={currentUser?.email || undefined}
+        userName={currentUser?.displayName || undefined}
         onSuccessfulCheckout={(items, paymentData) => {
           executePurchaseQuickJump({
             itemsToBuy: items,

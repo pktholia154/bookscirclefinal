@@ -14,8 +14,11 @@ import { getBooksFromFirestore, getCategoriesFromFirestore } from '@/lib/service
 import { getPurchasedBookIdsFromLocal, savePurchasedBookIds } from '@/lib/offline-storage';
 import { recordUserPurchaseInFirestore, syncUserPurchases } from '@/lib/services/purchases';
 import { processRazorpayPayment } from '@/lib/services/razorpay';
-import { auth, signOutUser } from '@/lib/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
+import {
+  getCachedAuthUserSync,
+  persistAndBroadcastAuthUser,
+  subscribeToUnifiedAuthState,
+} from '@/lib/firebase';
 import {
   executePurchaseQuickJump,
   subscribeToPurchasesUpdated,
@@ -67,10 +70,8 @@ function SearchPageContent({
       } catch {}
 
       try {
-        const savedUser =
-          localStorage.getItem('bookscircle_auth_user') ||
-          localStorage.getItem('bookscircle_user_session');
-        if (savedUser) setCurrentUser(JSON.parse(savedUser));
+        const cachedUser = getCachedAuthUserSync();
+        if (cachedUser) setCurrentUser(cachedUser);
       } catch {}
     }, 0);
 
@@ -82,10 +83,21 @@ function SearchPageContent({
       setPurchasedBookIds((prev) => Array.from(new Set([...prev, ...newIds])));
     });
 
+    const handlePurchasesUpdatedEvent = (e: Event) => {
+      const customEvent = e as CustomEvent<string[]>;
+      if (Array.isArray(customEvent.detail)) {
+        setPurchasedBookIds((prev) => Array.from(new Set([...prev, ...customEvent.detail])));
+      } else {
+        setPurchasedBookIds(getPurchasedBookIdsFromLocal());
+      }
+    };
+    window.addEventListener('bookscircle:purchases-updated', handlePurchasesUpdatedEvent);
+
     return () => {
       clearTimeout(timer);
       unsubCart();
       unsubPurchases();
+      window.removeEventListener('bookscircle:purchases-updated', handlePurchasesUpdatedEvent);
     };
   }, [router]);
 
@@ -112,21 +124,17 @@ function SearchPageContent({
     } catch {}
   }, [cart]);
 
-  // Auth sync
+  // Unified Auth sync across Web & Installed PWA
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (user) => {
-      if (user && !user.isAnonymous) {
-        const profile: UserProfile = {
-          uid: user.uid,
-          email: user.email,
-          displayName: user.displayName || 'Google User',
-          photoURL: user.photoURL,
-        };
+    const unsub = subscribeToUnifiedAuthState(async (profile) => {
+      if (profile && profile.uid) {
         setCurrentUser(profile);
         try {
-          const synced = await syncUserPurchases(user.uid, user.email || undefined);
+          const synced = await syncUserPurchases(profile.uid, profile.email || undefined);
           setPurchasedBookIds(synced);
         } catch {}
+      } else {
+        setCurrentUser(null);
       }
     });
     return () => unsub();
@@ -260,6 +268,10 @@ function SearchPageContent({
         onRemoveItem={(id) => setCart((prev) => prev.filter((i) => i.book.id !== id))}
         onClearCart={() => setCart([])}
         currentUser={currentUser}
+        onRequireLogin={(onLoginCompleted) => {
+          setPendingActionAfterLogin(() => onLoginCompleted);
+          setIsGoogleModalOpen(true);
+        }}
         onSuccessfulCheckout={(items, paymentData) => {
           executePurchaseQuickJump({
             itemsToBuy: items,
@@ -281,10 +293,11 @@ function SearchPageContent({
         }}
         onSelectUser={(profile) => {
           setCurrentUser(profile);
+          persistAndBroadcastAuthUser(profile);
           if (pendingActionAfterLogin) {
             const act = pendingActionAfterLogin;
             setPendingActionAfterLogin(null);
-            setTimeout(() => act(profile), 300);
+            setTimeout(() => act(profile), 200);
           }
         }}
       />

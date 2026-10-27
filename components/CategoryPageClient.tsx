@@ -52,8 +52,13 @@ import {
   recordUserPurchaseInFirestore,
   syncUserPurchases,
 } from '@/lib/services/purchases';
-import { auth, signInWithGoogle } from '@/lib/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
+import {
+  signInWithGoogle,
+  getCachedAuthUserSync,
+  persistAndBroadcastAuthUser,
+  subscribeToUnifiedAuthState,
+} from '@/lib/firebase';
+import { syncUserProfileToFirestore } from '@/lib/services/users';
 import {
   executePurchaseQuickJump,
   subscribeToPurchasesUpdated,
@@ -109,32 +114,36 @@ export const CategoryPageClient: React.FC<CategoryPageClientProps> = ({
       setWishlistIds(getWishlistIdsFromLocal());
       setCart(getCartFromLocal());
       setPurchasedBookIds(getPurchasedBookIdsFromLocal());
-      const savedUser =
-        localStorage.getItem('bookscircle_auth_user') ||
-        localStorage.getItem('bookscircle_user_session');
-      if (savedUser) {
-        setCurrentUser(JSON.parse(savedUser));
+      const cachedUser = getCachedAuthUserSync();
+      if (cachedUser) {
+        setCurrentUser(cachedUser);
       }
     } catch {}
 
     const unsubWishlist = subscribeToWishlistChanges((ids) => setWishlistIds(ids));
     const unsubCart = subscribeToCartChanges((items) => setCart(items));
 
-    const unsubAuth = onAuthStateChanged(auth, async (user) => {
-      if (user && !user.isAnonymous) {
-        const profile: UserProfile = {
-          uid: user.uid,
-          email: user.email,
-          displayName: user.displayName || user.email?.split('@')[0] || 'User',
-          photoURL: user.photoURL,
-        };
+    const unsubAuth = subscribeToUnifiedAuthState(async (profile) => {
+      if (profile && profile.uid) {
         setCurrentUser(profile);
         try {
-          const synced = await syncUserPurchases(user.uid, user.email || undefined);
+          const synced = await syncUserPurchases(profile.uid, profile.email || undefined);
           setPurchasedBookIds(synced);
         } catch {}
+      } else {
+        setCurrentUser(null);
       }
     });
+
+    const handlePurchasesUpdatedEvent = (e: Event) => {
+      const customEvent = e as CustomEvent<string[]>;
+      if (Array.isArray(customEvent.detail)) {
+        setPurchasedBookIds((prev) => Array.from(new Set([...prev, ...customEvent.detail])));
+      } else {
+        setPurchasedBookIds(getPurchasedBookIdsFromLocal());
+      }
+    };
+    window.addEventListener('bookscircle:purchases-updated', handlePurchasesUpdatedEvent);
 
     const unsubPurchases = subscribeToPurchasesUpdated((newIds) => {
       setPurchasedBookIds((prev) => Array.from(new Set([...prev, ...newIds])));
@@ -145,6 +154,7 @@ export const CategoryPageClient: React.FC<CategoryPageClientProps> = ({
       unsubCart();
       unsubAuth();
       unsubPurchases();
+      window.removeEventListener('bookscircle:purchases-updated', handlePurchasesUpdatedEvent);
     };
   }, [router]);
 
@@ -616,6 +626,30 @@ export const CategoryPageClient: React.FC<CategoryPageClientProps> = ({
         currentUser={currentUser}
         userEmail={currentUser?.email || undefined}
         userName={currentUser?.displayName || undefined}
+        onRequireLogin={async (onLoginCompleted) => {
+          try {
+            const res = await signInWithGoogle();
+            if (res.user) {
+              const profile: UserProfile = {
+                uid: res.user.uid,
+                email: res.user.email,
+                displayName: res.user.displayName || 'Google User',
+                photoURL: res.user.photoURL,
+              };
+              setCurrentUser(profile);
+              persistAndBroadcastAuthUser(profile);
+              syncUserProfileToFirestore({
+                uid: res.user.uid,
+                email: res.user.email,
+                displayName: res.user.displayName,
+                photoURL: res.user.photoURL,
+                providerId: 'google.com',
+              }).catch(() => {});
+              showToast(`Welcome, ${profile.displayName?.split(' ')[0]}!`);
+              onLoginCompleted(profile);
+            }
+          } catch {}
+        }}
         onSuccessfulCheckout={(purchasedItems, paymentData) => {
           executePurchaseQuickJump({
             itemsToBuy: purchasedItems,

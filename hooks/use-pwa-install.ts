@@ -869,7 +869,10 @@ export function usePWAInstall() {
       if (typeof window !== 'undefined' && 'caches' in window) {
         const keys = await caches.keys();
         const staleKeys = keys.filter(
-          (k) => !k.includes('bookscircle-v18') && !k.includes('bookscircle-shell-v18')
+          (k) =>
+            !k.includes('bookscircle-v18') &&
+            !k.includes('bookscircle-shell-v18') &&
+            !k.includes('bookscircle-auth-sync-v1')
         );
         if (staleKeys.length > 0) {
           await Promise.allSettled(staleKeys.map((k) => caches.delete(k)));
@@ -1034,7 +1037,16 @@ export function usePWAInstall() {
       await flushAllAppCachesAndStorage();
     } catch {}
     if (typeof window !== 'undefined') {
-      const targetUrl = `${window.location.origin}/?source=pwa`;
+      let authQuery = '';
+      try {
+        const rawUser =
+          localStorage.getItem('bookscircle_auth_user') ||
+          localStorage.getItem('bookscircle_user_session');
+        if (rawUser) {
+          authQuery = `&_auth=${encodeURIComponent(btoa(unescape(encodeURIComponent(rawUser))))}`;
+        }
+      } catch {}
+      const targetUrl = `${window.location.origin}/?source=pwa${authQuery}`;
       window.location.assign(targetUrl);
     }
   }, []);

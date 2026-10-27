@@ -112,20 +112,20 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         </span>
       </button>
 
-      {/* 4. Purchased Tab - Highlighted with #5e17eb on Book details page & purchased tab to catch visitor attention */}
+      {/* 4. My Books Tab - Highlighted in green on Book details page & My Books tab to catch visitor attention */}
       <button
         id="nav-tab-purchased"
         onClick={() => onTabChange('purchased')}
         className={`flex-1 py-1 relative flex flex-col items-center justify-center gap-1 transition-all active:scale-95 cursor-pointer ${
           activeTab === 'purchased' || activeTab === 'book'
-            ? 'text-[#5e17eb]'
+            ? 'text-emerald-600'
             : 'text-gray-600 hover:text-gray-900'
         }`}
       >
         <div
           className={`w-9.5 h-9.5 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl border-2 relative flex items-center justify-center transition-all ${
             activeTab === 'purchased' || activeTab === 'book'
-              ? 'border-[#5e17eb] bg-[#5e17eb]/15 text-[#5e17eb] shadow-xs ring-2 ring-[#5e17eb]/25'
+              ? 'border-emerald-600 bg-emerald-600/15 text-emerald-600 shadow-xs ring-2 ring-emerald-600/25'
               : 'border-gray-300 bg-white text-gray-700 hover:border-gray-500'
           }`}
         >
@@ -137,11 +137,11 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         <span
           className={`text-xs tracking-tight ${
             activeTab === 'purchased' || activeTab === 'book'
-              ? 'text-[#5e17eb] font-black'
+              ? 'text-emerald-600 font-black'
               : 'text-gray-600 font-bold'
           }`}
         >
-          Purchased
+          My Books
         </span>
       </button>
 

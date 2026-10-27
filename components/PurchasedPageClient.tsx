@@ -15,8 +15,13 @@ import { getPurchasedBookIdsFromLocal, savePurchasedBookIds } from '@/lib/offlin
 import { syncUserPurchases, subscribeToUserPurchases } from '@/lib/services/purchases';
 import { syncUserProfileToFirestore } from '@/lib/services/users';
 import { getCartFromLocal, subscribeToCartChanges, clearCartAction } from '@/lib/services/cart';
-import { auth, signInWithGoogle } from '@/lib/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
+import {
+  auth,
+  signInWithGoogle,
+  getCachedAuthUserSync,
+  subscribeToUnifiedAuthState,
+  persistAndBroadcastAuthUser,
+} from '@/lib/firebase';
 import { usePWAInstall } from '@/hooks/use-pwa-install';
 import { triggerNativeLoading } from '@/components/NativePageLoadingIndicator';
 import {
@@ -88,10 +93,8 @@ export const PurchasedPageClient: React.FC<PurchasedPageClientProps> = ({
     } catch {}
 
     try {
-      const saved =
-        localStorage.getItem('bookscircle_auth_user') ||
-        localStorage.getItem('bookscircle_user_session');
-      if (saved) setCurrentUser(JSON.parse(saved));
+      const cachedUser = getCachedAuthUserSync();
+      if (cachedUser) setCurrentUser(cachedUser);
     } catch {}
 
     try {
@@ -113,17 +116,11 @@ export const PurchasedPageClient: React.FC<PurchasedPageClientProps> = ({
       }
     });
 
-    const unsubAuth = onAuthStateChanged(auth, async (user) => {
-      if (user && !user.isAnonymous) {
-        const profile: UserProfile = {
-          uid: user.uid,
-          email: user.email,
-          displayName: user.displayName || user.email?.split('@')[0] || 'Google User',
-          photoURL: user.photoURL,
-        };
-        setCurrentUser(profile);
+    const unsubAuth = subscribeToUnifiedAuthState(async (profile) => {
+      setCurrentUser(profile);
+      if (profile?.uid) {
         try {
-          const synced = await syncUserPurchases(user.uid, user.email || undefined);
+          const synced = await syncUserPurchases(profile.uid, profile.email || undefined);
           if (synced && synced.length > 0) {
             setPurchasedBookIds((prev) => Array.from(new Set([...prev, ...synced, FREE_SAMPLE_BOOK_ID])));
           }
@@ -166,21 +163,19 @@ export const PurchasedPageClient: React.FC<PurchasedPageClientProps> = ({
     } catch {}
   };
 
-  const handleOpenLogin = async () => {
+  const handleOpenLogin = async (callback?: (user: UserProfile) => void) => {
     try {
       showToast('Initiating Google sign in...', 2500);
       const res = await signInWithGoogle();
       if (res.user) {
-        const profile: UserProfile = {
+        const profile: UserProfile = res.profile || {
           uid: res.user.uid,
           email: res.user.email,
           displayName: res.user.displayName || (res.user.email ? res.user.email.split('@')[0] : 'Google User'),
           photoURL: res.user.photoURL,
         };
         setCurrentUser(profile);
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('bookscircle_user_session', JSON.stringify(profile));
-        }
+        persistAndBroadcastAuthUser(profile, 'local');
         showToast(`Signed in as ${profile.displayName || profile.email}`, 3000);
         syncUserProfileToFirestore({
           uid: profile.uid,
@@ -190,6 +185,7 @@ export const PurchasedPageClient: React.FC<PurchasedPageClientProps> = ({
           providerId: 'google.com',
         }).catch(() => {});
         handleSyncPurchases();
+        if (callback) callback(profile);
       }
     } catch (err: any) {
       if (!err?.message?.includes('popup-closed-by-user')) {
@@ -278,6 +274,7 @@ export const PurchasedPageClient: React.FC<PurchasedPageClientProps> = ({
           });
         }}
         currentUser={currentUser}
+        onRequireLogin={(cb) => handleOpenLogin(cb)}
         userEmail={currentUser?.email || undefined}
         userName={currentUser?.displayName || undefined}
       />

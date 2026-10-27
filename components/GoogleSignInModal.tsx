@@ -4,8 +4,9 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, ShieldCheck, RefreshCw, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { UserProfile } from '@/components/Header';
-import { signInWithGoogle } from '@/lib/firebase';
+import { signInWithGoogle, persistAndBroadcastAuthUser } from '@/lib/firebase';
 import { syncUserProfileToFirestore } from '@/lib/services/users';
+import { syncUserPurchases } from '@/lib/services/purchases';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -61,6 +62,7 @@ export const GoogleSignInModal: React.FC<LoginModalProps> = ({
           displayName: res.user.displayName || 'Google User',
           photoURL: res.user.photoURL,
         };
+        persistAndBroadcastAuthUser(profile);
         syncUserProfileToFirestore({
           uid: res.user.uid,
           email: res.user.email,
@@ -68,6 +70,7 @@ export const GoogleSignInModal: React.FC<LoginModalProps> = ({
           photoURL: res.user.photoURL,
           providerId: 'google.com',
         }).catch((err) => console.warn('Modal user sync note:', err));
+        syncUserPurchases(res.user.uid, res.user.email || undefined).catch(() => {});
         onSelectUser(profile);
         onClose();
       } else if (res.cancelled) {

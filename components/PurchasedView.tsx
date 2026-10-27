@@ -475,7 +475,7 @@ export const PurchasedView: React.FC<PurchasedViewProps> = ({
             <div className="flex items-center gap-1.5 flex-wrap">
               <button
                 onClick={() => setFilterMode('all')}
-                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                className={`px-3 py-1 rounded-md text-[13px] font-bold transition-all cursor-pointer ${
                   filterMode === 'all'
                     ? 'bg-[#1c0ca3] text-white shadow-2xs'
                     : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
@@ -485,13 +485,13 @@ export const PurchasedView: React.FC<PurchasedViewProps> = ({
               </button>
               <button
                 onClick={() => setFilterMode('offline_only')}
-                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                className={`px-3 py-1 rounded-md text-[13px] font-bold transition-all cursor-pointer flex items-center gap-1 ${
                   filterMode === 'offline_only'
                     ? 'bg-emerald-600 text-white shadow-2xs'
                     : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
                 }`}
               >
-                <WifiOff className="w-3 h-3" />
+                <WifiOff className="w-3.5 h-3.5" />
                 <span>Downloaded ({storageStats.count})</span>
               </button>
             </div>
@@ -527,7 +527,7 @@ export const PurchasedView: React.FC<PurchasedViewProps> = ({
               </div>
               <button
                 onClick={() => setFilterMode('all')}
-                className="px-4 py-2 bg-[#1c0ca3] text-white rounded-xl text-xs font-bold hover:bg-[#150980] cursor-pointer inline-flex items-center gap-1.5 active:scale-95 transition-all shadow-2xs"
+                className="px-4 py-2 bg-[#1c0ca3] text-white rounded-md text-[13px] font-bold hover:bg-[#150980] cursor-pointer inline-flex items-center gap-1.5 active:scale-95 transition-all shadow-2xs"
               >
                 <span>View All Library Books</span>
               </button>
@@ -547,7 +547,7 @@ export const PurchasedView: React.FC<PurchasedViewProps> = ({
                 <button
                   id="empty-library-browse-btn"
                   onClick={onNavigateHome}
-                  className="px-5 py-2.5 bg-[#1c0ca3] text-white rounded-xl text-xs font-bold shadow-xs hover:bg-[#150980] cursor-pointer inline-flex items-center gap-1.5 active:scale-95 transition-all"
+                  className="px-5 py-2.5 bg-[#1c0ca3] text-white rounded-md text-[13px] font-bold shadow-xs hover:bg-[#150980] cursor-pointer inline-flex items-center gap-1.5 active:scale-95 transition-all"
                 >
                   <ShoppingBag className="w-3.5 h-3.5" />
                   <span>Explore E-Books</span>
@@ -670,7 +670,7 @@ export const PurchasedView: React.FC<PurchasedViewProps> = ({
                             e.stopPropagation();
                             handleResumeBook(book, readingProgressMap[book.id]);
                           }}
-                          className="text-[11px] font-bold text-[#1c0ca3] hover:text-[#150980] active:scale-95 inline-flex items-center gap-1 transition-all cursor-pointer py-0.5 px-2 rounded-md hover:bg-[#1c0ca3]/10 shrink-0"
+                          className="text-[12px] font-bold text-[#1c0ca3] hover:text-[#150980] active:scale-95 inline-flex items-center gap-1 transition-all cursor-pointer py-0.5 px-2 rounded-md hover:bg-[#1c0ca3]/10 shrink-0"
                           title="Resume reading where you left off"
                         >
                           <Play className="w-2.5 h-2.5 fill-current" />
@@ -711,7 +711,7 @@ export const PurchasedView: React.FC<PurchasedViewProps> = ({
                         <button
                           id={`btn-read-pdf-${book.id}`}
                           onClick={() => setActiveReader({ book, mode: 'full' })}
-                          className="rounded-full border-2 border-[#1c0ca3] text-[#1c0ca3] bg-white hover:bg-[#1c0ca3]/5 active:scale-95 transition-all text-[11px] sm:text-xs font-bold px-2.5 sm:px-4 py-1 sm:py-1.5 inline-flex items-center justify-center gap-1 cursor-pointer shadow-2xs select-none shrink-0 whitespace-nowrap"
+                          className="rounded-md border-2 border-[#1c0ca3] text-[#1c0ca3] bg-white hover:bg-[#1c0ca3]/5 active:scale-95 transition-all text-[12px] sm:text-[13px] font-bold px-2.5 sm:px-4 py-1 sm:py-1.5 inline-flex items-center justify-center gap-1 cursor-pointer shadow-2xs select-none shrink-0 whitespace-nowrap"
                           title="Read PDF online"
                         >
                           <Wifi className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#1c0ca3]" />
@@ -724,7 +724,7 @@ export const PurchasedView: React.FC<PurchasedViewProps> = ({
                             <button
                               id={`btn-read-pdf-offline-${book.id}`}
                               onClick={() => setActiveReader({ book, mode: 'offline' })}
-                              className="rounded-full bg-emerald-600 hover:bg-emerald-700 text-white active:scale-95 transition-all text-[11px] sm:text-xs font-bold px-2.5 sm:px-4 py-1 sm:py-1.5 inline-flex items-center justify-center gap-1 cursor-pointer shadow-2xs select-none shrink-0 whitespace-nowrap"
+                              className="rounded-md bg-emerald-600 hover:bg-emerald-700 text-white active:scale-95 transition-all text-[12px] sm:text-[13px] font-bold px-2.5 sm:px-4 py-1 sm:py-1.5 inline-flex items-center justify-center gap-1 cursor-pointer shadow-2xs select-none shrink-0 whitespace-nowrap"
                               title="Read saved offline PDF"
                             >
                               <WifiOff className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
@@ -733,7 +733,7 @@ export const PurchasedView: React.FC<PurchasedViewProps> = ({
                             {/* Prominent, accessible Delete button */}
                             <button
                               onClick={(e) => handleDeletePdfOffline(book.id, book.title, e)}
-                              className="p-1 sm:p-1.5 rounded-full text-red-600 bg-red-50 hover:bg-red-100 border border-red-200/80 transition-colors cursor-pointer shrink-0 shadow-2xs"
+                              className="p-1 sm:p-1.5 rounded-md text-red-600 bg-red-50 hover:bg-red-100 border border-red-200/80 transition-colors cursor-pointer shrink-0 shadow-2xs"
                               title="Delete offline PDF"
                               aria-label="Delete offline PDF"
                             >
@@ -745,7 +745,7 @@ export const PurchasedView: React.FC<PurchasedViewProps> = ({
                             id={`btn-save-pdf-${book.id}`}
                             disabled={isPdfDownloading}
                             onClick={(e) => handleDownloadPdfOffline(book, e)}
-                            className={`rounded-full text-white active:scale-95 transition-all text-[11px] sm:text-xs font-bold px-2.5 sm:px-4 py-1 sm:py-1.5 inline-flex items-center justify-center gap-1 cursor-pointer shadow-2xs select-none shrink-0 whitespace-nowrap ${
+                            className={`rounded-md text-white active:scale-95 transition-all text-[12px] sm:text-[13px] font-bold px-2.5 sm:px-4 py-1 sm:py-1.5 inline-flex items-center justify-center gap-1 cursor-pointer shadow-2xs select-none shrink-0 whitespace-nowrap ${
                               isPdfDownloading
                                 ? 'bg-[#1c0ca3]/60 cursor-not-allowed'
                                 : 'bg-[#1c0ca3] hover:bg-[#150980]'
@@ -781,7 +781,7 @@ export const PurchasedView: React.FC<PurchasedViewProps> = ({
                         <button
                           id={`btn-read-epub-${book.id}`}
                           onClick={() => setActiveMdReader({ book })}
-                          className="rounded-full border-2 border-[#1c0ca3] text-[#1c0ca3] bg-white hover:bg-[#1c0ca3]/5 active:scale-95 transition-all text-[11px] sm:text-xs font-bold px-2.5 sm:px-4 py-1 sm:py-1.5 inline-flex items-center justify-center gap-1 cursor-pointer shadow-2xs select-none shrink-0 whitespace-nowrap"
+                          className="rounded-md border-2 border-[#1c0ca3] text-[#1c0ca3] bg-white hover:bg-[#1c0ca3]/5 active:scale-95 transition-all text-[12px] sm:text-[13px] font-bold px-2.5 sm:px-4 py-1 sm:py-1.5 inline-flex items-center justify-center gap-1 cursor-pointer shadow-2xs select-none shrink-0 whitespace-nowrap"
                           title="Read ePub online"
                         >
                           <Wifi className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#1c0ca3]" />
@@ -794,7 +794,7 @@ export const PurchasedView: React.FC<PurchasedViewProps> = ({
                             <button
                               id={`btn-read-epub-offline-${book.id}`}
                               onClick={() => setActiveMdReader({ book })}
-                              className="rounded-full bg-emerald-600 hover:bg-emerald-700 text-white active:scale-95 transition-all text-[11px] sm:text-xs font-bold px-2.5 sm:px-4 py-1 sm:py-1.5 inline-flex items-center justify-center gap-1 cursor-pointer shadow-2xs select-none shrink-0 whitespace-nowrap"
+                              className="rounded-md bg-emerald-600 hover:bg-emerald-700 text-white active:scale-95 transition-all text-[12px] sm:text-[13px] font-bold px-2.5 sm:px-4 py-1 sm:py-1.5 inline-flex items-center justify-center gap-1 cursor-pointer shadow-2xs select-none shrink-0 whitespace-nowrap"
                               title="Read saved offline ePub"
                             >
                               <WifiOff className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
@@ -803,7 +803,7 @@ export const PurchasedView: React.FC<PurchasedViewProps> = ({
                             {/* Prominent, accessible Delete button */}
                             <button
                               onClick={(e) => handleDeleteEpubOffline(book.id, book.title, e)}
-                              className="p-1 sm:p-1.5 rounded-full text-red-600 bg-red-50 hover:bg-red-100 border border-red-200/80 transition-colors cursor-pointer shrink-0 shadow-2xs"
+                              className="p-1 sm:p-1.5 rounded-md text-red-600 bg-red-50 hover:bg-red-100 border border-red-200/80 transition-colors cursor-pointer shrink-0 shadow-2xs"
                               title="Delete offline ePub"
                               aria-label="Delete offline ePub"
                             >
@@ -815,7 +815,7 @@ export const PurchasedView: React.FC<PurchasedViewProps> = ({
                             id={`btn-save-epub-${book.id}`}
                             disabled={isEpubDownloading}
                             onClick={(e) => handleDownloadEpubOffline(book, e)}
-                            className={`rounded-full text-white active:scale-95 transition-all text-[11px] sm:text-xs font-bold px-2.5 sm:px-4 py-1 sm:py-1.5 inline-flex items-center justify-center gap-1 cursor-pointer shadow-2xs select-none shrink-0 whitespace-nowrap ${
+                            className={`rounded-md text-white active:scale-95 transition-all text-[12px] sm:text-[13px] font-bold px-2.5 sm:px-4 py-1 sm:py-1.5 inline-flex items-center justify-center gap-1 cursor-pointer shadow-2xs select-none shrink-0 whitespace-nowrap ${
                               isEpubDownloading
                                 ? 'bg-[#1c0ca3]/60 cursor-not-allowed'
                                 : 'bg-[#1c0ca3] hover:bg-[#150980]'

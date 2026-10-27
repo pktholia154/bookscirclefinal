@@ -44,7 +44,8 @@ export function PWARegister() {
               if (
                 key.startsWith('bookscircle') &&
                 key !== 'bookscircle-v18' &&
-                key !== 'bookscircle-shell-v18'
+                key !== 'bookscircle-shell-v18' &&
+                key !== 'bookscircle-auth-sync-v1'
               ) {
                 caches.delete(key).catch(() => {});
               }
