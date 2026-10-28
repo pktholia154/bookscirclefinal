@@ -93,7 +93,7 @@ export const CategoryPageClient: React.FC<CategoryPageClientProps> = ({
   const [, startTransition] = useTransition();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<'popular' | 'price-asc' | 'price-desc' | 'rating'>('popular');
+  const [sortBy, setSortBy] = useState<'popular' | 'price-asc' | 'price-desc'>('popular');
   const [wishlistIds, setWishlistIds] = useState<string[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [purchasedBookIds, setPurchasedBookIds] = useState<string[]>([FREE_SAMPLE_BOOK_ID]);
@@ -254,7 +254,7 @@ export const CategoryPageClient: React.FC<CategoryPageClientProps> = ({
     setCurrentPage(1);
   };
 
-  const handleSortChange = (val: 'popular' | 'price-asc' | 'price-desc' | 'rating') => {
+  const handleSortChange = (val: 'popular' | 'price-asc' | 'price-desc') => {
     setSortBy(val);
     setCurrentPage(1);
   };
@@ -442,7 +442,6 @@ export const CategoryPageClient: React.FC<CategoryPageClientProps> = ({
                 className="bg-transparent text-xs font-bold text-gray-800 focus:outline-none cursor-pointer"
               >
                 <option value="popular">Most Popular</option>
-                <option value="rating">Top Rated</option>
                 <option value="price-asc">Price: Low to High</option>
                 <option value="price-desc">Price: High to Low</option>
               </select>

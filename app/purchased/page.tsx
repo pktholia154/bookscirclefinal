@@ -7,7 +7,7 @@ import { SITE_NAME, SITE_URL } from '@/lib/seo';
 export const revalidate = 300;
 
 export const metadata: Metadata = {
-  title: `My Library & Purchased E-Books | ${SITE_NAME}`,
+  title: 'My Library & Purchased E-Books',
   description:
     'Instant offline and online reading access to all your purchased exam guide PDFs and ePubs, including complimentary test sample material.',
   alternates: {

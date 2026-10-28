@@ -1,4 +1,5 @@
-import PrivacyPolicyPage, { metadata } from '../privacy-policy/page';
+import { permanentRedirect } from 'next/navigation';
 
-export { metadata };
-export default PrivacyPolicyPage;
+export default function PrivacyRedirectPage() {
+  permanentRedirect('/privacy-policy');
+}

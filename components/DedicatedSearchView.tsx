@@ -70,7 +70,7 @@ export const DedicatedSearchView: React.FC<DedicatedSearchViewProps> = ({
 }) => {
   const [query, setQuery] = useState(initialQuery);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<'relevance' | 'rating' | 'price_low' | 'price_high'>('relevance');
+  const [sortBy, setSortBy] = useState<'relevance' | 'price_low' | 'price_high'>('relevance');
   const [visibleCount, setVisibleCount] = useState<number>(12);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
@@ -330,7 +330,6 @@ export const DedicatedSearchView: React.FC<DedicatedSearchViewProps> = ({
               className="text-xs font-bold text-gray-800 bg-transparent border-0 focus:outline-none cursor-pointer pr-1"
             >
               <option value="relevance">Sort: Relevance</option>
-              <option value="rating">Top Rated</option>
               <option value="price_low">Price: Low to High</option>
               <option value="price_high">Price: High to Low</option>
             </select>
@@ -433,16 +432,6 @@ export const DedicatedSearchView: React.FC<DedicatedSearchViewProps> = ({
                       <p className="text-xs text-gray-500 truncate mt-0.5">
                         {book.publisher || book.publication || 'Mocktime Publication'}
                       </p>
-
-                      <div className="flex items-center gap-1 text-amber-500 mt-1">
-                        <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                        <span className="text-xs font-bold text-gray-700">
-                          {book.rating?.toFixed(1) || '4.7'}
-                        </span>
-                        <span className="text-xs text-gray-400">
-                          ({book.rating_count || 120} reviews)
-                        </span>
-                      </div>
                     </div>
 
                     {/* Right Pricing & Quick Buy / Cart Actions */}

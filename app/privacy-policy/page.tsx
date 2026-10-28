@@ -4,7 +4,7 @@ import { ShieldCheck, ArrowLeft, Mail, MapPin, Globe, Lock, CheckCircle2, Chevro
 import { Footer } from '@/components/Footer';
 
 export const metadata: Metadata = {
-  title: 'Privacy Policy | Exam Kart (Legal: Pardeep Kumar) - BooksCircle',
+  title: 'Privacy Policy | Exam Kart (Legal: Pardeep Kumar)',
   description: 'Privacy Policy for digital e-book purchases on Exam Kart (Legal entity: Pardeep Kumar) at https://bookscircle.org/. Learn how your data is collected and protected.',
   alternates: {
     canonical: 'https://bookscircle.org/privacy-policy',

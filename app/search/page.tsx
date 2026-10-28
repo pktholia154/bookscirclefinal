@@ -7,9 +7,9 @@ import { SITE_URL, SITE_NAME } from '@/lib/seo';
 export const revalidate = 300;
 
 export const metadata: Metadata = {
-  title: `Search Competitive Exam PDF E-Books & Study Material | ${SITE_NAME}`,
+  title: 'Search Competitive Exam PDF E-Books & Study Material',
   description:
-    'Search across 1,800+ competitive exam PDF e-books, solved question banks, and study guides for UPSC, SSC, Banking, CUET PG, Engineering, and State PSC exams on BooksCircle.',
+    'Search across 2,400+ competitive exam PDF e-books, solved question banks, and study guides for UPSC, SSC, Banking, CUET PG, Engineering, and State PSC exams on BooksCircle.',
   alternates: {
     canonical: `${SITE_URL}/search`,
   },
@@ -33,7 +33,9 @@ export default async function SearchRoutePage() {
       getBooksFromFirestore().catch(() => INITIAL_BOOKS),
       getCategoriesFromFirestore().catch(() => INITIAL_CATEGORIES),
     ]);
-    if (fetchedBooks && fetchedBooks.length > 0) books = fetchedBooks;
+    if (fetchedBooks && fetchedBooks.length > 0) {
+      books = fetchedBooks.filter((b) => b && b.isActive !== false && !b.canonicalSlug);
+    }
     if (fetchedCategories && fetchedCategories.length > 0) categories = fetchedCategories;
   } catch {}
 

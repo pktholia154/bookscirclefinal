@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Image from 'next/image';
-import { ShoppingCart, Star, Check, Heart } from 'lucide-react';
+import { ShoppingCart, Check, Heart } from 'lucide-react';
 import { Book } from '@/lib/types';
 import { DEFAULT_BOOK_COVER } from '@/lib/data';
 import { toggleWishlistAction } from '@/lib/services/wishlist';
@@ -47,8 +47,6 @@ export const BookCard: React.FC<BookCardProps> = ({
   const discountPercent = hasCatalogDiscount
     ? Math.round(((listPrice - displayPrice) / listPrice) * 100)
     : 0;
-
-  const rating = book.rating || 4.7;
 
   const containerClasses =
     layout === 'grid'
@@ -159,25 +157,11 @@ export const BookCard: React.FC<BookCardProps> = ({
         {book.category || 'Exam Guide'}
       </p>
 
-      {/* Star Rating & Numeric Rating + Verified Sold Count */}
+      {/* Format Metadata & Verified Sold Count */}
       <div className="flex items-center justify-between gap-1 mt-1 min-w-0">
-        <div className="flex items-center gap-1 text-amber-500">
-          <div className="flex items-center">
-            {[...Array(5)].map((_, i) => (
-              <Star
-                key={i}
-                className={`w-2.5 h-2.5 sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 ${
-                  i < Math.floor(rating)
-                    ? 'fill-amber-400 text-amber-400'
-                    : 'fill-gray-200 text-gray-200'
-                }`}
-              />
-            ))}
-          </div>
-          <span className="text-[11px] sm:text-xs font-semibold text-gray-500">
-            {rating.toFixed(1)}
-          </span>
-        </div>
+        <span className="text-[10px] sm:text-[11px] text-gray-400 font-medium truncate">
+          {book.language || 'English'} • PDF
+        </span>
 
         {book.sold_count !== undefined && book.sold_count > 0 && (
           <span

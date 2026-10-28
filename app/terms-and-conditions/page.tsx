@@ -4,7 +4,7 @@ import { FileText, ArrowLeft, Mail, MapPin, Globe, CheckCircle2, AlertOctagon, S
 import { Footer } from '@/components/Footer';
 
 export const metadata: Metadata = {
-  title: 'Terms and Conditions | Exam Kart (Legal: Pardeep Kumar) - BooksCircle',
+  title: 'Terms and Conditions | Exam Kart (Legal: Pardeep Kumar)',
   description: 'Terms of Service and Conditions governing digital e-book purchases on Exam Kart (Legal Name: Pardeep Kumar) at https://bookscircle.org/.',
   alternates: {
     canonical: 'https://bookscircle.org/terms-and-conditions',

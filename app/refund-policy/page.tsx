@@ -4,7 +4,7 @@ import { RefreshCw, ArrowLeft, Mail, MapPin, Globe, CheckCircle2, Clock, HelpCir
 import { Footer } from '@/components/Footer';
 
 export const metadata: Metadata = {
-  title: 'Refund & Cancellation Policy | Exam Kart (Legal: Pardeep Kumar) - BooksCircle',
+  title: 'Refund & Cancellation Policy | Exam Kart (Legal: Pardeep Kumar)',
   description: 'Refund & Cancellation Policy for digital e-book purchases on Exam Kart (Legal entity: Pardeep Kumar) at https://bookscircle.org/. Clear guidelines on digital fulfillment and refunds.',
   alternates: {
     canonical: 'https://bookscircle.org/refund-policy',

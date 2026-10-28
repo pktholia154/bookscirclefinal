@@ -1,8 +1,12 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
-import { ArrowLeft, BookOpen } from 'lucide-react';
-import { getBooksFromFirestore, getFirestoreBookById, slimBookForList } from '@/lib/services/books';
-import { generateBookSchema, SITE_URL, SITE_NAME } from '@/lib/seo';
+import { notFound, permanentRedirect } from 'next/navigation';
+import {
+  getBooksFromFirestore,
+  getFirestoreBookById,
+  slimBookForList,
+  fetchBookStructuredPreview,
+} from '@/lib/services/books';
+import { generateBookSchema, stripMarkdownToPlainText, SITE_URL, SITE_NAME } from '@/lib/seo';
 import { BookPageClient } from '@/components/BookPageClient';
 import { Book } from '@/lib/types';
 
@@ -16,9 +20,12 @@ interface PageProps {
 export async function generateStaticParams() {
   try {
     const books = await getBooksFromFirestore();
-    return books.slice(0, 20).map((book) => ({
-      slug: book.seoslug || book.slug || book.id,
-    }));
+    return books
+      .filter((b) => b && b.isActive !== false && !b.canonicalSlug)
+      .slice(0, 20)
+      .map((book) => ({
+        slug: book.seoslug || book.slug || book.id,
+      }));
   } catch (error) {
     console.warn('generateStaticParams error:', error);
     return [];
@@ -29,49 +36,53 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { slug } = await params;
   const book = await getFirestoreBookById(slug);
 
-  if (!book) {
+  if (!book || (book.isActive === false && !book.canonicalSlug)) {
     return {
-      title: 'Book Not Found | BooksCircle',
+      title: 'Book Not Found',
       description: 'The requested exam e-book could not be located in our catalog.',
       robots: { index: false, follow: false },
     };
   }
 
-  const bookTitle = `${book.title} - ${book.category || 'Exam'} PDF eBook | BooksCircle`;
-  const bookDesc =
+  const ogTitle = `${book.title} - ${book.category || 'Exam'} PDF eBook | ${SITE_NAME}`;
+  const rawDesc =
     book.seo_description ||
+    book.seoDescription ||
     book.full_description ||
     `Download ${book.title} PDF eBook for ${book.category || 'Competitive Exams'}. Complete syllabus, study notes, and solved questions with instant delivery.`;
-  const canonicalUrl = `${SITE_URL}/book/${encodeURIComponent(book.seoslug || book.slug || book.id)}`;
-  const coverUrl = book.cover || 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?q=80&w=1200&auto=format&fit=crop';
+  const bookDesc = stripMarkdownToPlainText(rawDesc);
+  const canonicalTargetSlug = book.canonicalSlug || book.seoslug || book.slug || book.id;
+  const canonicalUrl = `${SITE_URL}/book/${encodeURIComponent(canonicalTargetSlug)}`;
+  const coverUrl = book.cover || `${SITE_URL}/logo.png`;
+  const isDuplicateVariant = Boolean(book.canonicalSlug);
 
   return {
-    title: bookTitle,
+    title: book.title,
     description: bookDesc.slice(0, 160),
     keywords: [
       book.title,
       book.category || 'Exam Guide',
       `${book.category || 'Exam'} PDF`,
-      'Exam Guide eBook',
-      'Study Notes PDF',
       ...(Array.isArray(book.tags) ? book.tags : []),
     ],
     alternates: {
       canonical: canonicalUrl,
     },
-    robots: {
-      index: true,
-      follow: true,
-      googleBot: {
-        index: true,
-        follow: true,
-        'max-video-preview': -1,
-        'max-image-preview': 'large',
-        'max-snippet': -1,
-      },
-    },
+    robots: isDuplicateVariant
+      ? { index: false, follow: true }
+      : {
+          index: true,
+          follow: true,
+          googleBot: {
+            index: true,
+            follow: true,
+            'max-video-preview': -1,
+            'max-image-preview': 'large',
+            'max-snippet': -1,
+          },
+        },
     openGraph: {
-      title: bookTitle,
+      title: ogTitle,
       description: bookDesc,
       url: canonicalUrl,
       siteName: SITE_NAME,
@@ -88,7 +99,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     },
     twitter: {
       card: 'summary_large_image',
-      title: bookTitle,
+      title: ogTitle,
       description: bookDesc,
       images: [coverUrl],
     },
@@ -97,140 +108,63 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function BookSSRPage({ params }: PageProps) {
   const { slug } = await params;
-  const book = await getFirestoreBookById(slug);
+  const decodedSlug = decodeURIComponent(slug);
+  const book = await getFirestoreBookById(decodedSlug);
 
-  if (!book) {
-    return (
-      <div className="min-h-screen bg-white text-gray-900 flex flex-col items-center justify-center p-6 text-center space-y-4">
-        <div className="w-16 h-16 rounded-full bg-[#5e17eb]/10 text-[#5e17eb] flex items-center justify-center">
-          <BookOpen className="w-8 h-8" />
-        </div>
-        <h1 className="text-xl font-bold text-gray-900">E-Book Not Found</h1>
-        <p className="text-xs text-gray-500 max-w-sm">
-          We could not locate this title in our active catalog. It may have been renamed or archived.
-        </p>
-        <Link
-          href="/"
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#5e17eb] text-white text-xs font-bold hover:bg-[#4d0ec5] transition-all"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" />
-          <span>Browse All Exam Guides</span>
-        </Link>
-      </div>
-    );
+  // Return genuine HTTP 404 when book does not exist (eliminates Soft 404s in Google Search Console)
+  if (!book || (book.isActive === false && !book.canonicalSlug)) {
+    notFound();
   }
 
-  // Fetch category sibling books & recent content for Link Loop Crawling
+  // 301 Redirect duplicate variants, legacy slugs without -bk000xxxx, or raw BK IDs to the single canonical book URL
+  const canonicalTargetSlug = book.canonicalSlug || book.seoslug || book.slug || book.id;
+  if (canonicalTargetSlug && decodedSlug !== canonicalTargetSlug) {
+    permanentRedirect(`/book/${encodeURIComponent(canonicalTargetSlug)}`);
+  }
+
+  // Fetch structured book differentiation data (Table of Contents + Sample MCQs)
+  const structuredPreview = await fetchBookStructuredPreview(book).catch(() => ({
+    tableOfContents: [],
+    sampleQuestions: [],
+  }));
+
+  const enrichedBook: Book = {
+    ...book,
+    tableOfContents: structuredPreview.tableOfContents,
+    sampleQuestions: structuredPreview.sampleQuestions,
+  };
+
+  // Fetch category sibling books for relevant recommendation
   let relatedBooks: Book[] = [];
-  let prevBook: Book | null = null;
-  let nextBook: Book | null = null;
-  let recentBooks: Book[] = [];
 
   try {
     const allBooks = await getBooksFromFirestore();
-    const activeBooks = allBooks.filter((b) => b && b.isActive !== false);
-    const targetCategoryLower = (book.category || '').toLowerCase();
+    const activeBooks = allBooks.filter((b) => b && b.isActive !== false && !b.canonicalSlug);
+    const targetCategoryLower = (enrichedBook.category || '').toLowerCase();
 
-    // Sibling links within same category
     const categoryBooks = activeBooks.filter(
       (b) => (b.category || '').toLowerCase() === targetCategoryLower
     );
-    const currentIndex = categoryBooks.findIndex((b) => b.id === book.id);
-    if (currentIndex > 0) {
-      prevBook = slimBookForList(categoryBooks[currentIndex - 1]);
-    } else if (categoryBooks.length > 1) {
-      prevBook = slimBookForList(categoryBooks[categoryBooks.length - 1]);
-    }
-
-    if (currentIndex >= 0 && currentIndex < categoryBooks.length - 1) {
-      nextBook = slimBookForList(categoryBooks[currentIndex + 1]);
-    } else if (categoryBooks.length > 1) {
-      nextBook = slimBookForList(categoryBooks[0]);
-    }
 
     relatedBooks = categoryBooks
-      .filter((b) => b.id !== book.id)
+      .filter((b) => b.id !== enrichedBook.id)
       .slice(0, 6)
-      .map(slimBookForList);
-
-    // Recent Content Strip: Top 10 most recent books across catalog for crawlability
-    recentBooks = activeBooks
-      .filter((b) => b.id !== book.id)
-      .slice(0, 10)
       .map(slimBookForList);
   } catch {}
 
   // Generate nested JSON-LD schema
-  const bookJsonLd = generateBookSchema(book);
+  const bookJsonLd = generateBookSchema(enrichedBook);
 
   return (
     <>
-      {/* Dynamic Server-Injected JSON-LD Schema (Book, Product, Offer, AggregateRating, BreadcrumbList, FAQPage) */}
+      {/* Dynamic Server-Injected JSON-LD Schema */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(bookJsonLd) }}
       />
 
       {/* Interactive & Accessible Presentation UI */}
-      <BookPageClient book={book} relatedBooks={relatedBooks} />
-
-      {/* 4. Link Loop Injection (Bottom of Post Template: Prev/Next Siblings & Recent Strip for Crawler Traversal) */}
-      <footer aria-label="Related Guides & Crawl Loop" className="w-full bg-white border-t border-gray-100 px-4 sm:px-6 py-6 pb-20">
-        {/* Sibling Links in Same Category */}
-        {(prevBook || nextBook) && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
-            {prevBook && prevBook.id !== book.id && (
-              <Link
-                href={`/book/${encodeURIComponent(prevBook.seoslug || prevBook.slug || prevBook.id)}`}
-                className="flex flex-col p-3 rounded-xl border border-gray-200 hover:border-[#4029AB] hover:bg-[#4029AB]/[0.02] transition-colors group"
-              >
-                <span className="text-[10px] font-bold text-gray-400 group-hover:text-[#4029AB] uppercase tracking-wider mb-0.5">
-                  ← Previous in {book.category}
-                </span>
-                <span className="text-xs sm:text-sm font-bold text-gray-900 group-hover:text-[#4029AB] line-clamp-1">
-                  {prevBook.title}
-                </span>
-              </Link>
-            )}
-            {nextBook && nextBook.id !== book.id && (
-              <Link
-                href={`/book/${encodeURIComponent(nextBook.seoslug || nextBook.slug || nextBook.id)}`}
-                className="flex flex-col p-3 rounded-xl border border-gray-200 hover:border-[#4029AB] hover:bg-[#4029AB]/[0.02] transition-colors sm:text-right group"
-              >
-                <span className="text-[10px] font-bold text-gray-400 group-hover:text-[#4029AB] uppercase tracking-wider mb-0.5">
-                  Next in {book.category} →
-                </span>
-                <span className="text-xs sm:text-sm font-bold text-gray-900 group-hover:text-[#4029AB] line-clamp-1">
-                  {nextBook.title}
-                </span>
-              </Link>
-            )}
-          </div>
-        )}
-
-        {/* Recent Content Anchor Strip */}
-        {recentBooks.length > 0 && (
-          <aside className="p-4 rounded-xl bg-gray-50 border border-gray-100">
-            <h3 className="text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-2.5 flex items-center justify-between">
-              <span>Recent Exam Notes &amp; PDF Guides</span>
-              <span className="text-[10px] font-normal text-gray-400">Direct Links</span>
-            </h3>
-            <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
-              {recentBooks.map((rb) => (
-                <li key={rb.id} className="truncate">
-                  <Link
-                    href={`/book/${encodeURIComponent(rb.seoslug || rb.slug || rb.id)}`}
-                    className="text-gray-700 hover:text-[#4029AB] hover:underline font-medium"
-                    title={rb.title}
-                  >
-                    • {rb.title}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </aside>
-        )}
-      </footer>
+      <BookPageClient book={enrichedBook} relatedBooks={relatedBooks} />
     </>
   );
 }

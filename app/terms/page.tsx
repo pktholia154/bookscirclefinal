@@ -1,4 +1,5 @@
-import TermsAndConditionsPage, { metadata } from '../terms-and-conditions/page';
+import { permanentRedirect } from 'next/navigation';
 
-export { metadata };
-export default TermsAndConditionsPage;
+export default function TermsRedirectPage() {
+  permanentRedirect('/terms-and-conditions');
+}

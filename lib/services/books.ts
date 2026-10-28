@@ -7,7 +7,7 @@ import {
   limit,
 } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Book, Category } from '../types';
+import { Book, Category, SampleQuestionItem } from '../types';
 import { INITIAL_BOOKS, INITIAL_CATEGORIES } from '../data';
 import {
   resolveBookCoverUrl,
@@ -179,19 +179,50 @@ function resolveIsoTimestamp(val: any): string | undefined {
   return undefined;
 }
 
+function sanitizePlainTextDescription(raw: string): string {
+  if (!raw) return '';
+  return String(raw)
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/__(.*?)__/g, '$1')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/#{1,6}\s+/g, '')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\*/g, '')
+    .replace(/Chapterwsie/gi, 'Chapterwise')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+const DUPLICATE_CANONICAL_MAP: Record<string, string> = {
+  BK0000520: 'ssc-junior-engineer-je-civil-bk0000521',
+  BK0000501: 'high-court-of-uttarakhand-ukpsc-uttarakhand-judicial-service-civil-bk0000500',
+  BK0000475: 'allahabad-high-court-review-officer-ro-assistant-review-officer-aro-bk0000474',
+  BK0000997: 'haryana-htet-level-3-pgt-biology-post-graduate-teacher-classes-9-12-bk0000989',
+};
+
 export function parseBookDocument(docSnap: any): Book {
   const data = docSnap.data ? docSnap.data() : docSnap;
   const bookId = docSnap.id || data.id || '';
   const buyPrice = Number(data.buyprice ?? data.buy_price ?? data.price ?? data.sale_price ?? 0);
   const listPrice = Number(data.listprice ?? data.list_price ?? data.mrp ?? data.original_price ?? (buyPrice > 0 ? Math.round(buyPrice * 1.6) : 300));
-  const rating = Number(data.averageRating ?? data.rating ?? data.avg_rating ?? 4.8);
-  const ratingCount = Number(data.reviewCount ?? data.rating_count ?? data.ratings_count ?? data.review_count ?? 120);
   const pages = Number(data.pageCount ?? data.pages ?? data.page_count ?? data.num_pages ?? 0);
 
-  const seoDesc = String(data.seoDescription ?? data.seo_description ?? data.short_description ?? data.shortDescription ?? data.subtitle ?? '').trim();
-  const fullDesc = String(data.fullDescription ?? data.full_description ?? data.description ?? data.summary ?? data.content ?? '').trim();
+  const rawSeoDesc = String(data.seoDescription ?? data.seo_description ?? data.short_description ?? data.shortDescription ?? data.subtitle ?? '').trim();
+  const seoDesc = sanitizePlainTextDescription(rawSeoDesc);
+  const fullDesc = String(data.fullDescription ?? data.full_description ?? data.description ?? data.summary ?? data.content ?? '')
+    .replace(/Chapterwsie/g, 'Chapterwise')
+    .trim();
   const seoslug = String(data.seoslug ?? data.slug ?? bookId).trim();
-  const categorySlug = String(data.categorySlug ?? data.category_slug ?? (data.category ? data.category.toLowerCase().replace(/\s+/g, '-') : '')).trim();
+
+  let resolvedCategory = data.category || 'CUET PG';
+  let categorySlug = String(data.categorySlug ?? data.category_slug ?? (resolvedCategory ? resolvedCategory.toLowerCase().replace(/\s+/g, '-') : '')).trim();
+  if (bookId === 'BK0000520' || bookId === 'BK0000521') {
+    resolvedCategory = 'SSC';
+    categorySlug = 'ssc';
+  }
+
+  const canonicalSlug = data.canonicalSlug || DUPLICATE_CANONICAL_MAP[bookId] || undefined;
+  const isDuplicateInactive = Boolean(DUPLICATE_CANONICAL_MAP[bookId]) || data.status === 'duplicate_redirect';
 
   const rawCover = data.imageUrl || data.cover || data.cover_image || data.image || data.thumbnail || data.image_url || data.coverImage || data.coverUrl || '';
   const resolvedCover = resolveBookCoverUrl(rawCover, bookId);
@@ -203,7 +234,7 @@ export function parseBookDocument(docSnap: any): Book {
   const resolvedFullPdfUrl = resolveBookPdfUrl(rawPdfStoragePath, bookId);
 
   // Markdown URLs
-  const rawMdSample = data.mdsampleurl || data.mdSampleUrl || data.md_sample_url || data.md_sample || data.sample_md || '';
+  const rawMdSample = data.mdsampleurl || data.mdSampleUrl || data.md_sample_url || data.samplemdurl || data.md_sample || data.sample_md || '';
   const resolvedMdSample = resolveBookMdSampleUrl(rawMdSample, bookId);
 
   const rawMdUrl = data.mdurl || data.mdUrl || data.md_url || data.md_file || data.full_md_url || data.md || '';
@@ -221,19 +252,30 @@ export function parseBookDocument(docSnap: any): Book {
     resolveIsoTimestamp(data.updatedAt ?? data.updated_at ?? data._updateTime) ||
     createdAtIso;
 
+  const cleanTitle = String(data.title || data.name || 'Untitled Book')
+    .replace(/Chapterwsie/g, 'Chapterwise')
+    .replace(/\(5arg\s*2\)/gi, '(Varg 2)')
+    .replace(/\(5arg\s*3\)/gi, '(Varg 3)')
+    .replace(/Category\s*I5\b/gi, 'Category IV');
+
+  const rawTags = Array.isArray(data.tags)
+    ? data.tags.map((t: any) => String(t || '').trim()).filter(Boolean)
+    : [];
+
   return {
     id: bookId,
-    title: data.title || data.name || 'Untitled Book',
+    title: cleanTitle,
     slug: bookId,
     seoslug: seoslug,
+    canonicalSlug,
     seo_description: seoDesc,
     full_description: fullDesc,
     seoDescription: seoDesc,
     fullDescription: fullDesc,
-    category: data.category || 'CUET PG',
+    category: resolvedCategory,
     categorySlug: categorySlug,
-    tags: Array.isArray(data.tags) && data.tags.length > 0 ? data.tags : [data.category || 'Exam Book', language, bookType, 'Question Bank'],
-    isActive: data.isActive !== undefined ? Boolean(data.isActive) : true,
+    tags: rawTags,
+    isActive: isDuplicateInactive ? false : (data.isActive !== undefined ? Boolean(data.isActive) : true),
     buy_price: buyPrice,
     list_price: listPrice,
     pdf_file: resolvedFullPdfUrl,
@@ -253,22 +295,22 @@ export function parseBookDocument(docSnap: any): Book {
     imageUrl: resolvedCover,
     sample_file: resolvedSample,
     sampleUrl: resolvedSample,
-    rating: rating > 0 ? rating : 4.8,
-    rating_count: ratingCount > 0 ? ratingCount : 120,
+    rating: 0,
+    rating_count: 0,
     author: data.author || data.authors || publisher,
     publisher: publisher,
     publication: publisher,
     published_date: data.published_date || data.published_year || data.publish_date || (data.createdAt?.seconds ? new Date(data.createdAt.seconds * 1000).getFullYear().toString() : '2026'),
     created_at: createdAtIso,
     updated_at: updatedAtIso,
-    isbn: data.isbn || '',
-    pages: pages > 0 ? pages : 280,
+    isbn: data.isbn ? String(data.isbn).trim() : undefined,
+    pages: pages > 0 ? pages : undefined,
     language: language,
     type: bookType,
-    file_size: data.fileSizeInMB ? `${data.fileSizeInMB} MB` : (data.file_size || '14.5 MB'),
+    file_size: data.fileSizeInMB ? `${data.fileSizeInMB} MB` : (data.file_size ? String(data.file_size).trim() : undefined),
     sold_count: Number(data.sold_count ?? data.soldCount ?? data.total_sold ?? data.sales ?? data.sales_count ?? 0),
     topics: Array.isArray(data.topics) ? data.topics : (Array.isArray(data.features) ? data.features : []),
-    reviews: Array.isArray(data.reviews) ? data.reviews : [],
+    reviews: [],
   };
 }
 
@@ -473,6 +515,8 @@ async function fetchBooksFromFirestoreRest(): Promise<Book[] | null> {
               { fieldPath: 'topics' },
               { fieldPath: 'features' },
               { fieldPath: 'isActive' },
+              { fieldPath: 'canonicalSlug' },
+              { fieldPath: 'status' },
             ],
           },
           limit: 3500,
@@ -901,58 +945,92 @@ export async function getBooksByCategory(categorySlugOrTitle: string): Promise<B
   return allBooks.filter(matchesBook);
 }
 
+function slugifyForLookup(str: string): string {
+  return String(str || '')
+    .toLowerCase()
+    .replace(/\s*\([^)]*medium\)/gi, '')
+    .replace(/\s*\([^)]*edition\)/gi, '')
+    .replace(/&/g, ' and ')
+    .replace(/\+/g, ' plus ')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 function findBookInList(books: Book[], target: string): Book | null {
   if (!Array.isArray(books) || books.length === 0 || !target) return null;
 
-  const exactIdMatch = books.find((b) => b && b.id && b.id.toLowerCase() === target);
+  const cleanTarget = target.toLowerCase().trim();
+
+  // 1. Exact ID match
+  const exactIdMatch = books.find((b) => b && b.id && b.id.toLowerCase() === cleanTarget);
   if (exactIdMatch) return exactIdMatch;
 
+  // 2. Exact seoslug or slug match
   const slugMatch = books.find(
     (b) =>
       b &&
-      ((b.seoslug && b.seoslug.toLowerCase() === target) ||
-        (b.slug && b.slug.toLowerCase() === target))
+      ((b.seoslug && b.seoslug.toLowerCase() === cleanTarget) ||
+        (b.slug && b.slug.toLowerCase() === cleanTarget))
   );
   if (slugMatch) return slugMatch;
 
+  // 3. Extract trailing -bk000xxxx ID from slug if present
+  const bkMatch = cleanTarget.match(/-(bk\d{4,8})$/i);
+  if (bkMatch) {
+    const extractedId = bkMatch[1].toLowerCase();
+    const byExtractedId = books.find((b) => b && b.id && b.id.toLowerCase() === extractedId);
+    if (byExtractedId) return byExtractedId;
+  }
+
+  // 4. Match legacy indexed URLs without -bk000xxxx suffix (e.g., /book/manipur-tet-paper-i-primary-classes-1-5-previous-papers)
+  const targetBase = cleanTarget.replace(/-bk\d{4,8}$/i, '');
+  const baseSlugMatch = books.find((b) => {
+    if (!b) return false;
+    const bSeoBase = (b.seoslug || '').toLowerCase().replace(/-bk\d{4,8}$/i, '');
+    return bSeoBase && bSeoBase === targetBase;
+  });
+  if (baseSlugMatch) return baseSlugMatch;
+
+  // 5. Match against slugified book title (supports full untruncated titles)
+  const titleSlugMatch = books.find((b) => {
+    if (!b || !b.title) return false;
+    const tSlug = slugifyForLookup(b.title);
+    return tSlug === targetBase;
+  });
+  if (titleSlugMatch) return titleSlugMatch;
+
+  // 6. Prefix match for truncated seoslugs (where seoslug was capped at ~65 chars before -bk000xxxx)
+  if (targetBase.length >= 25) {
+    const prefixMatch = books.find((b) => {
+      if (!b || !b.seoslug) return false;
+      const bSeoBase = b.seoslug.toLowerCase().replace(/-bk\d{4,8}$/i, '');
+      return bSeoBase.length >= 25 && (targetBase.startsWith(bSeoBase) || bSeoBase.startsWith(targetBase));
+    });
+    if (prefixMatch) return prefixMatch;
+  }
+
+  // 7. Suffix ID or exact title match
   const suffixMatch = books.find(
     (b) =>
       b &&
       b.id &&
-      (b.id.toLowerCase().endsWith(target) || target.endsWith(b.id.toLowerCase()))
+      (b.id.toLowerCase().endsWith(cleanTarget) || cleanTarget.endsWith(b.id.toLowerCase()))
   );
   if (suffixMatch) return suffixMatch;
 
-  const titleMatch = books.find((b) => b && b.title && b.title.toLowerCase() === target);
+  const titleMatch = books.find((b) => b && b.title && b.title.toLowerCase() === cleanTarget);
   if (titleMatch) return titleMatch;
 
   return null;
 }
 
-export async function getFirestoreBookById(idOrSlug: string): Promise<Book | null> {
-  if (!idOrSlug) return null;
-  let decoded = idOrSlug;
-  try {
-    decoded = decodeURIComponent(idOrSlug);
-  } catch {}
-  const rawTarget = decoded.trim();
-  const target = rawTarget.toLowerCase();
-  const isServer = typeof window === 'undefined';
-
-  if (isServer && serverBooksCache && serverBooksCache.length > 0) {
-    const cachedHit = findBookInList(serverBooksCache, target);
-    if (cachedHit && (cachedHit.full_description || cachedHit.fullDescription)) return cachedHit;
-  }
-  if (!isServer && clientBooksMemoryCache && clientBooksMemoryCache.length > 0) {
-    const cachedHit = findBookInList(clientBooksMemoryCache, target);
-    if (cachedHit && (cachedHit.full_description || cachedHit.fullDescription)) return cachedHit;
-  }
-
+async function fetchFullBookDocByIdRest(bookId: string): Promise<Book | null> {
+  if (!bookId) return null;
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 3000);
+    const timer = setTimeout(() => controller.abort(), 3500);
     const res = await fetch(
-      `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/${FIRESTORE_DATABASE_ID}/documents/books/${encodeURIComponent(rawTarget)}?key=${FIREBASE_API_KEY}`,
+      `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/${FIRESTORE_DATABASE_ID}/documents/books/${encodeURIComponent(bookId)}?key=${FIREBASE_API_KEY}`,
       { signal: controller.signal, cache: 'no-store' }
     );
     clearTimeout(timer);
@@ -970,13 +1048,217 @@ export async function getFirestoreBookById(idOrSlug: string): Promise<Book | nul
       }
     }
   } catch {}
+  return null;
+}
 
+export async function getFirestoreBookById(idOrSlug: string): Promise<Book | null> {
+  if (!idOrSlug) return null;
+  let decoded = idOrSlug;
+  try {
+    decoded = decodeURIComponent(idOrSlug);
+  } catch {}
+  const rawTarget = decoded.trim();
+  const target = rawTarget.toLowerCase();
+  const isServer = typeof window === 'undefined';
+
+  // Fast path: if rawTarget is a direct BK ID or ends with -bk000xxxx, extract the exact document ID
+  const directBkMatch = rawTarget.match(/^(BK\d{4,8})$/i) || rawTarget.match(/-(BK\d{4,8})$/i);
+  if (directBkMatch) {
+    const exactDocId = directBkMatch[1].toUpperCase();
+    const fullDoc = await fetchFullBookDocByIdRest(exactDocId);
+    if (fullDoc) return fullDoc;
+  }
+
+  if (isServer && serverBooksCache && serverBooksCache.length > 0) {
+    const cachedHit = findBookInList(serverBooksCache, target);
+    if (cachedHit) {
+      if (cachedHit.full_description || cachedHit.fullDescription) return cachedHit;
+      const hydrated = await fetchFullBookDocByIdRest(cachedHit.id);
+      return hydrated || cachedHit;
+    }
+  }
+  if (!isServer && clientBooksMemoryCache && clientBooksMemoryCache.length > 0) {
+    const cachedHit = findBookInList(clientBooksMemoryCache, target);
+    if (cachedHit) {
+      if (cachedHit.full_description || cachedHit.fullDescription) return cachedHit;
+      const hydrated = await fetchFullBookDocByIdRest(cachedHit.id);
+      return hydrated || cachedHit;
+    }
+  }
+
+  // Try direct document fetch if rawTarget happens to be the exact document ID
+  const directDoc = await fetchFullBookDocByIdRest(rawTarget);
+  if (directDoc) return directDoc;
+
+  // Resolve via catalog list and then hydrate the full document by its ID so fullDescription is always populated on SSR
   const books = await getBooksFromFirestore();
   const listMatch = findBookInList(books, target);
-  if (listMatch) return listMatch;
+  if (listMatch) {
+    if (listMatch.full_description || listMatch.fullDescription) return listMatch;
+    const hydrated = await fetchFullBookDocByIdRest(listMatch.id);
+    return hydrated || listMatch;
+  }
 
   const fallbackList = getCachedBooksSync();
-  return findBookInList(fallbackList, target);
+  const fallbackMatch = findBookInList(fallbackList, target);
+  if (fallbackMatch) {
+    const hydrated = await fetchFullBookDocByIdRest(fallbackMatch.id);
+    return hydrated || fallbackMatch;
+  }
+  return null;
+}
+
+const structuredPreviewCache = new Map<
+  string,
+  { expiresAt: number; tableOfContents: string[]; sampleQuestions: SampleQuestionItem[] }
+>();
+
+/**
+ * Extracts real chapter/section Table of Contents and sample MCQs from the book's Markdown sample file
+ * for genuine page differentiation on SSR product pages.
+ */
+export async function fetchBookStructuredPreview(book: Book): Promise<{
+  tableOfContents: string[];
+  sampleQuestions: SampleQuestionItem[];
+}> {
+  if (!book || !book.id) {
+    return { tableOfContents: [], sampleQuestions: [] };
+  }
+
+  const now = Date.now();
+  const cached = structuredPreviewCache.get(book.id);
+  if (cached && now < cached.expiresAt) {
+    return {
+      tableOfContents: cached.tableOfContents,
+      sampleQuestions: cached.sampleQuestions,
+    };
+  }
+
+  const tocSet = new Set<string>();
+  const sampleQuestions: SampleQuestionItem[] = [];
+
+  const mdSampleUrl = book.mdsampleurl || book.mdSampleUrl || book.md_sample_url || '';
+  if (mdSampleUrl && mdSampleUrl.startsWith('http')) {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 2500);
+      const res = await fetch(mdSampleUrl, {
+        signal: controller.signal,
+        next: { revalidate: 3600 },
+      });
+      clearTimeout(timer);
+
+      if (res.ok) {
+        const text = await res.text();
+        if (text && !text.trim().startsWith('<')) {
+          // 1. Extract headings (#, ##, ###) for Table of Contents
+          const headingRegex = /^#{1,3}\s+(.+)$/gm;
+          let hMatch: RegExpExecArray | null;
+          while ((hMatch = headingRegex.exec(text)) !== null) {
+            const cleanHeading = hMatch[1]
+              .replace(/\*\*(.*?)\*\*/g, '$1')
+              .replace(/`([^`]+)`/g, '$1')
+              .replace(/\*/g, '')
+              .trim();
+            if (
+              cleanHeading.length >= 4 &&
+              cleanHeading.length <= 110 &&
+              !/^(answer|explanation|solution|note|hint)\b/i.test(cleanHeading)
+            ) {
+              tocSet.add(cleanHeading);
+              if (tocSet.size >= 12) break;
+            }
+          }
+
+          // 2. Extract up to 4 real Sample MCQs from the Markdown sample
+          const lines = text.split(/\r?\n/);
+          let currentQ: string | null = null;
+          let currentOpts: string[] = [];
+          let currentAns: string | undefined = undefined;
+
+          const flushQuestion = () => {
+            if (currentQ && currentOpts.length >= 2 && sampleQuestions.length < 4) {
+              sampleQuestions.push({
+                question: currentQ,
+                options: currentOpts.slice(0, 4),
+                answer: currentAns,
+              });
+            }
+            currentQ = null;
+            currentOpts = [];
+            currentAns = undefined;
+          };
+
+          for (const rawLine of lines) {
+            const line = rawLine.trim();
+            if (!line) continue;
+
+            const qMatch = line.match(/^(?:\*\*|###?\s*)?(?:Q(?:uestion)?\s*\d+|^\d+)\s*[.:)]\s*(.+?)(?:\*\*)?$/i);
+            if (qMatch && qMatch[1].length > 12 && !/^\([a-d]\)/i.test(line)) {
+              flushQuestion();
+              if (sampleQuestions.length >= 4) break;
+              currentQ = qMatch[1].replace(/\*\*/g, '').trim();
+              continue;
+            }
+
+            if (currentQ) {
+              const optMatch = line.match(/^(?:-\s*)?(?:\*\*)?\(([a-dA-D1-4])\)(?:\*\*)?\s*(.+)$/) ||
+                line.match(/^(?:-\s*)?(?:\*\*)?([a-dA-D])[.)](?:\*\*)?\s+(.+)$/);
+              if (optMatch) {
+                currentOpts.push(`(${optMatch[1].toLowerCase()}) ${optMatch[2].replace(/\*\*/g, '').trim()}`);
+                continue;
+              }
+
+              const ansMatch = line.match(/^(?:\*\*)?(?:Ans(?:wer)?|Correct\s+Option|Correct\s+Answer)\s*[:\-]\s*(.+?)(?:\*\*)?$/i);
+              if (ansMatch) {
+                currentAns = ansMatch[1].replace(/\*\*/g, '').trim().slice(0, 80);
+                flushQuestion();
+                if (sampleQuestions.length >= 4) break;
+              }
+            }
+          }
+          flushQuestion();
+        }
+      }
+    } catch {}
+  }
+
+  // Fallback TOC extraction from fullDescription headings & topics if sample markdown had fewer headings
+  if (tocSet.size < 4 && (book.full_description || book.fullDescription)) {
+    const desc = (book.full_description || book.fullDescription || '').replace(/\\n/g, '\n');
+    const hRegex = /^#{1,3}\s+(.+)$/gm;
+    let m: RegExpExecArray | null;
+    while ((m = hRegex.exec(desc)) !== null) {
+      const clean = m[1].replace(/\*\*/g, '').trim();
+      if (clean.length >= 4 && clean.length <= 100) {
+        tocSet.add(clean);
+      }
+    }
+    const bulletBoldRegex = /^(?:\d+\.|-|\*)\s+\*\*([^*]{4,80})\*\*/gm;
+    while ((m = bulletBoldRegex.exec(desc)) !== null) {
+      const clean = m[1].replace(/:$/, '').trim();
+      if (clean.length >= 4) {
+        tocSet.add(clean);
+      }
+    }
+  }
+
+  if (Array.isArray(book.topics)) {
+    for (const t of book.topics) {
+      if (t && typeof t === 'string' && t.trim().length >= 3) {
+        tocSet.add(t.trim());
+      }
+    }
+  }
+
+  const tableOfContents = Array.from(tocSet).slice(0, 12);
+  structuredPreviewCache.set(book.id, {
+    expiresAt: now + 30 * 60 * 1000,
+    tableOfContents,
+    sampleQuestions,
+  });
+
+  return { tableOfContents, sampleQuestions };
 }
 
 let clientSoldCountsCache: Record<string, number> | null = null;

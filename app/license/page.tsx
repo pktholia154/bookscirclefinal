@@ -1,4 +1,5 @@
-import LicenseAgreementPage, { metadata } from '../license-agreement/page';
+import { permanentRedirect } from 'next/navigation';
 
-export { metadata };
-export default LicenseAgreementPage;
+export default function LicenseRedirectPage() {
+  permanentRedirect('/license-agreement');
+}

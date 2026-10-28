@@ -16,11 +16,18 @@ export interface Review {
   createdAt?: string;
 }
 
+export interface SampleQuestionItem {
+  question: string;
+  options: string[];
+  answer?: string;
+}
+
 export interface Book {
   id: string;
   title: string;
   slug: string;
   seoslug?: string;
+  canonicalSlug?: string;
   seo_description: string;
   full_description: string;
   seoDescription?: string;
@@ -65,6 +72,8 @@ export interface Book {
   is_bestseller?: boolean;
   badge?: string;
   topics?: string[];
+  tableOfContents?: string[];
+  sampleQuestions?: SampleQuestionItem[];
   reviews?: Review[];
 }
 

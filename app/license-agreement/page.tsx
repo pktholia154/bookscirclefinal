@@ -4,7 +4,7 @@ import { Award, ArrowLeft, Mail, MapPin, Globe, CheckCircle2, ShieldAlert, BookO
 import { Footer } from '@/components/Footer';
 
 export const metadata: Metadata = {
-  title: 'License Agreement | Exam Kart (Legal: Pardeep Kumar) - BooksCircle',
+  title: 'License Agreement | Exam Kart (Legal: Pardeep Kumar)',
   description: 'Digital Product License Agreement and End User License Agreement (EULA) for e-books purchased from Exam Kart (Legal Name: Pardeep Kumar) on https://bookscircle.org/.',
   alternates: {
     canonical: 'https://bookscircle.org/license-agreement',

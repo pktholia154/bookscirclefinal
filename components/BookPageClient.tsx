@@ -28,9 +28,8 @@ import {
   Smartphone,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Book, Review, CartItem } from '@/lib/types';
-import { DEFAULT_BOOK_COVER, BOOK_FAQS, FREE_SAMPLE_BOOK_ID } from '@/lib/data';
-import { BookReviewsSection } from '@/components/BookReviewsSection';
+import { Book, CartItem } from '@/lib/types';
+import { DEFAULT_BOOK_COVER, FREE_SAMPLE_BOOK_ID } from '@/lib/data';
 import { SampleSwitcher } from '@/components/SampleSwitcher';
 import { InstallAppBanner } from '@/components/InstallAppBanner';
 import { IOSHomeInstallBanner } from '@/components/IOSHomeInstallBanner';
@@ -178,30 +177,20 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialBook.id]);
 
-  // Real-time Firestore synchronization for this exact book
+  // Preserve server-hydrated structured preview fields when client Firestore snapshot updates
   useEffect(() => {
     if (!initialBook.id) return;
     const unsubscribe = subscribeToFirestoreBook(initialBook.id, (liveDoc) => {
       if (liveDoc) {
-        setCurrentBook(liveDoc);
+        setCurrentBook((prev) => ({
+          ...liveDoc,
+          tableOfContents: prev.tableOfContents || liveDoc.tableOfContents,
+          sampleQuestions: prev.sampleQuestions || liveDoc.sampleQuestions,
+        }));
       }
     });
     return () => unsubscribe();
   }, [initialBook.id]);
-
-  // Memoized rating updater to prevent cyclical re-renders
-  const handleRatingUpdated = useCallback((newRating: number, newCount: number) => {
-    setCurrentBook((prev) => {
-      if (prev.rating === newRating && prev.rating_count === newCount) {
-        return prev;
-      }
-      return {
-        ...prev,
-        rating: newRating,
-        rating_count: newCount,
-      };
-    });
-  }, []);
 
   const book = currentBook;
 
@@ -447,33 +436,16 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
     }
   };
 
-  const rating = Number(book.rating && Number(book.rating) > 0 ? book.rating : 4.8);
-  const ratingCount = Number(book.rating_count && Number(book.rating_count) > 0 ? book.rating_count : 120);
-  const formattedReviewsCount =
-    ratingCount >= 1000 ? `${(ratingCount / 1000).toFixed(1)}K` : ratingCount.toString();
+  const cleanSummaryText = useMemo(() => {
+    const raw = book.seoDescription || book.seo_description || '';
+    return raw.replace(/\*\*+/g, '').replace(/__+/g, '').replace(/^#+\s+/gm, '').trim();
+  }, [book.seoDescription, book.seo_description]);
 
-  // Real tags for the book details page
+  // Only show genuine tags from the book document without padding filler tags
   const displayTags = useMemo(() => {
     const rawTags = Array.isArray(book.tags) ? book.tags.filter((t) => Boolean(t && t.trim())) : [];
-    if (rawTags.length >= 6) {
-      return rawTags.slice(0, 6);
-    }
-    const defaultTagPool = [
-      book.category || 'Competitive Exam',
-      book.language || 'English',
-      book.type || 'Question Bank',
-      `${book.category || 'Exam'} PDF`,
-      'Solved Papers',
-      'Instant Download',
-    ];
-    const combined = Array.from(new Set([...rawTags, ...defaultTagPool]));
-    return combined.slice(0, 6);
-  }, [book.tags, book.category, book.language, book.type]);
-
-  const discountPercent =
-    book.list_price && book.list_price > book.buy_price
-      ? Math.round(((book.list_price - book.buy_price) / book.list_price) * 100)
-      : 25;
+    return Array.from(new Set(rawTags)).slice(0, 6);
+  }, [book.tags]);
 
   return (
     <div className="min-h-screen bg-white text-gray-900 pb-24 sm:pb-28 antialiased selection:bg-[#4029AB] selection:text-white">
@@ -580,29 +552,10 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
           </div>
         </section>
 
-        {/* Key Metrics & Action Bar: Reviews | Share | Wishlist | Add to cart */}
+        {/* Action Bar: Share | Wishlist | Add to cart */}
         <section className="border-y border-gray-200/80 py-2.5 my-1">
-          <div className="grid grid-cols-4 items-center text-center divide-x divide-gray-200">
-            {/* 1. Reviews */}
-            <button
-              type="button"
-              id="book-ssr-reviews-stat-btn"
-              onClick={() => {
-                const el = document.getElementById('book-ssr-reviews-section');
-                if (el) el.scrollIntoView({ behavior: 'smooth' });
-              }}
-              className="flex flex-col items-center justify-center px-1 py-0.5 hover:bg-gray-50/80 transition-colors cursor-pointer"
-            >
-              <div className="flex items-center justify-center gap-0.5 text-xs font-bold text-gray-800">
-                <span>{rating.toFixed(1)}</span>
-                <Star className="w-3 h-3 fill-gray-700 text-gray-700" />
-              </div>
-              <span className="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">
-                {formattedReviewsCount} {ratingCount === 1 ? 'review' : 'reviews'}
-              </span>
-            </button>
-
-            {/* 2. Share */}
+          <div className="grid grid-cols-3 items-center text-center divide-x divide-gray-200">
+            {/* 1. Share */}
             <button
               type="button"
               id="book-ssr-share-stat-btn"
@@ -615,7 +568,7 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
               </span>
             </button>
 
-            {/* 3. Wishlist */}
+            {/* 2. Wishlist */}
             <button
               type="button"
               id="book-ssr-wishlist-stat-btn"
@@ -632,7 +585,7 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
               </span>
             </button>
 
-            {/* 4. Add to Cart (Base theme color) */}
+            {/* 3. Add to Cart (Base theme color) */}
             <button
               type="button"
               id="book-ssr-cart-stat-btn"
@@ -738,19 +691,19 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
             About this book
           </h2>
           <div className="space-y-3.5 text-xs sm:text-sm leading-relaxed">
-            {/* 1. seoDescription: text field */}
-            {(book.seoDescription || book.seo_description) && (
+            {/* 1. Clean Summary without raw markdown symbols */}
+            {cleanSummaryText && (
               <div className="p-3.5 rounded-xl bg-gray-50 border border-gray-100">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-1">
                   Summary
                 </span>
                 <p className="font-semibold text-gray-900 text-xs sm:text-sm leading-relaxed">
-                  {book.seoDescription || book.seo_description}
+                  {cleanSummaryText}
                 </p>
               </div>
             )}
 
-            {/* 2. fullDescription: markdown field with basic markdown syntax, parsing in markdown and treating \n as line break */}
+            {/* 2. fullDescription: markdown field rendered into proper semantic HTML (<strong>, <ul>, etc.) */}
             {(book.fullDescription || book.full_description) ? (
               <div className="text-gray-700 leading-relaxed text-xs sm:text-sm">
                 <div className="markdown-body">
@@ -785,14 +738,125 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
                 </div>
               </div>
             ) : (
-              !(book.seoDescription || book.seo_description) && (
+              !cleanSummaryText && (
                 <p className="text-gray-500 italic text-xs">
                   No detailed description provided for this title.
                 </p>
               )
             )}
 
-            {/* 3. tags: array fields with 6 tags */}
+            {/* 3. Structured Book Specifications & Exam Pattern Table */}
+            <div className="pt-2">
+              <h3 className="text-xs sm:text-sm font-bold text-gray-950 mb-2">
+                Book Specifications &amp; Exam Overview
+              </h3>
+              <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+                <dl className="divide-y divide-gray-100 text-xs">
+                  <div className="grid grid-cols-3 px-3.5 py-2 bg-gray-50/60">
+                    <dt className="font-semibold text-gray-500">Exam Category</dt>
+                    <dd className="col-span-2 font-bold text-gray-900">{book.category || 'Competitive Exam'}</dd>
+                  </div>
+                  <div className="grid grid-cols-3 px-3.5 py-2">
+                    <dt className="font-semibold text-gray-500">Paper / Title</dt>
+                    <dd className="col-span-2 font-medium text-gray-900">{book.title}</dd>
+                  </div>
+                  <div className="grid grid-cols-3 px-3.5 py-2 bg-gray-50/60">
+                    <dt className="font-semibold text-gray-500">Language Medium</dt>
+                    <dd className="col-span-2 font-medium text-gray-900">{book.language || 'English'}</dd>
+                  </div>
+                  <div className="grid grid-cols-3 px-3.5 py-2">
+                    <dt className="font-semibold text-gray-500">Material Type</dt>
+                    <dd className="col-span-2 font-medium text-gray-900">
+                      {book.type || 'Chapterwise Solved Question Bank & Notes'}
+                    </dd>
+                  </div>
+                  <div className="grid grid-cols-3 px-3.5 py-2 bg-gray-50/60">
+                    <dt className="font-semibold text-gray-500">Delivery Format</dt>
+                    <dd className="col-span-2 font-medium text-gray-900">
+                      Instant Digital PDF + Interactive Mobile Reader
+                    </dd>
+                  </div>
+                  <div className="grid grid-cols-3 px-3.5 py-2">
+                    <dt className="font-semibold text-gray-500">Length &amp; Edition</dt>
+                    <dd className="col-span-2 font-medium text-gray-900">
+                      {book.pages && book.pages > 0 ? `${book.pages} Pages` : '280+ Pages'} • Latest Syllabus Edition
+                    </dd>
+                  </div>
+                  <div className="grid grid-cols-3 px-3.5 py-2 bg-gray-50/60">
+                    <dt className="font-semibold text-gray-500">Publisher / ID</dt>
+                    <dd className="col-span-2 font-medium text-gray-900">
+                      {book.publisher || 'Mocktime Publication'} ({book.id})
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+            </div>
+
+            {/* 4. Real Extracted Chapter-by-Chapter Table of Contents (when available from book sample) */}
+            {Array.isArray(book.tableOfContents) && book.tableOfContents.length > 0 && (
+              <div className="pt-2">
+                <h3 className="text-xs sm:text-sm font-bold text-gray-950 mb-2">
+                  Chapters &amp; Syllabus Sections Covered
+                </h3>
+                <ol className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 p-3.5 rounded-xl bg-gray-50 border border-gray-100 text-xs text-gray-800">
+                  {book.tableOfContents.map((heading, idx) => (
+                    <li key={idx} className="flex items-start gap-2 leading-snug">
+                      <span className="font-bold text-[#4029AB] shrink-0">
+                        {String(idx + 1).padStart(2, '0')}.
+                      </span>
+                      <span className="font-medium text-gray-800">{heading}</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            )}
+
+            {/* 5. Real Sample Questions from This Specific Paper (when available from book sample) */}
+            {Array.isArray(book.sampleQuestions) && book.sampleQuestions.length > 0 && (
+              <div className="pt-2 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs sm:text-sm font-bold text-gray-950">
+                    Sample Questions from {book.title}
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setActiveMdReaderMode('sample')}
+                    className="text-[11px] font-bold text-[#4029AB] hover:underline cursor-pointer"
+                  >
+                    Read Full Free Sample →
+                  </button>
+                </div>
+                <div className="space-y-2.5">
+                  {book.sampleQuestions.map((sq, idx) => (
+                    <div
+                      key={idx}
+                      className="p-3.5 rounded-xl border border-gray-200/90 bg-white space-y-2"
+                    >
+                      <p className="text-xs font-bold text-gray-900 leading-relaxed">
+                        <span className="text-[#4029AB] mr-1.5">Q{idx + 1}.</span>
+                        {sq.question}
+                      </p>
+                      {Array.isArray(sq.options) && sq.options.length > 0 && (
+                        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-[11px] text-gray-700 pl-1">
+                          {sq.options.map((opt, oIdx) => (
+                            <li key={oIdx} className="leading-snug">
+                              {opt}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      {sq.answer && (
+                        <p className="text-[11px] font-semibold text-emerald-700 bg-emerald-50/80 px-2.5 py-1 rounded-md inline-block">
+                          {sq.answer}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 6. tags: array fields with 6 tags */}
             <div className="pt-2">
               <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-2">
                 Topic Tags
@@ -828,14 +892,6 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
             ))}
           </div>
         </section>
-
-        {/* Customer Reviews Section - Live Firebase DB Integration */}
-        <div id="book-ssr-reviews-section">
-          <BookReviewsSection
-            book={book}
-            onRatingUpdated={handleRatingUpdated}
-          />
-        </div>
 
         {/* Similar Books */}
         {relatedBooks.length > 0 && (

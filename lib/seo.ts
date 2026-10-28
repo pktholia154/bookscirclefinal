@@ -1,5 +1,4 @@
-import { Book, Category, Review } from './types';
-import { BOOK_FAQS } from './data';
+import { Book, Category } from './types';
 
 export const SITE_URL = 'https://bookscircle.org';
 export const SITE_NAME = 'BooksCircle';
@@ -102,7 +101,6 @@ export function generateWebsiteSchema() {
         },
         contactPoint: {
           '@type': 'ContactPoint',
-          telephone: '+91-9812000000',
           contactType: 'customer service',
           email: 'support@exam-kart.com',
           areaServed: 'IN',
@@ -116,21 +114,32 @@ export function generateWebsiteSchema() {
           postalCode: '127021',
           addressCountry: 'IN',
         },
-        sameAs: [
-          'https://twitter.com/bookscircle',
-          'https://facebook.com/bookscircle',
-        ],
       },
     ],
   };
 }
 
 /**
- * Generates Comprehensive Nested JSON-LD for an individual Book / Product
+ * Strips raw Markdown syntax (**, __, ###, ##, #, backticks) from plain-text meta & schema descriptions
+ */
+export function stripMarkdownToPlainText(input?: string): string {
+  if (!input) return '';
+  return String(input)
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/__(.*?)__/g, '$1')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/#{1,6}\s+/g, '')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\*/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Generates Clean, Compliant JSON-LD for an individual Digital Book / Product.
+ * Excludes all fake ratings/reviews, physical shipping claims, or contradictory return policies.
  */
 export function generateBookSchema(book: Book) {
-  const ratingValue = Number(book.rating || 4.7).toFixed(1);
-  const ratingCount = Number(book.rating_count || 120);
   const buyPrice = Number(book.buy_price || 0);
   const bookSlug = book.seoslug || book.slug || book.id;
   const bookUrl = `${SITE_URL}/book/${encodeURIComponent(bookSlug)}`;
@@ -147,19 +156,60 @@ export function generateBookSchema(book: Book) {
   const datePublished = safeIsoDate(book.created_at, book.published_date, '2026-01-01T00:00:00.000Z').split('T')[0];
   const dateModified = safeIsoDate(book.updated_at, book.created_at, book.published_date);
 
-  const faqItems = BOOK_FAQS.map((faq) => ({
-    '@type': 'Question',
-    name: faq.question,
-    acceptedAnswer: {
-      '@type': 'Answer',
-      text: faq.answer,
+  const cleanDescription = stripMarkdownToPlainText(
+    book.seo_description ||
+      book.seoDescription ||
+      book.full_description ||
+      `${book.title} PDF eBook for ${book.category || 'competitive'} exams.`
+  );
+
+  const bookProductEntity: Record<string, any> = {
+    '@type': ['Book', 'Product'],
+    '@id': `${bookUrl}#book`,
+    name: book.title,
+    sku: book.id,
+    mpn: book.id,
+    url: bookUrl,
+    mainEntityOfPage: bookUrl,
+    image: [coverUrl],
+    description: cleanDescription,
+    inLanguage: book.language || 'English',
+    bookFormat: 'https://schema.org/EBook',
+    ...(book.pages && book.pages > 0 ? { numberOfPages: book.pages } : {}),
+    ...(book.isbn ? { isbn: book.isbn } : {}),
+    category: book.category || 'Exam Guides',
+    datePublished,
+    dateModified,
+    brand: {
+      '@type': 'Brand',
+      name: book.publisher || BRAND_NAME,
     },
-  }));
+    author: {
+      '@type': 'Organization',
+      name: book.author || book.publisher || 'Mocktime Publication',
+    },
+    publisher: {
+      '@type': 'Organization',
+      name: book.publisher || 'Mocktime Publication',
+    },
+    offers: {
+      '@type': 'Offer',
+      '@id': `${bookUrl}#offer`,
+      url: bookUrl,
+      priceCurrency: 'INR',
+      price: buyPrice.toFixed(2),
+      availability: 'https://schema.org/InStock',
+      itemCondition: 'https://schema.org/NewCondition',
+      seller: {
+        '@type': 'Organization',
+        name: BRAND_NAME,
+      },
+    },
+  };
 
   return {
     '@context': 'https://schema.org',
     '@graph': [
-      // 1. Breadcrumbs (referencing canonical /category/[slug] URL)
       {
         '@type': 'BreadcrumbList',
         '@id': `${bookUrl}#breadcrumb`,
@@ -184,143 +234,7 @@ export function generateBookSchema(book: Book) {
           },
         ],
       },
-      // 2. Book & Product Unified Entity (Google Merchant Listings & Rich Results Compliant)
-      {
-        '@type': ['Book', 'Product'],
-        '@id': `${bookUrl}#book`,
-        name: book.title,
-        headline: book.title,
-        sku: book.id,
-        mpn: bookSlug,
-        url: bookUrl,
-        mainEntityOfPage: bookUrl,
-        image: [coverUrl],
-        description:
-          book.seo_description ||
-          book.full_description ||
-          `${book.title} PDF eBook for ${book.category || 'competitive'} exams.`,
-        inLanguage: book.language || 'English',
-        bookFormat: 'https://schema.org/EBook',
-        numberOfPages: book.pages || undefined,
-        isbn: book.isbn || undefined,
-        category: book.category || 'Exam Guides',
-        datePublished,
-        dateModified,
-        brand: {
-          '@type': 'Brand',
-          name: book.publisher || BRAND_NAME,
-        },
-        author: {
-          '@type': 'Person',
-          name: book.author || 'Editorial Board',
-        },
-        publisher: {
-          '@type': 'Organization',
-          name: book.publisher || BRAND_NAME,
-        },
-        offers: {
-          '@type': 'Offer',
-          '@id': `${bookUrl}#offer`,
-          url: bookUrl,
-          priceCurrency: 'INR',
-          price: buyPrice.toString(),
-          priceValidUntil: '2027-12-31',
-          availability: 'https://schema.org/InStock',
-          itemCondition: 'https://schema.org/NewCondition',
-          seller: {
-            '@type': 'Organization',
-            name: BRAND_NAME,
-          },
-          hasMeasurement: {
-            '@type': 'QuantitativeValue',
-            value: book.file_size || 'Digital PDF',
-          },
-          shippingDetails: {
-            '@type': 'OfferShippingDetails',
-            shippingRate: {
-              '@type': 'MonetaryAmount',
-              value: '0',
-              currency: 'INR',
-            },
-            shippingDestination: {
-              '@type': 'DefinedRegion',
-              addressCountry: 'IN',
-            },
-            deliveryTime: {
-              '@type': 'ShippingDeliveryTime',
-              handlingTime: {
-                '@type': 'QuantitativeValue',
-                minValue: 0,
-                maxValue: 0,
-                unitCode: 'DAY',
-              },
-              transitTime: {
-                '@type': 'QuantitativeValue',
-                minValue: 0,
-                maxValue: 0,
-                unitCode: 'DAY',
-              },
-            },
-          },
-          hasMerchantReturnPolicy: {
-            '@type': 'MerchantReturnPolicy',
-            applicableCountry: 'IN',
-            returnPolicyCategory: 'https://schema.org/MerchantReturnFiniteReturnWindow',
-            merchantReturnDays: 7,
-            returnMethod: 'https://schema.org/ReturnByMail',
-            returnFees: 'https://schema.org/FreeReturn',
-            merchantReturnLink: `${SITE_URL}/refund-policy`,
-          },
-        },
-        aggregateRating: {
-          '@type': 'AggregateRating',
-          '@id': `${bookUrl}#aggregateRating`,
-          ratingValue: ratingValue,
-          reviewCount: ratingCount > 0 ? ratingCount : 15,
-          bestRating: '5',
-          worstRating: '1',
-        },
-        review:
-          book.reviews && book.reviews.length > 0
-            ? book.reviews.map((r: Review) => ({
-                '@type': 'Review',
-                author: {
-                  '@type': 'Person',
-                  name: r.user || 'Verified Buyer',
-                },
-                datePublished: safeIsoDate(r.date, '2026-08-20').split('T')[0],
-                reviewBody: r.comment,
-                reviewRating: {
-                  '@type': 'Rating',
-                  ratingValue: (r.rating || 5).toString(),
-                  bestRating: '5',
-                  worstRating: '1',
-                },
-              }))
-            : [
-                {
-                  '@type': 'Review',
-                  author: {
-                    '@type': 'Person',
-                    name: 'Verified Aspirant',
-                  },
-                  datePublished: '2026-08-15',
-                  reviewBody: `Exceptional exam prep resource. High quality syllabus coverage and crisp PDF rendering for ${book.category}.`,
-                  reviewRating: {
-                    '@type': 'Rating',
-                    ratingValue: ratingValue,
-                    bestRating: '5',
-                    worstRating: '1',
-                  },
-                },
-              ],
-      },
-      // 3. FAQPage Schema
-      {
-        '@type': 'FAQPage',
-        '@id': `${bookUrl}#faq`,
-        mainEntity: faqItems,
-      },
+      bookProductEntity,
     ],
   };
 }
@@ -338,7 +252,7 @@ export function generateCategorySchema(
   const categoryUrl = `${SITE_URL}${basePath}/${encodeURIComponent(categorySlug)}`;
   const effectiveDescription =
     seoCat ||
-    `Download ${categoryTitle} PDF e-books, previous year solved question papers, and competitive exam study material with instant access on ${SITE_NAME}.`;
+    `Download ${categoryTitle} PDF e-books, previous year solved question papers, and competitive exam study material on ${SITE_NAME}.`;
 
   return {
     '@context': 'https://schema.org',
@@ -356,12 +270,6 @@ export function generateCategorySchema(
           {
             '@type': 'ListItem',
             position: 2,
-            name: basePath === '/collection' ? 'Collections' : 'Categories',
-            item: `${SITE_URL}/`,
-          },
-          {
-            '@type': 'ListItem',
-            position: 3,
             name: categoryTitle,
             item: categoryUrl,
           },
@@ -371,7 +279,7 @@ export function generateCategorySchema(
         '@type': 'CollectionPage',
         '@id': `${categoryUrl}#webpage`,
         url: categoryUrl,
-        name: `${categoryTitle} PDF E-Books & Study Material | ${SITE_NAME}`,
+        name: `${categoryTitle} PDF E-Books & Study Material`,
         description: effectiveDescription,
         isPartOf: {
           '@id': `${SITE_URL}/#website`,
@@ -389,7 +297,7 @@ export function generateCategorySchema(
               image: book.cover,
               offers: {
                 '@type': 'Offer',
-                price: book.buy_price.toString(),
+                price: Number(book.buy_price || 0).toFixed(2),
                 priceCurrency: 'INR',
                 availability: 'https://schema.org/InStock',
               },
@@ -405,7 +313,7 @@ export function generateCategorySchema(
  * Generates Homepage CollectionPage & ItemList Schema for Root Discovery Route (/)
  */
 export function generateHomePageSchema(books: Book[], categories: Category[]) {
-  const topBooks = books.filter((b) => b.isActive !== false).slice(0, 24);
+  const topBooks = books.filter((b) => b.isActive !== false && !b.canonicalSlug).slice(0, 24);
   return {
     '@context': 'https://schema.org',
     '@graph': [
@@ -460,5 +368,3 @@ export function generateContactPageSchema() {
     },
   };
 }
-
-

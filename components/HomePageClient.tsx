@@ -816,7 +816,7 @@ export default function HomePage({
 
   // Curated collections for Horizontal Carousel Sections - Enforced 12-item initial limit
   const featuredTrendingBooks = useMemo(() => {
-    const featured = books.filter((b) => b && ((b.rating && b.rating >= 4.6) || (Array.isArray(b.tags) && b.tags.includes('featured'))));
+    const featured = books.filter((b) => b && Array.isArray(b.tags) && b.tags.includes('featured'));
     return (featured.length > 0 ? featured : books).slice(0, 12);
   }, [books]);
 
@@ -1012,9 +1012,9 @@ export default function HomePage({
                 ) : (
                   /* Default Full Home View with Peekaboo Carousel & Grids & Standard List */
                   <>
-                    {/* Horizontal Carousel 1: Trending & Top Rated with Peekaboo Effect */}
+                    {/* Horizontal Carousel 1: Trending & Featured with Peekaboo Effect */}
                     <CarouselSection
-                      title="Trending & Top Rated"
+                      title="Trending & Featured"
                       sectionId="trending-books"
                       limit={12}
                       viewAllHref="/collection/trending"

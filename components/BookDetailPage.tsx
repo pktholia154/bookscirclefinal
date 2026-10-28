@@ -24,9 +24,8 @@ import {
   HelpCircle,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Book, Review } from '@/lib/types';
-import { DEFAULT_BOOK_COVER, BOOK_FAQS } from '@/lib/data';
-import { BookReviewsSection } from '@/components/BookReviewsSection';
+import { Book } from '@/lib/types';
+import { DEFAULT_BOOK_COVER } from '@/lib/data';
 import { SampleSwitcher } from '@/components/SampleSwitcher';
 import { InstallAppBanner } from '@/components/InstallAppBanner';
 import { IOSHomeInstallBanner } from '@/components/IOSHomeInstallBanner';
@@ -123,20 +122,6 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
   const book = currentBook;
   const imgSrc = imgLoadFailed ? DEFAULT_BOOK_COVER : (book.cover || DEFAULT_BOOK_COVER);
 
-  // Memoized rating updater to prevent cyclical re-renders
-  const handleRatingUpdated = useCallback((newRating: number, newCount: number) => {
-    setCurrentBook((prev) => {
-      if (prev.rating === newRating && prev.rating_count === newCount) {
-        return prev;
-      }
-      return {
-        ...prev,
-        rating: newRating,
-        rating_count: newCount,
-      };
-    });
-  }, []);
-
   // Scroll to top on mount
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' });
@@ -175,15 +160,13 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
     showToast(res.isWishlisted ? 'Added to your wishlist!' : 'Removed from wishlist');
   };
 
-  const rating = book.rating && book.rating > 0 ? book.rating : 4.8;
-  const ratingCount = book.rating_count && book.rating_count > 0 ? book.rating_count : 120;
-  const formattedReviewsCount =
-    ratingCount >= 1000
-      ? `${(ratingCount / 1000).toFixed(1)}K`
-      : ratingCount.toString();
-
   const publisherName = book.publisher || book.publication || 'Mocktime Publication';
   const pageCount = book.pages && book.pages > 0 ? book.pages : 280;
+
+  const cleanSummaryText = useMemo(() => {
+    const raw = book.seo_description || book.seoDescription || '';
+    return raw.replace(/\*\*+/g, '').replace(/__+/g, '').replace(/^#+\s+/gm, '').trim();
+  }, [book.seo_description, book.seoDescription]);
 
   // Real tags from Firestore book document
   const displayTags = useMemo(() => {
@@ -295,29 +278,10 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
           </div>
         </section>
 
-        {/* 3. Key Metrics & Action Bar: Reviews | Share | Wishlist | Add to cart */}
+        {/* 3. Action Bar: Share | Wishlist | Add to cart */}
         <section className="border-y border-gray-200/80 py-2.5 my-1">
-          <div className="grid grid-cols-4 items-center text-center divide-x divide-gray-200">
-            {/* 1. Reviews */}
-            <button
-              type="button"
-              id="book-detail-reviews-stat-btn"
-              onClick={() => {
-                const el = document.getElementById('book-detail-reviews-section');
-                if (el) el.scrollIntoView({ behavior: 'smooth' });
-              }}
-              className="flex flex-col items-center justify-center px-1 py-0.5 hover:bg-gray-50/80 transition-colors cursor-pointer"
-            >
-              <div className="flex items-center justify-center gap-0.5 text-xs font-bold text-gray-800">
-                <span>{rating.toFixed(1)}</span>
-                <Star className="w-3 h-3 fill-gray-700 text-gray-700" />
-              </div>
-              <span className="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">
-                {formattedReviewsCount} {ratingCount === 1 ? 'review' : 'reviews'}
-              </span>
-            </button>
-
-            {/* 2. Share */}
+          <div className="grid grid-cols-3 items-center text-center divide-x divide-gray-200">
+            {/* 1. Share */}
             <button
               type="button"
               id="book-detail-share-stat-btn"
@@ -330,7 +294,7 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
               </span>
             </button>
 
-            {/* 3. Wishlist */}
+            {/* 2. Wishlist */}
             <button
               type="button"
               id="book-detail-wishlist-stat-btn"
@@ -347,7 +311,7 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
               </span>
             </button>
 
-            {/* 4. Add to Cart (Base theme color) */}
+            {/* 3. Add to Cart (Base theme color) */}
             <button
               type="button"
               id="book-detail-cart-stat-btn"
@@ -453,19 +417,6 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
           </h2>
 
           <div className="space-y-3.5 text-xs sm:text-sm leading-relaxed">
-            {/* Aspect 1: seoDescription: text field */}
-            {(book.seo_description || book.seoDescription) && (
-              <div className="p-3.5 rounded-xl bg-gray-50 border border-gray-100">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-1">
-                  Summary
-                </span>
-                <p className="font-semibold text-gray-900 text-xs sm:text-sm leading-relaxed">
-                  {book.seo_description || book.seoDescription}
-                </p>
-              </div>
-            )}
-
-            {/* Aspect 2: fullDescription: markdown field with basic markdown syntax, parsed in markdown and treating \n as line break */}
             {(book.full_description || book.fullDescription) ? (
               <div className="text-gray-700 leading-relaxed text-xs sm:text-sm">
                 <div className="markdown-body">
@@ -473,7 +424,7 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
                     remarkPlugins={[remarkGfm, remarkBreaks]}
                     components={{
                       p: ({ children }) => <p className="mb-2 leading-relaxed text-gray-700 last:mb-0">{children}</p>,
-                      h1: ({ children }) => <h1 className="text-sm sm:text-base font-bold text-gray-950 mt-3 mb-1.5">{children}</h1>,
+                      h1: ({ children }) => <h2 className="text-sm sm:text-base font-bold text-gray-950 mt-3 mb-1.5">{children}</h2>,
                       h2: ({ children }) => <h2 className="text-xs sm:text-sm font-bold text-gray-950 mt-2.5 mb-1">{children}</h2>,
                       h3: ({ children }) => <h3 className="text-xs font-bold text-gray-900 mt-2 mb-1">{children}</h3>,
                       ul: ({ children }) => <ul className="list-disc pl-4 space-y-1 my-2 text-gray-700">{children}</ul>,
@@ -499,60 +450,34 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
                   </Markdown>
                 </div>
               </div>
-            ) : (
-              !(book.seo_description || book.seoDescription) && (
-                <p className="text-gray-500 italic text-xs">
-                  No detailed description provided for this title.
-                </p>
-              )
+            ) : cleanSummaryText ? (
+              <p className="text-gray-700 text-xs sm:text-sm leading-relaxed">
+                {cleanSummaryText}
+              </p>
+            ) : null}
+
+            {/* Genuine Topic Tags */}
+            {displayTags.length > 0 && (
+              <div className="pt-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-2">
+                  Topic Tags
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {displayTags.map((tag, idx) => (
+                    <span
+                      key={idx}
+                      className="inline-flex items-center px-2.5 py-1 text-[11px] font-medium text-gray-700 bg-gray-100 hover:bg-gray-200/80 rounded-full transition-colors cursor-default"
+                    >
+                      #{tag.replace(/^#/, '')}
+                    </span>
+                  ))}
+                </div>
+              </div>
             )}
-
-            {/* Aspect 3: tags: array fields with 6 tags rendered as flexible chip buttons */}
-            <div className="pt-2">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-2">
-                Topic Tags
-              </span>
-              <div className="flex flex-wrap gap-1.5">
-                {displayTags.map((tag, idx) => (
-                  <span
-                    key={idx}
-                    className="inline-flex items-center px-2.5 py-1 text-[11px] font-medium text-gray-700 bg-gray-100 hover:bg-gray-200/80 rounded-full transition-colors cursor-default"
-                  >
-                    #{tag.replace(/^#/, '')}
-                  </span>
-                ))}
-              </div>
-            </div>
           </div>
         </section>
 
-        {/* Frequently Asked Questions */}
-        <section className="space-y-3 pt-4 border-t border-gray-100">
-          <h2 className="text-base sm:text-lg font-bold text-gray-950 flex items-center gap-2">
-            <HelpCircle className="w-4 h-4 text-[#4029AB]" />
-            <span>Frequently Asked Questions</span>
-          </h2>
-          <div className="space-y-2.5">
-            {BOOK_FAQS.map((faq, index) => (
-              <div key={index} className="p-3.5 rounded-xl border border-gray-200/80 bg-gray-50/50 space-y-1">
-                <h3 className="text-xs font-bold text-gray-900">{faq.question}</h3>
-                <p className="text-[11px] text-gray-600 leading-relaxed">
-                  {faq.answer}
-                </p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* 6. Ratings and reviews Section - Live Firebase DB Integration */}
-        <div id="book-detail-reviews-section">
-          <BookReviewsSection
-            book={book}
-            onRatingUpdated={handleRatingUpdated}
-          />
-        </div>
-
-        {/* 7. Similar Books Section (Carousel) */}
+        {/* 6. Similar Books Section (Carousel) */}
         {relatedBooks.length > 0 && (
           <section className="space-y-3 pt-4 border-t border-gray-100">
             <h3 className="text-sm font-bold text-gray-900">

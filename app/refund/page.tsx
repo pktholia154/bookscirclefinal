@@ -1,4 +1,5 @@
-import RefundPolicyPage, { metadata } from '../refund-policy/page';
+import { permanentRedirect } from 'next/navigation';
 
-export { metadata };
-export default RefundPolicyPage;
+export default function RefundRedirectPage() {
+  permanentRedirect('/refund-policy');
+}

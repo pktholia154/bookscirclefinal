@@ -1,4 +1,5 @@
 import { Metadata } from 'next';
+import { notFound, permanentRedirect } from 'next/navigation';
 import {
   getBooksFromFirestore,
   getCategoriesFromFirestore,
@@ -39,7 +40,7 @@ function filterBooksByCategory(category: Category, books: Book[]): Book[] {
   const catClean = catTitleLower.replace(/\s+exams?$/, '').replace(/-exams?$/, '');
 
   return books.filter((b) => {
-    if (!b) return false;
+    if (!b || b.isActive === false || b.canonicalSlug) return false;
     const bookCat = (b.category || '').toLowerCase().trim();
     const bookCatSlug = (b.categorySlug || '').toLowerCase().trim();
     return (
@@ -70,16 +71,27 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!categories || categories.length === 0) categories = INITIAL_CATEGORIES;
 
   const category = matchCategory(slug, categories);
-  const title = category ? category.title : decodeURIComponent(slug);
-  const canonicalSlug = category ? (category.seolsug || category.id) : decodeURIComponent(slug);
-  const seoCat = category?.seoCat || '';
+  if (!category) {
+    return {
+      title: 'Category Not Found',
+      description: 'The requested exam category could not be found in our catalog.',
+      robots: {
+        index: false,
+        follow: false,
+      },
+    };
+  }
+
+  const title = category.title;
+  const canonicalSlug = category.seolsug || category.id;
+  const seoCat = category.seoCat || '';
   const metaDescription =
     seoCat ||
     `Download ${title} PDF e-books, previous year solved question papers, and competitive exam study material with instant preview on ${SITE_NAME}.`;
   const url = `${SITE_URL}/category/${encodeURIComponent(canonicalSlug)}`;
 
   return {
-    title: `${title} PDF E-Books & Study Material | ${SITE_NAME}`,
+    title: `${title} PDF E-Books & Study Material`,
     description: metaDescription,
     alternates: {
       canonical: url,
@@ -106,6 +118,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function CategoryPage({ params }: Props) {
   const { slug } = await params;
+  const decodedSlug = decodeURIComponent(slug);
 
   let categories: Category[] = [];
   let books: Book[] = [];
@@ -116,32 +129,51 @@ export default async function CategoryPage({ params }: Props) {
       getBooksFromFirestore(),
     ]);
     categories = catsData.length > 0 ? catsData : INITIAL_CATEGORIES;
-    books = booksData.length > 0 ? booksData : INITIAL_BOOKS;
+    books = (booksData.length > 0 ? booksData : INITIAL_BOOKS).filter(
+      (b) => b && b.isActive !== false && !b.canonicalSlug
+    );
   } catch {
     categories = INITIAL_CATEGORIES;
     books = INITIAL_BOOKS;
   }
 
-  const category = matchCategory(slug, categories);
-  const categoryTitle = category ? category.title : decodeURIComponent(slug);
+  const category = matchCategory(decodedSlug, categories);
+  const categoryTitle = category ? category.title : decodedSlug;
   const seoCat = category?.seoCat || '';
 
+  // 301 Redirect non-canonical category slug variants to the canonical category slug
+  const canonicalCategorySlug = category ? category.seolsug || category.id : '';
+  if (
+    category &&
+    canonicalCategorySlug &&
+    decodedSlug.toLowerCase() !== canonicalCategorySlug.toLowerCase()
+  ) {
+    permanentRedirect(`/category/${encodeURIComponent(canonicalCategorySlug)}`);
+  }
+
   // Fetch verified category books directly from Firestore with fallback to local filter
-  let categoryBooks = await getBooksByCategory(categoryTitle || slug);
+  let categoryBooks = (await getBooksByCategory(categoryTitle || decodedSlug)).filter(
+    (b) => b && b.isActive !== false && !b.canonicalSlug
+  );
   if (categoryBooks.length === 0 && category) {
     categoryBooks = filterBooksByCategory(category, books);
   }
   if (categoryBooks.length === 0) {
-    const rawTarget = decodeURIComponent(slug).toLowerCase().trim();
+    const rawTarget = decodedSlug.toLowerCase().trim();
     categoryBooks = books.filter((b) => (b?.category || '').toLowerCase().trim() === rawTarget);
   }
 
-  const targetBooks = (categoryBooks.length > 0 ? categoryBooks : books.slice(0, 72)).map(slimBookForList);
+  // Return genuine HTTP 404 when neither a valid category nor any matching books exist
+  if (!category && categoryBooks.length === 0) {
+    notFound();
+  }
+
+  const targetBooks = categoryBooks.map(slimBookForList);
 
   // Schema.org JSON-LD for rich SEO
   const jsonLd = generateCategorySchema(
     categoryTitle,
-    slug,
+    canonicalCategorySlug || decodedSlug,
     seoCat,
     targetBooks.slice(0, 24)
   );
@@ -154,7 +186,7 @@ export default async function CategoryPage({ params }: Props) {
       />
       <CategoryPageClient
         categoryTitle={categoryTitle}
-        categorySlug={slug}
+        categorySlug={canonicalCategorySlug || decodedSlug}
         seoCat={seoCat}
         books={targetBooks}
         allCategories={categories}

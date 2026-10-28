@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getBooksFromFirestore } from '@/lib/services/books';
-import { SITE_URL, SITE_NAME, BRAND_NAME, safeIsoDate, getBookTimestampMs } from '@/lib/seo';
+import { SITE_URL, SITE_NAME, BRAND_NAME, safeIsoDate, getBookTimestampMs, stripMarkdownToPlainText } from '@/lib/seo';
 
 // 15-minute in-memory cache
 let cachedFeedXml: string | null = null;
@@ -53,9 +53,9 @@ export async function GET(req: NextRequest) {
   try {
     const books = await getBooksFromFirestore();
 
-    // Latest 100 published items ordered DESC
+    // Latest 100 published items ordered DESC (excluding duplicate redirect variants)
     const sortedBooks = books
-      .filter((b) => b.isActive !== false)
+      .filter((b) => b.isActive !== false && !b.canonicalSlug)
       .map((book, index) => ({ book, index, ts: getBookTimestampMs(book) }))
       .sort((a, b) => (b.ts !== a.ts ? b.ts - a.ts : b.index - a.index))
       .slice(0, 100)
@@ -67,7 +67,8 @@ export async function GET(req: NextRequest) {
         const bookUrl = `${SITE_URL}/book/${slug}`;
         const isoDate = safeIsoDate(b.updated_at, b.created_at, b.published_date);
         const pubDate = new Date(isoDate).toUTCString();
-        const desc = b.seo_description || b.full_description || `${b.title} PDF eBook for competitive exams.`;
+        const rawDesc = b.seo_description || b.full_description || `${b.title} PDF eBook for competitive exams.`;
+        const desc = stripMarkdownToPlainText(rawDesc);
 
         return `    <item>
       <title><![CDATA[${escapeCdata(b.title)}]]></title>

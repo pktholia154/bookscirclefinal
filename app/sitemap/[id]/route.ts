@@ -55,13 +55,22 @@ export async function GET(
     });
   }
 
-  let xml: string;
+  let xml: string | null = null;
   if (cleanId === 'latest') {
     xml = await buildLatestSitemapXml(LATEST_SITEMAP_MAX_URLS);
-  } else {
-    const parsedBatch = parseInt(cleanId, 10);
-    const batchId = isNaN(parsedBatch) || parsedBatch < 0 ? 0 : parsedBatch;
+  } else if (/^\d+$/.test(cleanId)) {
+    const batchId = parseInt(cleanId, 10);
     xml = await buildBatchSitemapXml(batchId);
+  }
+
+  if (!xml) {
+    return new NextResponse('Sitemap batch not found', {
+      status: 404,
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'X-Robots-Tag': 'noindex, nofollow',
+      },
+    });
   }
 
   const etag = generateEtag(xml);

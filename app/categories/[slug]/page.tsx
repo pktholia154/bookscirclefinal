@@ -1,5 +1,10 @@
-import CategoryPage, { generateMetadata } from '../../category/[slug]/page';
+import { permanentRedirect } from 'next/navigation';
 
-export const revalidate = 300;
-export { generateMetadata };
-export default CategoryPage;
+interface PageProps {
+  params: Promise<{ slug: string }>;
+}
+
+export default async function CategoriesRedirectPage({ params }: PageProps) {
+  const { slug } = await params;
+  permanentRedirect(`/category/${encodeURIComponent(decodeURIComponent(slug))}`);
+}

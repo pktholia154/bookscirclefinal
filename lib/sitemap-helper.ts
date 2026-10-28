@@ -87,12 +87,6 @@ export function getStaticSitemapEntries(nowIso: string): SitemapUrlEntry[] {
       priority: '0.8',
     },
     {
-      loc: `${SITE_URL}/collection/top-rated`,
-      lastmod: nowIso,
-      changefreq: 'daily',
-      priority: '0.8',
-    },
-    {
       loc: `${SITE_URL}/collection/new-releases`,
       lastmod: nowIso,
       changefreq: 'daily',
@@ -168,7 +162,7 @@ export async function getAllCatalogSitemapEntries(): Promise<SitemapUrlEntry[]> 
     });
 
     const rawBooks = books && books.length > 0 ? books : INITIAL_BOOKS;
-    const activeBooks = rawBooks.filter((b) => b.isActive !== false);
+    const activeBooks = rawBooks.filter((b) => b.isActive !== false && !b.canonicalSlug);
 
     const bookEntries: SitemapUrlEntry[] = activeBooks.map((b) => {
       const slug = encodeURIComponent(b.seoslug || b.slug || b.id);
@@ -202,7 +196,7 @@ export async function buildLatestSitemapXml(maxUrls: number = LATEST_SITEMAP_MAX
     ]);
 
     const rawBooks = books && books.length > 0 ? books : INITIAL_BOOKS;
-    const activeBooks = rawBooks.filter((b) => b.isActive !== false);
+    const activeBooks = rawBooks.filter((b) => b.isActive !== false && !b.canonicalSlug);
 
     // Sort active books by latest timestamp descending (preserving reverse insertion order on ties)
     const indexedBooks = activeBooks.map((book, index) => ({
@@ -279,16 +273,15 @@ export async function buildLatestSitemapXml(maxUrls: number = LATEST_SITEMAP_MAX
 /**
  * Builds a specific batch sitemap XML (/sitemap/0.xml, /sitemap/1.xml, etc.) with up to 1,000 URLs per batch.
  */
-export async function buildBatchSitemapXml(batchId: number): Promise<string> {
+export async function buildBatchSitemapXml(batchId: number): Promise<string | null> {
+  if (batchId < 0) return null;
   const allEntries = await getAllCatalogSitemapEntries();
-  const safeBatch = Math.max(0, batchId);
-  const start = safeBatch * SITEMAP_BATCH_SIZE;
+  const start = batchId * SITEMAP_BATCH_SIZE;
   const end = start + SITEMAP_BATCH_SIZE;
-  let sliced = allEntries.slice(start, end);
+  const sliced = allEntries.slice(start, end);
 
-  // Guarantee non-empty valid XML even if a higher batch index is requested during cache warm-up
-  if (sliced.length === 0 && allEntries.length > 0) {
-    sliced = allEntries.slice(Math.max(0, allEntries.length - Math.min(200, allEntries.length)));
+  if (sliced.length === 0) {
+    return null;
   }
 
   return renderUrlsetXml(sliced);

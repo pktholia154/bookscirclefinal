@@ -3,7 +3,7 @@ import ContactPageClient from '@/components/ContactPageClient';
 import { generateContactPageSchema, SITE_URL, SITE_NAME, BRAND_NAME } from '@/lib/seo';
 
 export const metadata: Metadata = {
-  title: `Contact Us & Customer Support | ${BRAND_NAME} - ${SITE_NAME}`,
+  title: `Contact Us & Customer Support | ${BRAND_NAME}`,
   description:
     'Official customer support and contact desk for Exam Kart (Legal entity: Pardeep Kumar) at BooksCircle.org. Get help with PDF e-books, Razorpay orders, and exam study material.',
   alternates: {

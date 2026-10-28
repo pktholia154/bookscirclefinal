@@ -1,8 +1,10 @@
-import BookSSRPage, {
-  generateMetadata,
-} from '../../book/[slug]/page';
+import { permanentRedirect } from 'next/navigation';
 
-export const revalidate = 60;
-export const dynamicParams = true;
-export { generateMetadata };
-export default BookSSRPage;
+interface PageProps {
+  params: Promise<{ slug: string }>;
+}
+
+export default async function BooksRedirectPage({ params }: PageProps) {
+  const { slug } = await params;
+  permanentRedirect(`/book/${encodeURIComponent(decodeURIComponent(slug))}`);
+}
