@@ -164,15 +164,15 @@ export function persistAndBroadcastAuthUser(
     if ('caches' in window) {
       caches
         .open(AUTH_CACHE_NAME)
-        .then((cache) => {
+        .then(async (cache) => {
           if (profile) {
             const response = new Response(
               JSON.stringify({ profile, updatedAt: Date.now() }),
               { headers: { 'Content-Type': 'application/json' } }
             );
-            return cache.put(AUTH_CACHE_URL, response);
+            await cache.put(AUTH_CACHE_URL, response);
           } else {
-            return cache.delete(AUTH_CACHE_URL);
+            await cache.delete(AUTH_CACHE_URL);
           }
         })
         .catch(() => {});

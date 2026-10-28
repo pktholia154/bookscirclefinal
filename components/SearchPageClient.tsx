@@ -269,7 +269,9 @@ function SearchPageContent({
         onClearCart={() => setCart([])}
         currentUser={currentUser}
         onRequireLogin={(onLoginCompleted) => {
-          setPendingActionAfterLogin(() => onLoginCompleted);
+          if (onLoginCompleted) {
+            setPendingActionAfterLogin(() => onLoginCompleted);
+          }
           setIsGoogleModalOpen(true);
         }}
         onSuccessfulCheckout={(items, paymentData) => {

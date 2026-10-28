@@ -425,14 +425,14 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
           </div>
         </section>
 
-        {/* Animated Green Notice + App Install Banner */}
+        {/* Animated Orange Notice + App Install Banner */}
         <div className="pt-0.5 space-y-1.5">
           <motion.p
             id="book-detail-my-books-notice"
             initial={{ opacity: 0.75 }}
             animate={{ opacity: [0.65, 1, 0.65], y: [0, -1.5, 0] }}
             transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
-            className="text-xs sm:text-[13px] font-semibold text-emerald-600 leading-snug select-none"
+            className="text-xs sm:text-[13px] font-bold text-orange-600 leading-snug select-none"
           >
             Read/Access your purchased books in the &quot;My Books&quot; menu.
           </motion.p>

@@ -646,7 +646,9 @@ export const CategoryPageClient: React.FC<CategoryPageClientProps> = ({
                 providerId: 'google.com',
               }).catch(() => {});
               showToast(`Welcome, ${profile.displayName?.split(' ')[0]}!`);
-              onLoginCompleted(profile);
+              if (onLoginCompleted) {
+                onLoginCompleted(profile);
+              }
             }
           } catch {}
         }}
