@@ -34,7 +34,6 @@ import { IOSHomeInstallBanner } from '@/components/IOSHomeInstallBanner';
 import { IOSInstallGuideModal } from '@/components/IOSInstallGuideModal';
 import { InstallSuccessModal } from '@/components/InstallSuccessModal';
 import { usePWAInstall } from '@/hooks/use-pwa-install';
-import { CartDrawer } from '@/components/CartDrawer';
 import { BottomNav, TabKey } from '@/components/BottomNav';
 import { triggerNativeLoading } from '@/components/NativePageLoadingIndicator';
 import {
@@ -44,6 +43,10 @@ import {
 } from '@/lib/services/quick-jump';
 import { UserProfile } from '@/components/Header';
 
+const CartDrawer = dynamic(
+  () => import('@/components/CartDrawer').then((m) => m.CartDrawer),
+  { ssr: false }
+);
 const PDFReaderModal = dynamic(
   () => import('@/components/PDFReaderModal').then((m) => m.PDFReaderModal),
   { ssr: false }

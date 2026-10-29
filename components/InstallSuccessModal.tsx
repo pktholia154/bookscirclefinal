@@ -4,7 +4,6 @@ import React, { useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { CheckCircle2, ExternalLink, X } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
 
 interface InstallSuccessModalProps {
   isOpen?: boolean;
@@ -35,15 +34,10 @@ export const InstallSuccessModal: React.FC<InstallSuccessModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/45 backdrop-blur-xs">
-        <motion.div
-          initial={{ opacity: 0, y: 24, scale: 0.95 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 24, scale: 0.95 }}
-          transition={{ duration: 0.22, ease: 'easeOut' }}
-          className="w-full max-w-sm rounded-2xl bg-white border border-gray-200 p-4 sm:p-5 shadow-2xl relative"
-        >
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/45 backdrop-blur-xs">
+      <div
+        className="w-full max-w-sm rounded-2xl bg-white border border-gray-200 p-4 sm:p-5 shadow-2xl relative transition-all duration-200"
+      >
           <button
             onClick={onClose}
             className="absolute top-3 right-3 p-1 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer"
@@ -101,8 +95,7 @@ export const InstallSuccessModal: React.FC<InstallSuccessModalProps> = ({
               Done
             </button>
           </div>
-        </motion.div>
+        </div>
       </div>
-    </AnimatePresence>
   );
 };

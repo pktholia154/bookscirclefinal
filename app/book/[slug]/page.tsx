@@ -107,68 +107,88 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 }
 
+function isNextControlFlow(err: any): boolean {
+  if (!err) return false;
+  const digest = String(err.digest || '');
+  const msg = String(err.message || '');
+  return (
+    digest.startsWith('NEXT_REDIRECT') ||
+    digest.startsWith('NEXT_NOT_FOUND') ||
+    msg.includes('NEXT_REDIRECT') ||
+    msg.includes('NEXT_NOT_FOUND')
+  );
+}
+
 export default async function BookSSRPage({ params }: PageProps) {
-  const { slug } = await params;
-  let decodedSlug = slug;
   try {
-    decodedSlug = decodeURIComponent(slug);
-  } catch {}
+    const { slug } = await params;
+    let decodedSlug = slug;
+    try {
+      decodedSlug = decodeURIComponent(slug);
+    } catch {}
 
-  const book = await getFirestoreBookById(decodedSlug);
+    let book = await getFirestoreBookById(decodedSlug);
 
-  // Return genuine HTTP 404 when book does not exist (eliminates Soft 404s in Google Search Console)
-  if (!book || (book.isActive === false && !book.canonicalSlug)) {
+    // Return genuine HTTP 404 when book does not exist (eliminates Soft 404s in Google Search Console)
+    if (!book || (book.isActive === false && !book.canonicalSlug)) {
+      notFound();
+    }
+
+    // 301 Redirect duplicate variants, legacy slugs without -bk000xxxx, or raw BK IDs to the single canonical book URL
+    const canonicalTargetSlug = book.canonicalSlug || book.seoslug || book.slug || book.id;
+    if (canonicalTargetSlug) {
+      const cleanCanonical = canonicalTargetSlug.trim();
+      const cleanCurrent = decodedSlug.trim();
+      const encodedCanonical = encodeURIComponent(cleanCanonical);
+
+      // Only redirect if genuinely pointing to a different target and not already on the destination
+      if (
+        cleanCurrent.toLowerCase() !== cleanCanonical.toLowerCase() &&
+        slug.toLowerCase() !== encodedCanonical.toLowerCase()
+      ) {
+        permanentRedirect(`/book/${encodedCanonical}`);
+      }
+    }
+
+    // Fetch structured book differentiation data (Table of Contents + Sample MCQs)
+    let structuredPreview = { tableOfContents: [] as string[], sampleQuestions: [] as any[] };
+    try {
+      structuredPreview = await fetchBookStructuredPreview(book);
+    } catch {}
+
+    const enrichedBook: Book = {
+      ...book,
+      tableOfContents: structuredPreview.tableOfContents || [],
+      sampleQuestions: structuredPreview.sampleQuestions || [],
+    };
+
+    // Generate nested JSON-LD schema
+    let bookJsonLd: any = null;
+    try {
+      bookJsonLd = generateBookSchema(enrichedBook);
+    } catch (err) {
+      console.warn('generateBookSchema warning:', err);
+    }
+
+    return (
+      <>
+        {/* Dynamic Server-Injected JSON-LD Schema */}
+        {bookJsonLd && (
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{ __html: JSON.stringify(bookJsonLd) }}
+          />
+        )}
+
+        {/* Interactive & Accessible Presentation UI */}
+        <BookPageClient book={enrichedBook} />
+      </>
+    );
+  } catch (err: any) {
+    if (isNextControlFlow(err)) {
+      throw err;
+    }
+    console.error('BookSSRPage server exception caught:', err);
     notFound();
   }
-
-  // 301 Redirect duplicate variants, legacy slugs without -bk000xxxx, or raw BK IDs to the single canonical book URL
-  const canonicalTargetSlug = book.canonicalSlug || book.seoslug || book.slug || book.id;
-  if (canonicalTargetSlug) {
-    const cleanCanonical = canonicalTargetSlug.trim();
-    const cleanCurrent = decodedSlug.trim();
-    const encodedCanonical = encodeURIComponent(cleanCanonical);
-
-    // Only redirect if genuinely pointing to a different target and not already on the destination
-    if (
-      cleanCurrent.toLowerCase() !== cleanCanonical.toLowerCase() &&
-      slug.toLowerCase() !== encodedCanonical.toLowerCase()
-    ) {
-      permanentRedirect(`/book/${encodedCanonical}`);
-    }
-  }
-
-  // Fetch structured book differentiation data (Table of Contents + Sample MCQs)
-  let structuredPreview = { tableOfContents: [] as string[], sampleQuestions: [] as any[] };
-  try {
-    structuredPreview = await fetchBookStructuredPreview(book);
-  } catch {}
-
-  const enrichedBook: Book = {
-    ...book,
-    tableOfContents: structuredPreview.tableOfContents || [],
-    sampleQuestions: structuredPreview.sampleQuestions || [],
-  };
-
-  // Generate nested JSON-LD schema
-  let bookJsonLd: any = null;
-  try {
-    bookJsonLd = generateBookSchema(enrichedBook);
-  } catch (err) {
-    console.warn('generateBookSchema warning:', err);
-  }
-
-  return (
-    <>
-      {/* Dynamic Server-Injected JSON-LD Schema */}
-      {bookJsonLd && (
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(bookJsonLd) }}
-        />
-      )}
-
-      {/* Interactive & Accessible Presentation UI */}
-      <BookPageClient book={enrichedBook} />
-    </>
-  );
 }

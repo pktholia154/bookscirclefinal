@@ -1,8 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { FileText, Smartphone } from 'lucide-react';
-import { motion } from 'motion/react';
 
 interface SampleSwitcherProps {
   onOpenPdf: () => void;
@@ -10,78 +9,24 @@ interface SampleSwitcherProps {
   className?: string;
 }
 
-const SAMPLE_LETTERS = ['S', 'A', 'M', 'P', 'L', 'E'];
-
-/**
- * SampleSwitcher
- *
- * Implements an attention-catching switcher for book samples:
- * 1. "SAMPLE" centered with character-by-character entry animation.
- * 2. Rectangular split button with slight corner radius (rounded-md) containing "PDF" and "mobile" buttons.
- * 3. Split buttons remain completely stable and tactile for immediate clicking.
- * 4. Compatible with single-token theme (#4029AB, white, slate).
- */
 export const SampleSwitcher: React.FC<SampleSwitcherProps> = ({
   onOpenPdf,
   onOpenMd,
   className = '',
 }) => {
-  const [animKey, setAnimKey] = useState(0);
-
-  // Periodically re-animate characters every 4.2 seconds to continually grab visitor attention
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setAnimKey((prev) => (prev + 1) % 1000);
-    }, 4200);
-    return () => clearInterval(timer);
-  }, []);
-
   return (
     <div className={`flex flex-col gap-1 w-full ${className}`}>
-      {/* Attached SAMPLE tag text centered with character-by-character animation */}
+      {/* Attached SAMPLE tag text centered */}
       <div className="flex items-center justify-center px-0.5 text-center h-[18px]">
-        <motion.span
-          key={animKey}
+        <span
           id="sample-label-text"
           className="inline-flex items-center justify-center text-[10px] sm:text-[11px] font-bold text-gray-500 uppercase tracking-widest select-none"
-          initial="hidden"
-          animate="visible"
-          variants={{
-            hidden: { opacity: 0 },
-            visible: {
-              opacity: 1,
-              transition: {
-                staggerChildren: 0.08,
-                delayChildren: 0.1,
-              },
-            },
-          }}
         >
-          {SAMPLE_LETTERS.map((char, index) => (
-            <motion.span
-              key={index}
-              variants={{
-                hidden: { opacity: 0, y: -2, scale: 0.75 },
-                visible: {
-                  opacity: 1,
-                  y: 0,
-                  scale: 1,
-                  transition: {
-                    type: 'spring',
-                    damping: 12,
-                    stiffness: 220,
-                  },
-                },
-              }}
-              className="inline-block"
-            >
-              {char}
-            </motion.span>
-          ))}
-        </motion.span>
+          SAMPLE
+        </span>
       </div>
 
-      {/* 2. Rectangular Split Container with Slight Corner Radius (rounded-md) */}
+      {/* Rectangular Split Container with Slight Corner Radius (rounded-md) */}
       <div
         id="sample-split-capsule"
         className="flex items-stretch rounded-md overflow-hidden border-2 border-[#4029AB] shadow-xs h-10 w-full bg-[#4029AB] p-[2px] transition-shadow hover:shadow-md"
