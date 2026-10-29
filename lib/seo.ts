@@ -309,8 +309,31 @@ export function generateCategorySchema(
   };
 }
 
+export const HOME_PAGE_FAQS = [
+  {
+    question: 'How do I preview a book before buying on BooksCircle?',
+    answer:
+      'Every exam guide and question bank on BooksCircle includes a free sample preview. Click the Free Sample PDF or Mobile Reader button on any book page to inspect actual chapters, questions, and solutions before purchasing.',
+  },
+  {
+    question: 'How do I access my purchased PDF e-books after payment?',
+    answer:
+      'Once your Razorpay checkout completes, your purchased e-books unlock immediately in the "My Books" (Purchased) section. Your library is synced with your Google account so you can access your books anytime across devices.',
+  },
+  {
+    question: 'Which competitive exams are covered in the BooksCircle catalog?',
+    answer:
+      'BooksCircle offers chapterwise solved question banks, previous year papers, and study notes for SSC, Banking, Railway, UPSC, State PSC, State Exams, Teaching (CTET/TET), UGC NET, CUET PG, GATE, Defense, Law & Judiciary, Vocational (ITI), and IGNOU courses.',
+  },
+  {
+    question: 'Can I read the e-books on both mobile phones and laptops?',
+    answer:
+      'Yes. All books include both high-resolution PDF editions and an interactive Mobile Reader format with adjustable font sizes for comfortable reading on smartphones, tablets, and desktops.',
+  },
+];
+
 /**
- * Generates Homepage CollectionPage & ItemList Schema for Root Discovery Route (/)
+ * Generates Homepage CollectionPage, ItemList, and FAQPage Schema for Root Discovery Route (/) ONLY
  */
 export function generateHomePageSchema(books: Book[], categories: Category[]) {
   const topBooks = books.filter((b) => b.isActive !== false && !b.canonicalSlug).slice(0, 24);
@@ -343,6 +366,18 @@ export function generateHomePageSchema(books: Book[], categories: Category[]) {
             name: book.title,
           })),
         },
+      },
+      {
+        '@type': 'FAQPage',
+        '@id': `${SITE_URL}/#faq`,
+        mainEntity: HOME_PAGE_FAQS.map((faq) => ({
+          '@type': 'Question',
+          name: faq.question,
+          acceptedAnswer: {
+            '@type': 'Answer',
+            text: faq.answer,
+          },
+        })),
       },
     ],
   };

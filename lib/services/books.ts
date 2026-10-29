@@ -214,7 +214,7 @@ export function parseBookDocument(docSnap: any): Book {
     .trim();
   const seoslug = String(data.seoslug ?? data.slug ?? bookId).trim();
 
-  let resolvedCategory = data.category || 'CUET PG';
+  let resolvedCategory = data.category || 'Exam Guides';
   let categorySlug = String(data.categorySlug ?? data.category_slug ?? (resolvedCategory ? resolvedCategory.toLowerCase().replace(/\s+/g, '-') : '')).trim();
   if (bookId === 'BK0000520' || bookId === 'BK0000521') {
     resolvedCategory = 'SSC';

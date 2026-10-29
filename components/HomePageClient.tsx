@@ -81,7 +81,8 @@ import {
   consumeTargetHomeTab,
   HOME_TAB_SWITCH_EVENT,
 } from '@/lib/services/quick-jump';
-import { Check, ShoppingBag, RefreshCw, Lock, Trash2, Tag, Sparkles } from 'lucide-react';
+import { HOME_PAGE_FAQS } from '@/lib/seo';
+import { Check, ShoppingBag, RefreshCw, Lock, Trash2, Tag, Sparkles, HelpCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 const savePendingCheckoutSession = (items: CartItem[]) => {
@@ -1122,6 +1123,32 @@ export default function HomePage({
                       wishlistBookIds={wishlistBookIds}
                       onToggleWishlist={handleToggleWishlist}
                     />
+
+                    {/* Frequently Asked Questions — Exclusively on Home Page */}
+                    <section
+                      id="home-faq-section"
+                      className="max-w-5xl mx-auto px-4 sm:px-6 pt-8 pb-2 space-y-3"
+                    >
+                      <h2 className="text-base sm:text-lg font-bold text-gray-950 flex items-center gap-2">
+                        <HelpCircle className="w-4 h-4 text-[#5e17eb]" />
+                        <span>Frequently Asked Questions</span>
+                      </h2>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {HOME_PAGE_FAQS.map((faq, idx) => (
+                          <div
+                            key={idx}
+                            className="p-4 rounded-xl border border-gray-200/80 bg-gray-50/50 space-y-1"
+                          >
+                            <h3 className="text-xs sm:text-sm font-bold text-gray-900">
+                              {faq.question}
+                            </h3>
+                            <p className="text-xs text-gray-600 leading-relaxed">
+                              {faq.answer}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
                   </>
                 )}
 

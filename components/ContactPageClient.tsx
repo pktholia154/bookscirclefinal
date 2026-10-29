@@ -281,37 +281,6 @@ export default function ContactPage() {
           )}
         </div>
 
-        {/* Quick FAQ Section */}
-        <div className="p-6 sm:p-8 rounded-3xl border border-gray-200 bg-white space-y-4 shadow-2xs">
-          <h2 className="text-base font-bold text-gray-950 flex items-center gap-2">
-            <FileQuestion className="w-4 h-4 text-[#5e17eb]" />
-            <span>Frequently Asked Support Questions</span>
-          </h2>
-
-          <div className="space-y-3 text-xs">
-            <div className="p-4 rounded-2xl bg-gray-50 border border-gray-200/80">
-              <h3 className="font-bold text-gray-900">How do I access my purchased e-books?</h3>
-              <p className="text-gray-600 mt-1">
-                Your purchased books unlock instantly on the <strong>Purchased</strong> tab in the BooksCircle app. You can read them directly in our built-in PDF viewer or save them for offline study.
-              </p>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-gray-50 border border-gray-200/80">
-              <h3 className="font-bold text-gray-900">My payment succeeded on Razorpay but the book didn&apos;t show immediately?</h3>
-              <p className="text-gray-600 mt-1">
-                Simply click the <strong>Refresh</strong> button in the app or reload the page. If the issue persists, email <a href="mailto:support@exam-kart.com" className="text-[#5e17eb] font-bold">support@exam-kart.com</a> with your Razorpay payment ID and we will activate your library within minutes.
-              </p>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-gray-50 border border-gray-200/80">
-              <h3 className="font-bold text-gray-900">What is the official brand &amp; entity name?</h3>
-              <p className="text-gray-600 mt-1">
-                The platform is operated under the brand name <strong>Exam Kart</strong> with registered legal entity <strong>Pardeep Kumar</strong>.
-              </p>
-            </div>
-          </div>
-        </div>
-
       </main>
 
       <Footer />

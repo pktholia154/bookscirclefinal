@@ -12,11 +12,8 @@ RUN apk add --no-cache libc6-compat
 # ==============================================================================
 FROM base AS deps
 WORKDIR /app
-COPY package.json package-lock.json* bun.lock* ./
-RUN \
-  if [ -f package-lock.json ]; then npm ci; \
-  else npm install; \
-  fi
+COPY package.json ./
+RUN npm install --legacy-peer-deps
 
 # ==============================================================================
 # Builder Stage: Build Next.js in standalone mode

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { buildSitemapIndexXml, generateEtag } from '@/lib/sitemap-helper';
 
-export const revalidate = 900; // 15-minute ISR
+export const dynamic = 'force-dynamic';
 
 let cachedIndexXml: string | null = null;
 let cachedIndexEtag: string | null = null;

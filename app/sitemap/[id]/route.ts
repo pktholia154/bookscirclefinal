@@ -6,7 +6,7 @@ import {
   LATEST_SITEMAP_MAX_URLS,
 } from '@/lib/sitemap-helper';
 
-export const revalidate = 900; // 15-minute ISR
+export const dynamic = 'force-dynamic';
 
 interface CachedBatch {
   xml: string;

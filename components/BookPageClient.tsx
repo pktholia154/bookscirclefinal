@@ -22,7 +22,6 @@ import {
   Sparkles,
   Award,
   Zap,
-  HelpCircle,
   Heart,
   FileCode,
   Smartphone,
@@ -711,7 +710,7 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
                     remarkPlugins={[remarkGfm, remarkBreaks]}
                     components={{
                       p: ({ children }) => <p className="mb-2 leading-relaxed text-gray-700 last:mb-0">{children}</p>,
-                      h1: ({ children }) => <h1 className="text-sm sm:text-base font-bold text-gray-950 mt-3 mb-1.5">{children}</h1>,
+                      h1: ({ children }) => <h2 className="text-sm sm:text-base font-bold text-gray-950 mt-3 mb-1.5">{children}</h2>,
                       h2: ({ children }) => <h2 className="text-xs sm:text-sm font-bold text-gray-950 mt-2.5 mb-1">{children}</h2>,
                       h3: ({ children }) => <h3 className="text-xs font-bold text-gray-900 mt-2 mb-1">{children}</h3>,
                       ul: ({ children }) => <ul className="list-disc pl-4 space-y-1 my-2 text-gray-700">{children}</ul>,
@@ -733,7 +732,9 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
                       ),
                     }}
                   >
-                    {(book.fullDescription || book.full_description || '').replace(/\\n/g, '\n')}
+                    {(book.fullDescription || book.full_description || '')
+                      .replace(/\\n/g, '\n')
+                      .replace(/\n+#{1,4}\s*(?:Frequently Asked Questions|FAQs?)\b[\s\S]*$/i, '')}
                   </Markdown>
                 </div>
               </div>
@@ -745,49 +746,49 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
               )
             )}
 
-            {/* 3. Structured Book Specifications & Exam Pattern Table */}
+            {/* 3. Genuine Book Specifications (Only real fields from the book record) */}
             <div className="pt-2">
               <h3 className="text-xs sm:text-sm font-bold text-gray-950 mb-2">
-                Book Specifications &amp; Exam Overview
+                Book Details
               </h3>
               <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
                 <dl className="divide-y divide-gray-100 text-xs">
-                  <div className="grid grid-cols-3 px-3.5 py-2 bg-gray-50/60">
-                    <dt className="font-semibold text-gray-500">Exam Category</dt>
-                    <dd className="col-span-2 font-bold text-gray-900">{book.category || 'Competitive Exam'}</dd>
-                  </div>
+                  {book.category && (
+                    <div className="grid grid-cols-3 px-3.5 py-2 bg-gray-50/60">
+                      <dt className="font-semibold text-gray-500">Category</dt>
+                      <dd className="col-span-2 font-bold text-gray-900">{book.category}</dd>
+                    </div>
+                  )}
                   <div className="grid grid-cols-3 px-3.5 py-2">
-                    <dt className="font-semibold text-gray-500">Paper / Title</dt>
+                    <dt className="font-semibold text-gray-500">Title</dt>
                     <dd className="col-span-2 font-medium text-gray-900">{book.title}</dd>
                   </div>
-                  <div className="grid grid-cols-3 px-3.5 py-2 bg-gray-50/60">
-                    <dt className="font-semibold text-gray-500">Language Medium</dt>
-                    <dd className="col-span-2 font-medium text-gray-900">{book.language || 'English'}</dd>
-                  </div>
-                  <div className="grid grid-cols-3 px-3.5 py-2">
-                    <dt className="font-semibold text-gray-500">Material Type</dt>
-                    <dd className="col-span-2 font-medium text-gray-900">
-                      {book.type || 'Chapterwise Solved Question Bank & Notes'}
-                    </dd>
-                  </div>
-                  <div className="grid grid-cols-3 px-3.5 py-2 bg-gray-50/60">
-                    <dt className="font-semibold text-gray-500">Delivery Format</dt>
-                    <dd className="col-span-2 font-medium text-gray-900">
-                      Instant Digital PDF + Interactive Mobile Reader
-                    </dd>
-                  </div>
-                  <div className="grid grid-cols-3 px-3.5 py-2">
-                    <dt className="font-semibold text-gray-500">Length &amp; Edition</dt>
-                    <dd className="col-span-2 font-medium text-gray-900">
-                      {book.pages && book.pages > 0 ? `${book.pages} Pages` : '280+ Pages'} • Latest Syllabus Edition
-                    </dd>
-                  </div>
-                  <div className="grid grid-cols-3 px-3.5 py-2 bg-gray-50/60">
-                    <dt className="font-semibold text-gray-500">Publisher / ID</dt>
-                    <dd className="col-span-2 font-medium text-gray-900">
-                      {book.publisher || 'Mocktime Publication'} ({book.id})
-                    </dd>
-                  </div>
+                  {book.language && (
+                    <div className="grid grid-cols-3 px-3.5 py-2 bg-gray-50/60">
+                      <dt className="font-semibold text-gray-500">Language</dt>
+                      <dd className="col-span-2 font-medium text-gray-900">{book.language}</dd>
+                    </div>
+                  )}
+                  {book.type && (
+                    <div className="grid grid-cols-3 px-3.5 py-2">
+                      <dt className="font-semibold text-gray-500">Format</dt>
+                      <dd className="col-span-2 font-medium text-gray-900">{book.type}</dd>
+                    </div>
+                  )}
+                  {book.pages && book.pages > 0 ? (
+                    <div className="grid grid-cols-3 px-3.5 py-2 bg-gray-50/60">
+                      <dt className="font-semibold text-gray-500">Pages</dt>
+                      <dd className="col-span-2 font-medium text-gray-900">{book.pages} Pages</dd>
+                    </div>
+                  ) : null}
+                  {book.publisher && (
+                    <div className="grid grid-cols-3 px-3.5 py-2">
+                      <dt className="font-semibold text-gray-500">Publisher</dt>
+                      <dd className="col-span-2 font-medium text-gray-900">
+                        {book.publisher} ({book.id})
+                      </dd>
+                    </div>
+                  )}
                 </dl>
               </div>
             </div>
@@ -856,78 +857,26 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
               </div>
             )}
 
-            {/* 6. tags: array fields with 6 tags */}
-            <div className="pt-2">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-2">
-                Topic Tags
-              </span>
-              <div className="flex flex-wrap gap-1.5">
-                {displayTags.map((tag, idx) => (
-                  <span
-                    key={idx}
-                    className="inline-flex items-center px-2.5 py-1 text-[11px] font-medium text-gray-700 bg-gray-100 hover:bg-gray-200/80 rounded-full transition-colors cursor-default"
-                  >
-                    #{tag.replace(/^#/, '')}
-                  </span>
-                ))}
+            {/* 6. Genuine tags from the book document */}
+            {displayTags.length > 0 && (
+              <div className="pt-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-2">
+                  Topic Tags
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {displayTags.map((tag, idx) => (
+                    <span
+                      key={idx}
+                      className="inline-flex items-center px-2.5 py-1 text-[11px] font-medium text-gray-700 bg-gray-100 hover:bg-gray-200/80 rounded-full transition-colors cursor-default"
+                    >
+                      #{tag.replace(/^#/, '')}
+                    </span>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </section>
-
-        {/* Structured FAQ Section */}
-        <section className="space-y-3 pt-4 border-t border-gray-100">
-          <h2 className="text-base sm:text-lg font-bold text-gray-950 flex items-center gap-2">
-            <HelpCircle className="w-4 h-4 text-[#4029AB]" />
-            <span>Frequently Asked Questions</span>
-          </h2>
-          <div className="space-y-2.5">
-            {BOOK_FAQS.map((faq, index) => (
-              <div key={index} className="p-3.5 rounded-xl border border-gray-200/80 bg-gray-50/50 space-y-1">
-                <h3 className="text-xs font-bold text-gray-900">{faq.question}</h3>
-                <p className="text-[11px] text-gray-600 leading-relaxed">
-                  {faq.answer}
-                </p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* Similar Books */}
-        {relatedBooks.length > 0 && (
-          <section className="space-y-3 pt-4 border-t border-gray-100">
-            <h3 className="text-sm font-bold text-gray-900">
-              Recommended in {book.category}
-            </h3>
-            <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
-              {relatedBooks.map((relBook) => (
-                <Link
-                  key={relBook.id}
-                  href={`/book/${encodeURIComponent(relBook.seoslug || relBook.slug || relBook.id)}`}
-                  className="w-24 shrink-0 group"
-                >
-                  <div className="relative aspect-[3/4] w-full rounded-none overflow-hidden bg-gray-100 border border-gray-200 shadow-2xs">
-                    <Image
-                      src={relBook.cover || DEFAULT_BOOK_COVER}
-                      alt={relBook.title}
-                      fill
-                      unoptimized
-                      sizes="96px"
-                      className="object-cover rounded-none group-hover:scale-105 transition-transform"
-                      referrerPolicy="no-referrer"
-                    />
-                  </div>
-                  <h4 className="text-[11px] font-bold text-gray-900 truncate mt-1.5 group-hover:text-[#4029AB]">
-                    {relBook.title}
-                  </h4>
-                  <span className="text-[10px] text-gray-500 font-semibold">
-                    ₹{relBook.buy_price}
-                  </span>
-                </Link>
-              ))}
-            </div>
-          </section>
-        )}
       </main>
 
       {/* PDF Reader Modal */}

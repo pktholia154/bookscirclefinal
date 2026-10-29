@@ -11,7 +11,7 @@ let cachedSitemapEtag: string | null = null;
 let sitemapCacheExpiresAt = 0;
 const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
 
-export const revalidate = 900; // 15 minutes ISR
+export const dynamic = 'force-dynamic';
 
 /**
  * Rolling Fast-Discovery Sitemap: /sitemap-latest.xml

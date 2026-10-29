@@ -287,7 +287,12 @@ const nextConfig: NextConfig = {
     }
     return config;
   },
-  transpilePackages: ['motion'],
+  experimental: {
+    webpackMemoryOptimizations: true,
+    cpus: 1,
+    workerThreads: false,
+  },
 };
 
 export default nextConfig;
+

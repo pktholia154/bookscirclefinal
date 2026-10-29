@@ -1,9 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
 import {
-  getBooksFromFirestore,
   getFirestoreBookById,
-  slimBookForList,
   fetchBookStructuredPreview,
 } from '@/lib/services/books';
 import { generateBookSchema, stripMarkdownToPlainText, SITE_URL, SITE_NAME } from '@/lib/seo';
@@ -18,18 +16,7 @@ interface PageProps {
 }
 
 export async function generateStaticParams() {
-  try {
-    const books = await getBooksFromFirestore();
-    return books
-      .filter((b) => b && b.isActive !== false && !b.canonicalSlug)
-      .slice(0, 20)
-      .map((book) => ({
-        slug: book.seoslug || book.slug || book.id,
-      }));
-  } catch (error) {
-    console.warn('generateStaticParams error:', error);
-    return [];
-  }
+  return [];
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -134,24 +121,6 @@ export default async function BookSSRPage({ params }: PageProps) {
     sampleQuestions: structuredPreview.sampleQuestions,
   };
 
-  // Fetch category sibling books for relevant recommendation
-  let relatedBooks: Book[] = [];
-
-  try {
-    const allBooks = await getBooksFromFirestore();
-    const activeBooks = allBooks.filter((b) => b && b.isActive !== false && !b.canonicalSlug);
-    const targetCategoryLower = (enrichedBook.category || '').toLowerCase();
-
-    const categoryBooks = activeBooks.filter(
-      (b) => (b.category || '').toLowerCase() === targetCategoryLower
-    );
-
-    relatedBooks = categoryBooks
-      .filter((b) => b.id !== enrichedBook.id)
-      .slice(0, 6)
-      .map(slimBookForList);
-  } catch {}
-
   // Generate nested JSON-LD schema
   const bookJsonLd = generateBookSchema(enrichedBook);
 
@@ -164,7 +133,7 @@ export default async function BookSSRPage({ params }: PageProps) {
       />
 
       {/* Interactive & Accessible Presentation UI */}
-      <BookPageClient book={enrichedBook} relatedBooks={relatedBooks} />
+      <BookPageClient book={enrichedBook} />
     </>
   );
 }

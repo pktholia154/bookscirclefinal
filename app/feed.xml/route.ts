@@ -8,7 +8,7 @@ let cachedFeedEtag: string | null = null;
 let feedCacheExpiresAt = 0;
 const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
 
-export const revalidate = 900; // 15 minutes ISR
+export const dynamic = 'force-dynamic';
 
 function escapeCdata(str: string): string {
   return str.replace(/]]>/g, ']]]]><![CDATA[>');

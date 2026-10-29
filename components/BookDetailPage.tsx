@@ -161,30 +161,17 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
   };
 
   const publisherName = book.publisher || book.publication || 'Mocktime Publication';
-  const pageCount = book.pages && book.pages > 0 ? book.pages : 280;
 
   const cleanSummaryText = useMemo(() => {
     const raw = book.seo_description || book.seoDescription || '';
     return raw.replace(/\*\*+/g, '').replace(/__+/g, '').replace(/^#+\s+/gm, '').trim();
   }, [book.seo_description, book.seoDescription]);
 
-  // Real tags from Firestore book document
+  // Real tags from Firestore book document only
   const displayTags = useMemo(() => {
     const rawTags = Array.isArray(book.tags) ? book.tags.filter((t) => Boolean(t && t.trim())) : [];
-    if (rawTags.length >= 6) {
-      return rawTags.slice(0, 6);
-    }
-    const defaultTagPool = [
-      book.category || 'Competitive Exam',
-      book.language || 'English',
-      book.type || 'Question Bank',
-      `${book.category || 'Exam'} PDF`,
-      'Solved Papers',
-      'Instant Download',
-    ];
-    const combined = Array.from(new Set([...rawTags, ...defaultTagPool]));
-    return combined.slice(0, 6);
-  }, [book.tags, book.category, book.language, book.type]);
+    return Array.from(new Set(rawTags)).slice(0, 6);
+  }, [book.tags]);
 
   return (
     <div className="min-h-screen bg-white text-gray-900 pb-24 sm:pb-28 antialiased selection:bg-[#4029AB] selection:text-white">
@@ -446,7 +433,9 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
                       ),
                     }}
                   >
-                    {(book.full_description || book.fullDescription || '').replace(/\\n/g, '\n')}
+                    {(book.full_description || book.fullDescription || '')
+                      .replace(/\\n/g, '\n')
+                      .replace(/\n+#{1,4}\s*(?:Frequently Asked Questions|FAQs?)\b[\s\S]*$/i, '')}
                   </Markdown>
                 </div>
               </div>
@@ -476,42 +465,6 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
             )}
           </div>
         </section>
-
-        {/* 6. Similar Books Section (Carousel) */}
-        {relatedBooks.length > 0 && (
-          <section className="space-y-3 pt-4 border-t border-gray-100">
-            <h3 className="text-sm font-bold text-gray-900">
-              More in {book.category}
-            </h3>
-            <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
-              {relatedBooks.map((relBook) => (
-                <div
-                  key={relBook.id}
-                  onClick={() => onSelectRelatedBook && onSelectRelatedBook(relBook)}
-                  className="w-24 shrink-0 cursor-pointer group"
-                >
-                  <div className="relative aspect-[3/4] w-full rounded-none overflow-hidden bg-gray-100 border border-gray-200 shadow-2xs">
-                    <Image
-                      src={relBook.cover || DEFAULT_BOOK_COVER}
-                      alt={relBook.title}
-                      fill
-                      unoptimized
-                      sizes="96px"
-                      className="object-cover rounded-none group-hover:scale-105 transition-transform"
-                      referrerPolicy="no-referrer"
-                    />
-                  </div>
-                  <h4 className="text-[11px] font-bold text-gray-900 truncate mt-1.5 group-hover:text-[#4029AB]">
-                    {relBook.title}
-                  </h4>
-                  <span className="text-[10px] text-gray-500 font-semibold">
-                    ₹{relBook.buy_price}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
       </main>
 
       {/* Real-time PDFium WASM PDF Reader for Sample & Purchased Reading */}
