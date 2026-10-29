@@ -287,7 +287,15 @@ const nextConfig: NextConfig = {
     }
     return config;
   },
-  transpilePackages: ['motion', 'framer-motion'],
+  transpilePackages: [
+    'motion',
+    'framer-motion',
+    'react-markdown',
+    'remark-gfm',
+    'remark-breaks',
+    'rehype-katex',
+    'remark-math',
+  ],
   experimental: {
     cpus: 1,
     workerThreads: false,
