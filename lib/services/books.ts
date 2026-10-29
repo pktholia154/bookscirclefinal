@@ -1026,24 +1026,86 @@ function findBookInList(books: Book[], target: string): Book | null {
 
 async function fetchFullBookDocByIdRest(bookId: string): Promise<Book | null> {
   if (!bookId) return null;
+  const candidates = [bookId.trim()];
+  const upper = bookId.trim().toUpperCase();
+  const lower = bookId.trim().toLowerCase();
+  if (upper !== candidates[0]) candidates.push(upper);
+  if (lower !== candidates[0] && lower !== upper) candidates.push(lower);
+
+  for (const id of candidates) {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 3500);
+      const res = await fetch(
+        `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/${FIRESTORE_DATABASE_ID}/documents/books/${encodeURIComponent(id)}?key=${FIREBASE_API_KEY}`,
+        { signal: controller.signal, cache: 'no-store' }
+      );
+      clearTimeout(timer);
+      if (res.ok) {
+        const contentType = res.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          const text = await res.text();
+          if (!text.trim().startsWith('<')) {
+            const json = JSON.parse(text);
+            const parsed = parseFirestoreRestDocument(json);
+            if (parsed && parsed.id) {
+              return parseBookDocument(parsed);
+            }
+          }
+        }
+      }
+    } catch {}
+  }
+  return null;
+}
+
+async function fetchBookBySeoslugRest(target: string): Promise<Book | null> {
+  if (!target) return null;
+  const cleanTarget = target.trim();
+  const lowerTarget = cleanTarget.toLowerCase();
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 3500);
-    const res = await fetch(
-      `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/${FIRESTORE_DATABASE_ID}/documents/books/${encodeURIComponent(bookId)}?key=${FIREBASE_API_KEY}`,
-      { signal: controller.signal, cache: 'no-store' }
-    );
+    const timer = setTimeout(() => controller.abort(), 4000);
+    const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/${FIRESTORE_DATABASE_ID}/documents:runQuery?key=${FIREBASE_API_KEY}`;
+    
+    const filters: any[] = [
+      { fieldFilter: { field: { fieldPath: 'seoslug' }, op: 'EQUAL', value: { stringValue: lowerTarget } } },
+      { fieldFilter: { field: { fieldPath: 'slug' }, op: 'EQUAL', value: { stringValue: lowerTarget } } },
+      { fieldFilter: { field: { fieldPath: 'id' }, op: 'EQUAL', value: { stringValue: cleanTarget } } },
+      { fieldFilter: { field: { fieldPath: 'id' }, op: 'EQUAL', value: { stringValue: cleanTarget.toUpperCase() } } },
+    ];
+    if (cleanTarget !== lowerTarget) {
+      filters.push({ fieldFilter: { field: { fieldPath: 'seoslug' }, op: 'EQUAL', value: { stringValue: cleanTarget } } });
+    }
+
+    const queryBody = {
+      structuredQuery: {
+        from: [{ collectionId: 'books' }],
+        where: {
+          compositeFilter: {
+            op: 'OR',
+            filters,
+          },
+        },
+        limit: 1,
+      },
+    };
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(queryBody),
+      signal: controller.signal,
+      cache: 'no-store',
+    });
     clearTimeout(timer);
+
     if (res.ok) {
-      const contentType = res.headers.get('content-type') || '';
-      if (contentType.includes('application/json')) {
-        const text = await res.text();
-        if (!text.trim().startsWith('<')) {
-          const json = JSON.parse(text);
-          const parsed = parseFirestoreRestDocument(json);
-          if (parsed && parsed.id) {
-            return parseBookDocument(parsed);
-          }
+      const data = await res.json();
+      if (Array.isArray(data) && data[0]?.document) {
+        const parsed = parseFirestoreRestDocument(data[0].document);
+        if (parsed && parsed.id) {
+          return parseBookDocument(parsed);
         }
       }
     }
@@ -1061,7 +1123,7 @@ export async function getFirestoreBookById(idOrSlug: string): Promise<Book | nul
   const target = rawTarget.toLowerCase();
   const isServer = typeof window === 'undefined';
 
-  // Fast path: if rawTarget is a direct BK ID or ends with -bk000xxxx, extract the exact document ID
+  // 1. Fast path: if rawTarget is a direct BK ID or ends with -bk000xxxx, extract the exact document ID
   const directBkMatch = rawTarget.match(/^(BK\d{4,8})$/i) || rawTarget.match(/-(BK\d{4,8})$/i);
   if (directBkMatch) {
     const exactDocId = directBkMatch[1].toUpperCase();
@@ -1069,6 +1131,11 @@ export async function getFirestoreBookById(idOrSlug: string): Promise<Book | nul
     if (fullDoc) return fullDoc;
   }
 
+  // 2. Direct single-document Firestore REST index query (matches seoslug, slug, or document ID instantly)
+  const indexedDoc = await fetchBookBySeoslugRest(rawTarget);
+  if (indexedDoc) return indexedDoc;
+
+  // 3. In-memory / server cache lookup
   if (isServer && serverBooksCache && serverBooksCache.length > 0) {
     const cachedHit = findBookInList(serverBooksCache, target);
     if (cachedHit) {
@@ -1086,18 +1153,22 @@ export async function getFirestoreBookById(idOrSlug: string): Promise<Book | nul
     }
   }
 
-  // Try direct document fetch if rawTarget happens to be the exact document ID
+  // 4. Try direct document fetch if rawTarget happens to be the document ID
   const directDoc = await fetchFullBookDocByIdRest(rawTarget);
   if (directDoc) return directDoc;
 
-  // Resolve via catalog list and then hydrate the full document by its ID so fullDescription is always populated on SSR
-  const books = await getBooksFromFirestore();
-  const listMatch = findBookInList(books, target);
-  if (listMatch) {
-    if (listMatch.full_description || listMatch.fullDescription) return listMatch;
-    const hydrated = await fetchFullBookDocByIdRest(listMatch.id);
-    return hydrated || listMatch;
-  }
+  // 5. Try catalog list lookup as a fallback
+  try {
+    const books = await getBooksFromFirestore();
+    if (Array.isArray(books) && books.length > 0) {
+      const listMatch = findBookInList(books, target);
+      if (listMatch) {
+        if (listMatch.full_description || listMatch.fullDescription) return listMatch;
+        const hydrated = await fetchFullBookDocByIdRest(listMatch.id);
+        return hydrated || listMatch;
+      }
+    }
+  } catch {}
 
   const fallbackList = getCachedBooksSync();
   const fallbackMatch = findBookInList(fallbackList, target);

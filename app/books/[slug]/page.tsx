@@ -6,5 +6,9 @@ interface PageProps {
 
 export default async function BooksRedirectPage({ params }: PageProps) {
   const { slug } = await params;
-  permanentRedirect(`/book/${encodeURIComponent(decodeURIComponent(slug))}`);
+  let decoded = slug;
+  try {
+    decoded = decodeURIComponent(slug);
+  } catch {}
+  permanentRedirect(`/book/${encodeURIComponent(decoded)}`);
 }

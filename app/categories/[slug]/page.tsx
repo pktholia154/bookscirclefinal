@@ -6,5 +6,9 @@ interface PageProps {
 
 export default async function CategoriesRedirectPage({ params }: PageProps) {
   const { slug } = await params;
-  permanentRedirect(`/category/${encodeURIComponent(decodeURIComponent(slug))}`);
+  let decoded = slug;
+  try {
+    decoded = decodeURIComponent(slug);
+  } catch {}
+  permanentRedirect(`/category/${encodeURIComponent(decoded)}`);
 }

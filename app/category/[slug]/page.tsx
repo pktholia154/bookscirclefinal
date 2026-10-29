@@ -118,7 +118,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function CategoryPage({ params }: Props) {
   const { slug } = await params;
-  const decodedSlug = decodeURIComponent(slug);
+  let decodedSlug = slug;
+  try {
+    decodedSlug = decodeURIComponent(slug);
+  } catch {}
 
   let categories: Category[] = [];
   let books: Book[] = [];
