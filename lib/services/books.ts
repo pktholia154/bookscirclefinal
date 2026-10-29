@@ -1215,7 +1215,7 @@ export async function fetchBookStructuredPreview(book: Book): Promise<{
       const timer = setTimeout(() => controller.abort(), 2500);
       const res = await fetch(mdSampleUrl, {
         signal: controller.signal,
-        next: { revalidate: 3600 },
+        cache: 'no-store',
       });
       clearTimeout(timer);
 

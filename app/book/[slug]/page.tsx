@@ -9,14 +9,9 @@ import { BookPageClient } from '@/components/BookPageClient';
 import { Book } from '@/lib/types';
 
 export const revalidate = 300; // ISR: revalidate every 5 minutes
-export const dynamicParams = true;
 
 interface PageProps {
   params: Promise<{ slug: string }>;
-}
-
-export async function generateStaticParams() {
-  return [];
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
