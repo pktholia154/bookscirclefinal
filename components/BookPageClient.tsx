@@ -26,7 +26,6 @@ import {
   FileCode,
   Smartphone,
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
 import { Book, CartItem } from '@/lib/types';
 import { DEFAULT_BOOK_COVER, FREE_SAMPLE_BOOK_ID } from '@/lib/data';
 import { SampleSwitcher } from '@/components/SampleSwitcher';
@@ -664,16 +663,13 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
 
         {/* Animated Orange Notice + App Install Banner */}
         <div className="pt-0.5 space-y-1.5">
-          <motion.p
+          <p
             id="book-ssr-my-books-notice"
             onClick={() => handleTabChange('purchased')}
-            initial={{ opacity: 0.75 }}
-            animate={{ opacity: [0.65, 1, 0.65], y: [0, -1.5, 0] }}
-            transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
-            className="text-xs sm:text-[13px] font-bold text-orange-600 leading-snug cursor-pointer select-none"
+            className="text-xs sm:text-[13px] font-bold text-orange-600 leading-snug cursor-pointer select-none animate-pulse hover:underline"
           >
             Read/Access your purchased books in the &quot;My Books&quot; menu.
-          </motion.p>
+          </p>
 
           <InstallAppBanner
             onInstall={promptInstall}
@@ -948,19 +944,14 @@ export const BookPageClient: React.FC<BookPageClientProps> = ({
       />
 
       {/* Toast Notification */}
-      <AnimatePresence>
-        {toastMessage && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-gray-950 text-white text-xs font-semibold px-4 py-2 rounded-full shadow-xl flex items-center gap-2 pointer-events-none"
-          >
-            <Check className="w-3.5 h-3.5 text-emerald-400" />
-            <span>{toastMessage}</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {toastMessage && (
+        <div
+          className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-gray-950 text-white text-xs font-semibold px-4 py-2 rounded-full shadow-xl flex items-center gap-2 pointer-events-none transition-all duration-300 animate-in fade-in slide-in-from-bottom-2"
+        >
+          <Check className="w-3.5 h-3.5 text-emerald-400" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
       {/* Fixed Bottom Navigation Menu Bar - Book Details View */}
       <BottomNav
         activeTab="book"

@@ -287,8 +287,8 @@ const nextConfig: NextConfig = {
     }
     return config;
   },
+  transpilePackages: ['motion', 'framer-motion'],
   experimental: {
-    webpackMemoryOptimizations: true,
     cpus: 1,
     workerThreads: false,
   },
